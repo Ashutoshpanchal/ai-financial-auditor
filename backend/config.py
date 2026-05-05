@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -36,17 +35,17 @@ class Settings(BaseSettings):
     observability_backends: str = ""
 
     # LangSmith
-    langsmith_api_key: Optional[str] = None
+    langsmith_api_key: str | None = None
     langchain_project: str = "ai-financial-auditor"
     langchain_tracing_v2: bool = False
 
     # Langfuse
-    langfuse_public_key: Optional[str] = None
-    langfuse_secret_key: Optional[str] = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
     langfuse_host: str = "http://localhost:3001"
 
     @property
-    def active_backends(self) -> List[str]:
+    def active_backends(self) -> list[str]:
         """Return list of enabled observability backend names."""
         return [b.strip() for b in self.observability_backends.split(",") if b.strip()]
 

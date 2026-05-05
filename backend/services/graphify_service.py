@@ -12,16 +12,15 @@ import json
 import logging
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 def build_audit_graph(
-    audit_result: Dict,
+    audit_result: dict,
     user_id: str,
     document_id: str,
-) -> Tuple[Dict, str]:
+) -> tuple[dict, str]:
     """Run graphify on an audit result dict and return (graph_json, graph_html_string).
 
     Creates a temp directory with structured markdown files from the audit data,
@@ -44,13 +43,12 @@ def build_audit_graph(
         return {}, ""
 
 
-def _run_graphify_pipeline(audit_result: Dict, document_id: str) -> Tuple[Dict, str]:
+def _run_graphify_pipeline(audit_result: dict, document_id: str) -> tuple[dict, str]:
     """Internal — writes audit data to temp files and runs the graphify pipeline."""
-    from graphify.detect import detect
     from graphify.build import build_from_json
-    from graphify.cluster import cluster, score_all
-    from graphify.analyze import god_nodes, surprising_connections
-    from graphify.export import to_json, to_html
+    from graphify.cluster import cluster
+    from graphify.detect import detect
+    from graphify.export import to_html, to_json
 
     with tempfile.TemporaryDirectory(prefix=f"graphify_{document_id}_") as tmp_dir:
         tmp_path = Path(tmp_dir)
@@ -88,7 +86,7 @@ def _run_graphify_pipeline(audit_result: Dict, document_id: str) -> Tuple[Dict, 
         return graph_json, graph_html
 
 
-def _write_corpus_files(audit_result: Dict, out_dir: Path) -> None:
+def _write_corpus_files(audit_result: dict, out_dir: Path) -> None:
     """Write audit data as structured markdown files for graphify to process."""
     # Summary document
     summary_text = f"""# Financial Audit Summary
@@ -143,12 +141,12 @@ def _write_corpus_files(audit_result: Dict, out_dir: Path) -> None:
         (out_dir / "merchants.md").write_text("\n".join(merch_lines))
 
 
-def _extract(input_path: Path, detection: Dict) -> Dict:
+def _extract(input_path: Path, detection: dict) -> dict:
     """Run AST extraction (skips for markdown) — semantic extraction via graphify CLI.
 
     For markdown-only corpora we use graphify's built-in extract directly.
     """
-    from graphify.extract import collect_files, extract
+    from graphify.extract import extract
 
     doc_files = [Path(f) for f in detection.get("files", {}).get("document", [])]
     if not doc_files:

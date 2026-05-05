@@ -15,17 +15,13 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import date
-from typing import Dict, List, Optional
 
-from langchain_core.output_parsers import JsonOutputParser
 from langchain_openai import ChatOpenAI
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
 from backend.models.audit_report import AuditReport
 from backend.models.document import Document, DocumentStatus
-from backend.models.transaction import Transaction
 from backend.prompts.audit_prompt import audit_prompt
 from backend.services.graphify_service import build_audit_graph
 from backend.services.observability import get_callbacks
@@ -45,7 +41,7 @@ def _build_llm() -> ChatOpenAI:
     )
 
 
-def _format_transactions(transactions: List[Dict]) -> str:
+def _format_transactions(transactions: list[dict]) -> str:
     """Convert transaction dicts to a readable text block for the LLM prompt."""
     lines = ["Date | Description | Amount | Category"]
     lines.append("-" * 60)
@@ -57,7 +53,7 @@ def _format_transactions(transactions: List[Dict]) -> str:
     return "\n".join(lines)
 
 
-def _parse_llm_response(response_text: str) -> Dict:
+def _parse_llm_response(response_text: str) -> dict:
     """Extract JSON from LLM response, stripping any markdown fences."""
     text = response_text.strip()
     # Strip ```json fences if present
@@ -73,7 +69,7 @@ def _parse_llm_response(response_text: str) -> Dict:
 async def run_audit(
     db: Session,
     document: Document,
-    transactions: List[Dict],
+    transactions: list[dict],
     user_id: str,
 ) -> AuditReport:
     """Run the full audit pipeline for a document.
@@ -171,7 +167,7 @@ async def run_audit(
     return report
 
 
-def _get_date_range(transactions: List[Dict]) -> str:
+def _get_date_range(transactions: list[dict]) -> str:
     """Extract date range string from transaction list."""
     dates = [t.get("date") for t in transactions if t.get("date")]
     if not dates:
@@ -184,7 +180,6 @@ def _save_graph_html(html_content: str, document_id: str) -> str:
 
     TODO: Move to object storage (S3/Drive) in production.
     """
-    import os
     static_dir = Path("static/graphs")
     static_dir.mkdir(parents=True, exist_ok=True)
     html_path = static_dir / f"{document_id}.html"
@@ -192,4 +187,6 @@ def _save_graph_html(html_content: str, document_id: str) -> str:
     return f"/static/graphs/{document_id}.html"
 
 
-from pathlib import Path  # imported here to avoid circular reference with top-level imports
+from pathlib import (
+    Path,  # imported here to avoid circular reference with top-level imports
+)

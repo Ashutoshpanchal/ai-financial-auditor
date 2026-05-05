@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import io
 from datetime import date
-from typing import Dict, Optional, Tuple
 
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from google.oauth2.credentials import Credentials
 
 APP_DRIVE_FOLDER_NAME = "AI-Financial-Auditor"
 
 
-def _build_drive_client(access_token: str, refresh_token: Optional[str] = None):
+def _build_drive_client(access_token: str, refresh_token: str | None = None):
     """Build an authenticated Google Drive API client from stored tokens."""
     creds = Credentials(
         token=access_token,
@@ -23,7 +22,7 @@ def _build_drive_client(access_token: str, refresh_token: Optional[str] = None):
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def _get_or_create_folder(service, name: str, parent_id: Optional[str] = None) -> str:
+def _get_or_create_folder(service, name: str, parent_id: str | None = None) -> str:
     """Return folder ID for an existing folder, or create it if absent."""
     query = f"name='{name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     if parent_id:
@@ -48,12 +47,12 @@ def _get_or_create_folder(service, name: str, parent_id: Optional[str] = None) -
 
 def upload_file(
     access_token: str,
-    refresh_token: Optional[str],
+    refresh_token: str | None,
     file_bytes: bytes,
     filename: str,
     mime_type: str,
-    upload_date: Optional[date] = None,
-) -> Dict:
+    upload_date: date | None = None,
+) -> dict:
     """Upload a file to the user's Drive under AI-Financial-Auditor/{YYYY-MM-DD}/filename.
 
     Returns dict with drive_file_id, drive_folder_id, drive_web_url.
@@ -85,7 +84,7 @@ def upload_file(
 
 def fetch_file_bytes(
     access_token: str,
-    refresh_token: Optional[str],
+    refresh_token: str | None,
     drive_file_id: str,
 ) -> bytes:
     """Download a file from Google Drive by its file ID. Returns raw bytes."""

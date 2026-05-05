@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from jose import jwt
@@ -34,7 +33,7 @@ def get_google_auth_url() -> str:
     return f"{GOOGLE_AUTH_URL}?{query}"
 
 
-async def exchange_code_for_tokens(code: str) -> Dict:
+async def exchange_code_for_tokens(code: str) -> dict:
     """Exchange OAuth2 authorization code for access + refresh tokens."""
     settings = get_settings()
     async with httpx.AsyncClient() as client:
@@ -53,7 +52,7 @@ async def exchange_code_for_tokens(code: str) -> Dict:
         return response.json()
 
 
-async def get_google_user_info(access_token: str) -> Dict:
+async def get_google_user_info(access_token: str) -> dict:
     """Fetch Google user profile using the access token."""
     async with httpx.AsyncClient() as client:
         response = await client.get(
@@ -65,12 +64,12 @@ async def get_google_user_info(access_token: str) -> Dict:
         return response.json()
 
 
-def upsert_user(db: Session, google_user: Dict, tokens: Dict) -> User:
+def upsert_user(db: Session, google_user: dict, tokens: dict) -> User:
     """Create or update a user from Google profile data. Assign super_admin if email matches env."""
     settings = get_settings()
 
     expires_in = tokens.get("expires_in", 3600)
-    token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
     user = db.query(User).filter(User.google_id == google_user["sub"]).first()
 
@@ -104,12 +103,12 @@ def create_app_jwt(user: User) -> str:
         "sub": user.id,
         "email": user.email,
         "role": user.role.value,
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "exp": datetime.now(UTC) + timedelta(days=7),
     }
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 
-def decode_app_jwt(token: str) -> Optional[Dict]:
+def decode_app_jwt(token: str) -> dict | None:
     """Decode and verify the app JWT. Returns None if invalid or expired."""
     settings = get_settings()
     try:

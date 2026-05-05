@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from functools import wraps
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -18,11 +17,11 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     """Extract and verify JWT from Authorization header. Raises 401 if invalid."""
-    token: Optional[str] = None
+    token: str | None = None
 
     # Support both Authorization header and httpOnly cookie
     if credentials:

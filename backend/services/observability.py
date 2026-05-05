@@ -8,21 +8,20 @@ Usage:
 from __future__ import annotations
 
 import os
-from typing import List
 
 from langchain_core.callbacks import BaseCallbackHandler
 
 from backend.config import get_settings
 
 
-def get_callbacks() -> List[BaseCallbackHandler]:
+def get_callbacks() -> list[BaseCallbackHandler]:
     """Return active observability callback handlers based on OBSERVABILITY_BACKENDS env var.
 
     Supports: langsmith, langfuse, or both simultaneously.
     Returns empty list if neither is configured.
     """
     settings = get_settings()
-    callbacks: List[BaseCallbackHandler] = []
+    callbacks: list[BaseCallbackHandler] = []
 
     if settings.langsmith_enabled:
         _configure_langsmith(settings)
