@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.config import get_settings
 from backend.routers import auth
@@ -23,6 +27,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve Graphify HTML outputs — each audit writes its graph here
+_static_graphs = Path("static/graphs")
+_static_graphs.mkdir(parents=True, exist_ok=True)
+app.mount("/static/graphs", StaticFiles(directory=str(_static_graphs)), name="graphs")
 
 # Routers — additional routers added here as phases complete
 app.include_router(auth.router)
