@@ -7,7 +7,9 @@ Full-stack AI finance auditor: FastAPI + LangChain/LangGraph + React + PostgreSQ
 **Spec:** docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md
 
 ## Tech Stack
-- **Frontend:** React + TypeScript + Tailwind CSS + Recharts (Vite)
+- **Frontend:** React + TypeScript + Tailwind CSS + Recharts (Vite) + Vitest + React Testing Library
+- **Linting:** ruff + pyright (backend) + ESLint + tsc (frontend)
+- **Testing:** pytest + pytest-asyncio (backend) + Vitest (frontend)
 - **Backend:** FastAPI + Python 3.11
 - **AI:** LangChain (audit pipeline) + LangGraph (multi-agent chat)
 - **LLM:** OpenRouter (single provider — Llama 3.3, DeepSeek, Mistral)
@@ -50,9 +52,40 @@ Full-stack AI finance auditor: FastAPI + LangChain/LangGraph + React + PostgreSQ
 - One responsibility per function
 
 ## Custom Skills (run in Claude Code)
-- `/test`     — run pytest + TypeScript type-check
-- `/review`   — code review of current branch
+- `/quality`  — full quality gate: parallel lint + review + test subagents (RECOMMENDED before every commit)
+- `/test`     — run pytest + Vitest + auto-write tests for untested code
+- `/review`   — parallel lint + code review subagents (ruff, pyright, ESLint, tsc)
 - `/optimize` — profile slow paths and suggest improvements
+
+## Quality Workflow (MANDATORY)
+
+Claude maintains code quality through **parallel subagents** — not manual checks.
+
+### After writing code, BEFORE claiming "done":
+
+```
+1. Write code
+2. Hooks auto-run on every file save:
+   - py-lint.sh  → ruff format + ruff check --fix (backend .py files)
+   - ui-lint.sh  → ESLint (frontend .ts/.tsx files)
+   - git-safety.sh → blocks git add/commit of .env, node_modules, etc.
+3. Dispatch parallel subagents:
+   ├── Lint Agent     → ruff + pyright (backend) + ESLint + tsc (frontend)
+   ├── Review Agent   → correctness, security, coding rules, spec alignment
+   └── Test Writer    → writes pytest + Vitest tests for new/modified code
+4. Claude fixes all reported issues
+5. Test Runner Agent → runs pytest + Vitest
+6. If failures → fix → re-run (max 3 loops)
+7. Update graphify files
+8. Commit
+```
+
+### Key rules:
+- **NEVER skip the quality gate** — always run `/quality` or dispatch subagents before committing
+- **NEVER claim "done"** until lint + review + tests all pass
+- **Graphify must be updated** after every commit that changes code
+- Hooks are **non-blocking** — they report issues but don't stop file writes
+- `git-safety.sh` **is blocking** — prevents committing .env, node_modules, graphify-out, etc.
 
 ## Environment
 Copy `.env.example` to `.env` and fill in:

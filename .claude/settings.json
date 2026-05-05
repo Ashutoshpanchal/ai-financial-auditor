@@ -13,7 +13,61 @@
       "Bash(git remote *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(python3 -m pip install graphifyy -q)",
+      "Bash(pip3 install *)",
+      "Bash(python3 -c \"import graphify; print\\('OK'\\)\")",
+      "Bash(pip3 --version)",
+      "Bash(python3 -c \"import graphify; print\\('graphify OK'\\)\")",
+      "Bash(brew list *)",
+      "Bash(pipx install *)",
+      "Bash(graphify --help)",
+      "Bash(python3.11 -c \"import graphify; print\\('graphify OK', graphify.__version__ if hasattr\\(graphify,'__version__'\\) else 'imported'\\)\")",
+      "Bash(git push *)",
+      "Bash(ruff *)",
+      "Bash(pytest *)",
+      "Bash(npx eslint *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "Bash(bash .claude/hooks/*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/py-lint.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/ui-lint.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/git-safety.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/run-tests.sh"
+          }
+        ]
+      }
     ]
   }
 }
