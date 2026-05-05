@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/ashutoshpanchal/.claude/skills/**)",
+      "Read(//Users/ashutoshpanchal/.claude/plugins/cache/**)",
+      "Bash(gh auth *)",
+      "Bash(gh api *)",
+      "Bash(gh repo *)",
+      "Edit(/.claude/skills/review/**)",
+      "Edit(/.claude/skills/optimize/**)",
+      "Bash(npm create *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git branch *)"
+    ]
+  }
+}
