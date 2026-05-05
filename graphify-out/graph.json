@@ -1,0 +1,5844 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "db_migration_pipeline",
+        "label": "Ordered DB Migration Pipeline",
+        "nodes": [
+          "001_extensions_pgvector_extension",
+          "002_schema_database_schema",
+          "003_rls_row_level_security"
+        ],
+        "relation": "form",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.95,
+        "source_file": "migrations/001_extensions.sql"
+      },
+      {
+        "id": "frontend_page_auth_guard",
+        "label": "Auth-Guarded Frontend Pages",
+        "nodes": [
+          "dashboard_tsx_dashboard_page",
+          "upload_tsx_upload_page",
+          "chat_tsx_chat_page",
+          "admin_tsx_admin_page"
+        ],
+        "relation": "implement",
+        "confidence": "INFERRED",
+        "confidence_score": 0.85,
+        "source_file": "frontend/src/App.tsx"
+      },
+      {
+        "id": "sqlalchemy_orm_models",
+        "label": "SQLAlchemy ORM Models",
+        "nodes": [
+          "user_py_user_model",
+          "document_py_document_model",
+          "transaction_py_transaction_model",
+          "audit_report_py_auditreport_model",
+          "chat_session_py_chatsession_model"
+        ],
+        "relation": "implement",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.95,
+        "source_file": "backend/models/base.py"
+      },
+      {
+        "id": "audit_pipeline_flow",
+        "label": "Full Audit Pipeline Flow",
+        "nodes": [
+          "audit_py_run_audit",
+          "graphify_service_py_build_audit_graph",
+          "observability_py_get_callbacks",
+          "audit_prompt_py_audit_prompt"
+        ],
+        "relation": "participate_in",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.9,
+        "source_file": "backend/chains/audit.py"
+      },
+      {
+        "id": "observability_backends",
+        "label": "Dual Observability Backends",
+        "nodes": [
+          "observability_py_langsmith_handler",
+          "observability_py_langfuse_handler",
+          "observability_py_get_callbacks"
+        ],
+        "relation": "form",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.95,
+        "source_file": "backend/services/observability.py"
+      },
+      {
+        "id": "frontend_build_toolchain",
+        "label": "Frontend Build Toolchain (Vite + Tailwind + PostCSS)",
+        "nodes": [
+          "frontend_vite_config",
+          "frontend_tailwind_config",
+          "frontend_postcss_config"
+        ],
+        "relation": "form",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "frontend/vite.config.ts"
+      },
+      {
+        "id": "backend_orm_models_group",
+        "label": "All SQLAlchemy ORM Models",
+        "nodes": [
+          "backend_model_base",
+          "backend_model_user",
+          "backend_model_document",
+          "backend_model_transaction",
+          "backend_model_audit_report",
+          "backend_model_chat_session"
+        ],
+        "relation": "implement",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "backend/models/__init__.py"
+      },
+      {
+        "id": "ai_pipeline_stack",
+        "label": "AI Pipeline Stack (LangChain + LangGraph + OpenRouter)",
+        "nodes": [
+          "backend_langchain_pipeline",
+          "backend_langgraph_chat",
+          "backend_openrouter_llm"
+        ],
+        "relation": "participate_in",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "README.md"
+      },
+      {
+        "id": "observability_backends",
+        "label": "Dual Observability Backends (LangSmith + Langfuse)",
+        "nodes": [
+          "backend_observability",
+          "concept_observability_toggle"
+        ],
+        "relation": "implement",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "README.md"
+      },
+      {
+        "id": "rbac_roles_group",
+        "label": "RBAC Role Hierarchy",
+        "nodes": [
+          "concept_role_super_admin",
+          "concept_role_admin",
+          "concept_role_user"
+        ],
+        "relation": "participate_in",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "CLAUDE.md"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "label": "tailwind.config.ts",
+      "file_type": "code",
+      "source_file": "frontend/tailwind.config.ts",
+      "source_location": "L1",
+      "id": "frontend_tailwind_config_ts",
+      "community": 24,
+      "norm_label": "tailwind.config.ts"
+    },
+    {
+      "label": "vite.config.ts",
+      "file_type": "code",
+      "source_file": "frontend/vite.config.ts",
+      "source_location": "L1",
+      "id": "frontend_vite_config_ts",
+      "community": 25,
+      "norm_label": "vite.config.ts"
+    },
+    {
+      "label": "postcss.config.js",
+      "file_type": "code",
+      "source_file": "frontend/postcss.config.js",
+      "source_location": "L1",
+      "id": "frontend_postcss_config_js",
+      "community": 26,
+      "norm_label": "postcss.config.js"
+    },
+    {
+      "label": "App.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/App.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_app_tsx",
+      "community": 6,
+      "norm_label": "app.tsx"
+    },
+    {
+      "label": "main.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/main.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_main_tsx",
+      "community": 27,
+      "norm_label": "main.tsx"
+    },
+    {
+      "label": "ProtectedRoute.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/components/auth/ProtectedRoute.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_components_auth_protectedroute_tsx",
+      "community": 6,
+      "norm_label": "protectedroute.tsx"
+    },
+    {
+      "label": "ProtectedRoute()",
+      "file_type": "code",
+      "source_file": "frontend/src/components/auth/ProtectedRoute.tsx",
+      "source_location": "L4",
+      "id": "auth_protectedroute_protectedroute",
+      "community": 6,
+      "norm_label": "protectedroute()"
+    },
+    {
+      "label": "GraphifyPanel.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/components/audit/GraphifyPanel.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_components_audit_graphifypanel_tsx",
+      "community": 16,
+      "norm_label": "graphifypanel.tsx"
+    },
+    {
+      "label": "GraphifyPanel()",
+      "file_type": "code",
+      "source_file": "frontend/src/components/audit/GraphifyPanel.tsx",
+      "source_location": "L11",
+      "id": "audit_graphifypanel_graphifypanel",
+      "community": 16,
+      "norm_label": "graphifypanel()"
+    },
+    {
+      "label": "useAuth.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/hooks/useAuth.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_hooks_useauth_tsx",
+      "community": 6,
+      "norm_label": "useauth.tsx"
+    },
+    {
+      "label": "AuthProvider()",
+      "file_type": "code",
+      "source_file": "frontend/src/hooks/useAuth.tsx",
+      "source_location": "L20",
+      "id": "hooks_useauth_authprovider",
+      "community": 6,
+      "norm_label": "authprovider()"
+    },
+    {
+      "label": "useAuth()",
+      "file_type": "code",
+      "source_file": "frontend/src/hooks/useAuth.tsx",
+      "source_location": "L44",
+      "id": "hooks_useauth_useauth",
+      "community": 6,
+      "norm_label": "useauth()"
+    },
+    {
+      "label": "Login.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Login.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_pages_login_tsx",
+      "community": 6,
+      "norm_label": "login.tsx"
+    },
+    {
+      "label": "Login()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Login.tsx",
+      "source_location": "L6",
+      "id": "pages_login_login",
+      "community": 6,
+      "norm_label": "login()"
+    },
+    {
+      "label": "Dashboard.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Dashboard.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_pages_dashboard_tsx",
+      "community": 6,
+      "norm_label": "dashboard.tsx"
+    },
+    {
+      "label": "Dashboard()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Dashboard.tsx",
+      "source_location": "L3",
+      "id": "pages_dashboard_dashboard",
+      "community": 6,
+      "norm_label": "dashboard()"
+    },
+    {
+      "label": "Upload.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Upload.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_pages_upload_tsx",
+      "community": 18,
+      "norm_label": "upload.tsx"
+    },
+    {
+      "label": "Upload()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Upload.tsx",
+      "source_location": "L2",
+      "id": "pages_upload_upload",
+      "community": 18,
+      "norm_label": "upload()"
+    },
+    {
+      "label": "Chat.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Chat.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_pages_chat_tsx",
+      "community": 19,
+      "norm_label": "chat.tsx"
+    },
+    {
+      "label": "Chat()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Chat.tsx",
+      "source_location": "L2",
+      "id": "pages_chat_chat",
+      "community": 19,
+      "norm_label": "chat()"
+    },
+    {
+      "label": "AuditReport.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/AuditReport.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_pages_auditreport_tsx",
+      "community": 16,
+      "norm_label": "auditreport.tsx"
+    },
+    {
+      "label": "Admin.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Admin.tsx",
+      "source_location": "L1",
+      "id": "frontend_src_pages_admin_tsx",
+      "community": 20,
+      "norm_label": "admin.tsx"
+    },
+    {
+      "label": "Admin()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Admin.tsx",
+      "source_location": "L2",
+      "id": "pages_admin_admin",
+      "community": 20,
+      "norm_label": "admin()"
+    },
+    {
+      "label": "api.ts",
+      "file_type": "code",
+      "source_file": "frontend/src/services/api.ts",
+      "source_location": "L1",
+      "id": "frontend_src_services_api_ts",
+      "community": 28,
+      "norm_label": "api.ts"
+    },
+    {
+      "label": "config.py",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": "L1",
+      "id": "backend_config_py",
+      "community": 3,
+      "norm_label": "config.py"
+    },
+    {
+      "label": "Settings",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": "L11",
+      "id": "backend_config_settings",
+      "community": 3,
+      "norm_label": "settings"
+    },
+    {
+      "label": "BaseSettings",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "basesettings",
+      "community": 3,
+      "norm_label": "basesettings"
+    },
+    {
+      "label": "active_backends()",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": "L49",
+      "id": "backend_config_active_backends",
+      "community": 3,
+      "norm_label": "active_backends()"
+    },
+    {
+      "label": "langsmith_enabled()",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": "L54",
+      "id": "backend_config_langsmith_enabled",
+      "community": 3,
+      "norm_label": "langsmith_enabled()"
+    },
+    {
+      "label": "langfuse_enabled()",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": "L59",
+      "id": "backend_config_langfuse_enabled",
+      "community": 3,
+      "norm_label": "langfuse_enabled()"
+    },
+    {
+      "label": "get_settings()",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": "L65",
+      "id": "backend_config_get_settings",
+      "community": 3,
+      "norm_label": "get_settings()"
+    },
+    {
+      "label": "Central configuration \u2014 all env vars loaded here, never hardcoded elsewhere.",
+      "file_type": "rationale",
+      "source_file": "backend/config.py",
+      "source_location": "L1",
+      "id": "backend_config_rationale_1",
+      "community": 3,
+      "norm_label": "central configuration \u2014 all env vars loaded here, never hardcoded elsewhere."
+    },
+    {
+      "label": "Application settings loaded from environment variables.",
+      "file_type": "rationale",
+      "source_file": "backend/config.py",
+      "source_location": "L12",
+      "id": "backend_config_rationale_12",
+      "community": 3,
+      "norm_label": "application settings loaded from environment variables."
+    },
+    {
+      "label": "Return list of enabled observability backend names.",
+      "file_type": "rationale",
+      "source_file": "backend/config.py",
+      "source_location": "L50",
+      "id": "backend_config_rationale_50",
+      "community": 29,
+      "norm_label": "return list of enabled observability backend names."
+    },
+    {
+      "label": "True if LangSmith is in the active backends list.",
+      "file_type": "rationale",
+      "source_file": "backend/config.py",
+      "source_location": "L55",
+      "id": "backend_config_rationale_55",
+      "community": 30,
+      "norm_label": "true if langsmith is in the active backends list."
+    },
+    {
+      "label": "True if Langfuse is in the active backends list.",
+      "file_type": "rationale",
+      "source_file": "backend/config.py",
+      "source_location": "L60",
+      "id": "backend_config_rationale_60",
+      "community": 31,
+      "norm_label": "true if langfuse is in the active backends list."
+    },
+    {
+      "label": "Return cached settings instance \u2014 call this everywhere instead of instantiating",
+      "file_type": "rationale",
+      "source_file": "backend/config.py",
+      "source_location": "L66",
+      "id": "backend_config_rationale_66",
+      "community": 3,
+      "norm_label": "return cached settings instance \u2014 call this everywhere instead of instantiating"
+    },
+    {
+      "label": "database.py",
+      "file_type": "code",
+      "source_file": "backend/database.py",
+      "source_location": "L1",
+      "id": "backend_database_py",
+      "community": 9,
+      "norm_label": "database.py"
+    },
+    {
+      "label": "_make_engine()",
+      "file_type": "code",
+      "source_file": "backend/database.py",
+      "source_location": "L13",
+      "id": "backend_database_make_engine",
+      "community": 9,
+      "norm_label": "_make_engine()"
+    },
+    {
+      "label": "get_db()",
+      "file_type": "code",
+      "source_file": "backend/database.py",
+      "source_location": "L23",
+      "id": "backend_database_get_db",
+      "community": 9,
+      "norm_label": "get_db()"
+    },
+    {
+      "label": "set_rls_user()",
+      "file_type": "code",
+      "source_file": "backend/database.py",
+      "source_location": "L32",
+      "id": "backend_database_set_rls_user",
+      "community": 9,
+      "norm_label": "set_rls_user()"
+    },
+    {
+      "label": "Database session factory and dependency injection for FastAPI.",
+      "file_type": "rationale",
+      "source_file": "backend/database.py",
+      "source_location": "L1",
+      "id": "backend_database_rationale_1",
+      "community": 9,
+      "norm_label": "database session factory and dependency injection for fastapi."
+    },
+    {
+      "label": "Create SQLAlchemy engine from DATABASE_URL in settings.",
+      "file_type": "rationale",
+      "source_file": "backend/database.py",
+      "source_location": "L14",
+      "id": "backend_database_rationale_14",
+      "community": 9,
+      "norm_label": "create sqlalchemy engine from database_url in settings."
+    },
+    {
+      "label": "FastAPI dependency \u2014 yields a DB session and closes it after the request.",
+      "file_type": "rationale",
+      "source_file": "backend/database.py",
+      "source_location": "L24",
+      "id": "backend_database_rationale_24",
+      "community": 9,
+      "norm_label": "fastapi dependency \u2014 yields a db session and closes it after the request."
+    },
+    {
+      "label": "Set the PostgreSQL session variable used by Row Level Security policies.",
+      "file_type": "rationale",
+      "source_file": "backend/database.py",
+      "source_location": "L33",
+      "id": "backend_database_rationale_33",
+      "community": 9,
+      "norm_label": "set the postgresql session variable used by row level security policies."
+    },
+    {
+      "label": "main.py",
+      "file_type": "code",
+      "source_file": "backend/main.py",
+      "source_location": "L1",
+      "id": "backend_main_py",
+      "community": 10,
+      "norm_label": "main.py"
+    },
+    {
+      "label": "health_check()",
+      "file_type": "code",
+      "source_file": "backend/main.py",
+      "source_location": "L45",
+      "id": "backend_main_health_check",
+      "community": 10,
+      "norm_label": "health_check()"
+    },
+    {
+      "label": "FastAPI application entry point \u2014 registers all routers and startup hooks.",
+      "file_type": "rationale",
+      "source_file": "backend/main.py",
+      "source_location": "L1",
+      "id": "backend_main_rationale_1",
+      "community": 10,
+      "norm_label": "fastapi application entry point \u2014 registers all routers and startup hooks."
+    },
+    {
+      "label": "Liveness probe for Docker health checks.",
+      "file_type": "rationale",
+      "source_file": "backend/main.py",
+      "source_location": "L46",
+      "id": "backend_main_rationale_46",
+      "community": 10,
+      "norm_label": "liveness probe for docker health checks."
+    },
+    {
+      "label": "# TODO: app.include_router(documents.router)",
+      "file_type": "rationale",
+      "source_file": "backend/main.py",
+      "source_location": "L38",
+      "id": "backend_main_rationale_38",
+      "community": 10,
+      "norm_label": "# todo: app.include_router(documents.router)"
+    },
+    {
+      "label": "# TODO: app.include_router(audit.router)",
+      "file_type": "rationale",
+      "source_file": "backend/main.py",
+      "source_location": "L39",
+      "id": "backend_main_rationale_39",
+      "community": 10,
+      "norm_label": "# todo: app.include_router(audit.router)"
+    },
+    {
+      "label": "# TODO: app.include_router(chat.router)",
+      "file_type": "rationale",
+      "source_file": "backend/main.py",
+      "source_location": "L40",
+      "id": "backend_main_rationale_40",
+      "community": 10,
+      "norm_label": "# todo: app.include_router(chat.router)"
+    },
+    {
+      "label": "# TODO: app.include_router(admin.router)",
+      "file_type": "rationale",
+      "source_file": "backend/main.py",
+      "source_location": "L41",
+      "id": "backend_main_rationale_41",
+      "community": 10,
+      "norm_label": "# todo: app.include_router(admin.router)"
+    },
+    {
+      "label": "auth.py",
+      "file_type": "code",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L1",
+      "id": "backend_routers_auth_py",
+      "community": 11,
+      "norm_label": "auth.py"
+    },
+    {
+      "label": "google_login()",
+      "file_type": "code",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L23",
+      "id": "routers_auth_google_login",
+      "community": 11,
+      "norm_label": "google_login()"
+    },
+    {
+      "label": "google_callback()",
+      "file_type": "code",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L29",
+      "id": "routers_auth_google_callback",
+      "community": 3,
+      "norm_label": "google_callback()"
+    },
+    {
+      "label": "logout()",
+      "file_type": "code",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L58",
+      "id": "routers_auth_logout",
+      "community": 11,
+      "norm_label": "logout()"
+    },
+    {
+      "label": "get_me()",
+      "file_type": "code",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L65",
+      "id": "routers_auth_get_me",
+      "community": 11,
+      "norm_label": "get_me()"
+    },
+    {
+      "label": "Auth router \u2014 Google OAuth2 login and callback endpoints.",
+      "file_type": "rationale",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L1",
+      "id": "routers_auth_rationale_1",
+      "community": 11,
+      "norm_label": "auth router \u2014 google oauth2 login and callback endpoints."
+    },
+    {
+      "label": "Redirect URL for Google OAuth2 \u2014 frontend sends user to this URL.",
+      "file_type": "rationale",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L24",
+      "id": "routers_auth_rationale_24",
+      "community": 11,
+      "norm_label": "redirect url for google oauth2 \u2014 frontend sends user to this url."
+    },
+    {
+      "label": "Google OAuth2 callback \u2014 exchanges code for tokens, upserts user, sets JWT cooki",
+      "file_type": "rationale",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L30",
+      "id": "routers_auth_rationale_30",
+      "community": 3,
+      "norm_label": "google oauth2 callback \u2014 exchanges code for tokens, upserts user, sets jwt cooki"
+    },
+    {
+      "label": "Clear the JWT cookie to end the session.",
+      "file_type": "rationale",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L59",
+      "id": "routers_auth_rationale_59",
+      "community": 11,
+      "norm_label": "clear the jwt cookie to end the session."
+    },
+    {
+      "label": "Return the authenticated user's profile.",
+      "file_type": "rationale",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L66",
+      "id": "routers_auth_rationale_66",
+      "community": 11,
+      "norm_label": "return the authenticated user's profile."
+    },
+    {
+      "label": "auth.py",
+      "file_type": "code",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L1",
+      "id": "backend_middleware_auth_py",
+      "community": 14,
+      "norm_label": "auth.py"
+    },
+    {
+      "label": "get_current_user()",
+      "file_type": "code",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L19",
+      "id": "middleware_auth_get_current_user",
+      "community": 14,
+      "norm_label": "get_current_user()"
+    },
+    {
+      "label": "require_roles()",
+      "file_type": "code",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L47",
+      "id": "middleware_auth_require_roles",
+      "community": 14,
+      "norm_label": "require_roles()"
+    },
+    {
+      "label": "Auth middleware \u2014 JWT verification and role-based access control.",
+      "file_type": "rationale",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L1",
+      "id": "middleware_auth_rationale_1",
+      "community": 14,
+      "norm_label": "auth middleware \u2014 jwt verification and role-based access control."
+    },
+    {
+      "label": "Extract and verify JWT from Authorization header. Raises 401 if invalid.",
+      "file_type": "rationale",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L24",
+      "id": "middleware_auth_rationale_24",
+      "community": 14,
+      "norm_label": "extract and verify jwt from authorization header. raises 401 if invalid."
+    },
+    {
+      "label": "Dependency factory \u2014 raises 403 if the current user's role is not in allowed rol",
+      "file_type": "rationale",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L48",
+      "id": "middleware_auth_rationale_48",
+      "community": 14,
+      "norm_label": "dependency factory \u2014 raises 403 if the current user's role is not in allowed rol"
+    },
+    {
+      "label": "audit_report.py",
+      "file_type": "code",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L1",
+      "id": "backend_models_audit_report_py",
+      "community": 1,
+      "norm_label": "audit_report.py"
+    },
+    {
+      "label": "AuditReport",
+      "file_type": "code",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L13",
+      "id": "models_audit_report_auditreport",
+      "community": 1,
+      "norm_label": "auditreport"
+    },
+    {
+      "label": "Base",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "base",
+      "community": 1,
+      "norm_label": "base"
+    },
+    {
+      "label": "AuditReport model \u2014 stores LangChain audit output including Graphify knowledge g",
+      "file_type": "rationale",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L1",
+      "id": "models_audit_report_rationale_1",
+      "community": 1,
+      "norm_label": "auditreport model \u2014 stores langchain audit output including graphify knowledge g"
+    },
+    {
+      "label": "One audit report per document \u2014 stores structured insights + Graphify graph data",
+      "file_type": "rationale",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L14",
+      "id": "models_audit_report_rationale_14",
+      "community": 1,
+      "norm_label": "one audit report per document \u2014 stores structured insights + graphify graph data"
+    },
+    {
+      "label": "user.py",
+      "file_type": "code",
+      "source_file": "backend/models/user.py",
+      "source_location": "L1",
+      "id": "backend_models_user_py",
+      "community": 1,
+      "norm_label": "user.py"
+    },
+    {
+      "label": "UserRole",
+      "file_type": "code",
+      "source_file": "backend/models/user.py",
+      "source_location": "L14",
+      "id": "models_user_userrole",
+      "community": 1,
+      "norm_label": "userrole"
+    },
+    {
+      "label": "str",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "str",
+      "community": 1,
+      "norm_label": "str"
+    },
+    {
+      "label": "User",
+      "file_type": "code",
+      "source_file": "backend/models/user.py",
+      "source_location": "L21",
+      "id": "models_user_user",
+      "community": 1,
+      "norm_label": "user"
+    },
+    {
+      "label": "User model \u2014 all roles share this table; role column controls access level.",
+      "file_type": "rationale",
+      "source_file": "backend/models/user.py",
+      "source_location": "L1",
+      "id": "models_user_rationale_1",
+      "community": 1,
+      "norm_label": "user model \u2014 all roles share this table; role column controls access level."
+    },
+    {
+      "label": "Role hierarchy: super_admin > admin > user.",
+      "file_type": "rationale",
+      "source_file": "backend/models/user.py",
+      "source_location": "L15",
+      "id": "models_user_rationale_15",
+      "community": 1,
+      "norm_label": "role hierarchy: super_admin > admin > user."
+    },
+    {
+      "label": "Represents an authenticated user \u2014 created on first Google OAuth login.",
+      "file_type": "rationale",
+      "source_file": "backend/models/user.py",
+      "source_location": "L22",
+      "id": "models_user_rationale_22",
+      "community": 1,
+      "norm_label": "represents an authenticated user \u2014 created on first google oauth login."
+    },
+    {
+      "label": "transaction.py",
+      "file_type": "code",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L1",
+      "id": "backend_models_transaction_py",
+      "community": 1,
+      "norm_label": "transaction.py"
+    },
+    {
+      "label": "Transaction",
+      "file_type": "code",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L16",
+      "id": "models_transaction_transaction",
+      "community": 1,
+      "norm_label": "transaction"
+    },
+    {
+      "label": "Transaction model \u2014 single table for all banks, pgvector column for RAG.",
+      "file_type": "rationale",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L1",
+      "id": "models_transaction_rationale_1",
+      "community": 1,
+      "norm_label": "transaction model \u2014 single table for all banks, pgvector column for rag."
+    },
+    {
+      "label": "One row per bank transaction; bank_name column distinguishes sources.",
+      "file_type": "rationale",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L17",
+      "id": "models_transaction_rationale_17",
+      "community": 1,
+      "norm_label": "one row per bank transaction; bank_name column distinguishes sources."
+    },
+    {
+      "label": "__init__.py",
+      "file_type": "code",
+      "source_file": "backend/models/__init__.py",
+      "source_location": "L1",
+      "id": "backend_models_init_py",
+      "community": 21,
+      "norm_label": "__init__.py"
+    },
+    {
+      "label": "ORM models package \u2014 import all models here so Alembic autogenerate sees them.",
+      "file_type": "rationale",
+      "source_file": "backend/models/__init__.py",
+      "source_location": "L1",
+      "id": "models_init_rationale_1",
+      "community": 21,
+      "norm_label": "orm models package \u2014 import all models here so alembic autogenerate sees them."
+    },
+    {
+      "label": "chat_session.py",
+      "file_type": "code",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L1",
+      "id": "backend_models_chat_session_py",
+      "community": 1,
+      "norm_label": "chat_session.py"
+    },
+    {
+      "label": "ChatSession",
+      "file_type": "code",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L13",
+      "id": "models_chat_session_chatsession",
+      "community": 1,
+      "norm_label": "chatsession"
+    },
+    {
+      "label": "ChatSession model \u2014 persists LangGraph multi-agent conversation history.",
+      "file_type": "rationale",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L1",
+      "id": "models_chat_session_rationale_1",
+      "community": 1,
+      "norm_label": "chatsession model \u2014 persists langgraph multi-agent conversation history."
+    },
+    {
+      "label": "One session per user conversation thread with the finance agent.",
+      "file_type": "rationale",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L14",
+      "id": "models_chat_session_rationale_14",
+      "community": 1,
+      "norm_label": "one session per user conversation thread with the finance agent."
+    },
+    {
+      "label": "document.py",
+      "file_type": "code",
+      "source_file": "backend/models/document.py",
+      "source_location": "L1",
+      "id": "backend_models_document_py",
+      "community": 1,
+      "norm_label": "document.py"
+    },
+    {
+      "label": "DocumentStatus",
+      "file_type": "code",
+      "source_file": "backend/models/document.py",
+      "source_location": "L14",
+      "id": "models_document_documentstatus",
+      "community": 1,
+      "norm_label": "documentstatus"
+    },
+    {
+      "label": "Document",
+      "file_type": "code",
+      "source_file": "backend/models/document.py",
+      "source_location": "L25",
+      "id": "models_document_document",
+      "community": 1,
+      "norm_label": "document"
+    },
+    {
+      "label": "Document model \u2014 tracks uploaded files and their Google Drive location.",
+      "file_type": "rationale",
+      "source_file": "backend/models/document.py",
+      "source_location": "L1",
+      "id": "models_document_rationale_1",
+      "community": 1,
+      "norm_label": "document model \u2014 tracks uploaded files and their google drive location."
+    },
+    {
+      "label": "Processing lifecycle of an uploaded document.",
+      "file_type": "rationale",
+      "source_file": "backend/models/document.py",
+      "source_location": "L15",
+      "id": "models_document_rationale_15",
+      "community": 1,
+      "norm_label": "processing lifecycle of an uploaded document."
+    },
+    {
+      "label": "Represents one uploaded bank statement (CSV or PDF).",
+      "file_type": "rationale",
+      "source_file": "backend/models/document.py",
+      "source_location": "L26",
+      "id": "models_document_rationale_26",
+      "community": 1,
+      "norm_label": "represents one uploaded bank statement (csv or pdf)."
+    },
+    {
+      "label": "base.py",
+      "file_type": "code",
+      "source_file": "backend/models/base.py",
+      "source_location": "L1",
+      "id": "backend_models_base_py",
+      "community": 1,
+      "norm_label": "base.py"
+    },
+    {
+      "label": "Base",
+      "file_type": "code",
+      "source_file": "backend/models/base.py",
+      "source_location": "L6",
+      "id": "models_base_base",
+      "community": 1,
+      "norm_label": "base"
+    },
+    {
+      "label": "DeclarativeBase",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "declarativebase",
+      "community": 1,
+      "norm_label": "declarativebase"
+    },
+    {
+      "label": "SQLAlchemy declarative base \u2014 shared by all models.",
+      "file_type": "rationale",
+      "source_file": "backend/models/base.py",
+      "source_location": "L1",
+      "id": "models_base_rationale_1",
+      "community": 1,
+      "norm_label": "sqlalchemy declarative base \u2014 shared by all models."
+    },
+    {
+      "label": "Base class for all ORM models.",
+      "file_type": "rationale",
+      "source_file": "backend/models/base.py",
+      "source_location": "L7",
+      "id": "models_base_rationale_7",
+      "community": 1,
+      "norm_label": "base class for all orm models."
+    },
+    {
+      "label": "audit_prompt.py",
+      "file_type": "code",
+      "source_file": "backend/prompts/audit_prompt.py",
+      "source_location": "L1",
+      "id": "backend_prompts_audit_prompt_py",
+      "community": 22,
+      "norm_label": "audit_prompt.py"
+    },
+    {
+      "label": "Prompt templates for the LangChain audit pipeline.",
+      "file_type": "rationale",
+      "source_file": "backend/prompts/audit_prompt.py",
+      "source_location": "L1",
+      "id": "prompts_audit_prompt_rationale_1",
+      "community": 22,
+      "norm_label": "prompt templates for the langchain audit pipeline."
+    },
+    {
+      "label": "audit.py",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L1",
+      "id": "backend_chains_audit_py",
+      "community": 4,
+      "norm_label": "audit.py"
+    },
+    {
+      "label": "_build_llm()",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L36",
+      "id": "chains_audit_build_llm",
+      "community": 4,
+      "norm_label": "_build_llm()"
+    },
+    {
+      "label": "_format_transactions()",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L48",
+      "id": "chains_audit_format_transactions",
+      "community": 4,
+      "norm_label": "_format_transactions()"
+    },
+    {
+      "label": "_parse_llm_response()",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L60",
+      "id": "chains_audit_parse_llm_response",
+      "community": 4,
+      "norm_label": "_parse_llm_response()"
+    },
+    {
+      "label": "run_audit()",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L73",
+      "id": "chains_audit_run_audit",
+      "community": 4,
+      "norm_label": "run_audit()"
+    },
+    {
+      "label": "_get_date_range()",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L174",
+      "id": "chains_audit_get_date_range",
+      "community": 4,
+      "norm_label": "_get_date_range()"
+    },
+    {
+      "label": "_save_graph_html()",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L182",
+      "id": "chains_audit_save_graph_html",
+      "community": 4,
+      "norm_label": "_save_graph_html()"
+    },
+    {
+      "label": "LangChain audit pipeline \u2014 parses transactions, audits via OpenRouter LLM, runs",
+      "file_type": "rationale",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L1",
+      "id": "chains_audit_rationale_1",
+      "community": 4,
+      "norm_label": "langchain audit pipeline \u2014 parses transactions, audits via openrouter llm, runs"
+    },
+    {
+      "label": "Build LangChain LLM client pointed at OpenRouter.",
+      "file_type": "rationale",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L37",
+      "id": "chains_audit_rationale_37",
+      "community": 4,
+      "norm_label": "build langchain llm client pointed at openrouter."
+    },
+    {
+      "label": "Convert transaction dicts to a readable text block for the LLM prompt.",
+      "file_type": "rationale",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L49",
+      "id": "chains_audit_rationale_49",
+      "community": 4,
+      "norm_label": "convert transaction dicts to a readable text block for the llm prompt."
+    },
+    {
+      "label": "Extract JSON from LLM response, stripping any markdown fences.",
+      "file_type": "rationale",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L61",
+      "id": "chains_audit_rationale_61",
+      "community": 4,
+      "norm_label": "extract json from llm response, stripping any markdown fences."
+    },
+    {
+      "label": "Run the full audit pipeline for a document.      Steps:       1. Format transact",
+      "file_type": "rationale",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L79",
+      "id": "chains_audit_rationale_79",
+      "community": 4,
+      "norm_label": "run the full audit pipeline for a document.      steps:       1. format transact"
+    },
+    {
+      "label": "Extract date range string from transaction list.",
+      "file_type": "rationale",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L175",
+      "id": "chains_audit_rationale_175",
+      "community": 4,
+      "norm_label": "extract date range string from transaction list."
+    },
+    {
+      "label": "Save Graphify HTML to a static path and return the relative URL path.      TODO:",
+      "file_type": "rationale",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L183",
+      "id": "chains_audit_rationale_183",
+      "community": 4,
+      "norm_label": "save graphify html to a static path and return the relative url path.      todo:"
+    },
+    {
+      "label": "auth.py",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L1",
+      "id": "backend_services_auth_py",
+      "community": 3,
+      "norm_label": "auth.py"
+    },
+    {
+      "label": "get_google_auth_url()",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L22",
+      "id": "services_auth_get_google_auth_url",
+      "community": 3,
+      "norm_label": "get_google_auth_url()"
+    },
+    {
+      "label": "exchange_code_for_tokens()",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L37",
+      "id": "services_auth_exchange_code_for_tokens",
+      "community": 3,
+      "norm_label": "exchange_code_for_tokens()"
+    },
+    {
+      "label": "get_google_user_info()",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L56",
+      "id": "services_auth_get_google_user_info",
+      "community": 3,
+      "norm_label": "get_google_user_info()"
+    },
+    {
+      "label": "upsert_user()",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L68",
+      "id": "services_auth_upsert_user",
+      "community": 3,
+      "norm_label": "upsert_user()"
+    },
+    {
+      "label": "create_app_jwt()",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L100",
+      "id": "services_auth_create_app_jwt",
+      "community": 3,
+      "norm_label": "create_app_jwt()"
+    },
+    {
+      "label": "decode_app_jwt()",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L112",
+      "id": "services_auth_decode_app_jwt",
+      "community": 3,
+      "norm_label": "decode_app_jwt()"
+    },
+    {
+      "label": "Google OAuth2 service \u2014 handles login flow, token exchange, and JWT creation.",
+      "file_type": "rationale",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L1",
+      "id": "services_auth_rationale_1",
+      "community": 3,
+      "norm_label": "google oauth2 service \u2014 handles login flow, token exchange, and jwt creation."
+    },
+    {
+      "label": "Build Google OAuth2 authorization URL with all required scopes.",
+      "file_type": "rationale",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L23",
+      "id": "services_auth_rationale_23",
+      "community": 3,
+      "norm_label": "build google oauth2 authorization url with all required scopes."
+    },
+    {
+      "label": "Exchange OAuth2 authorization code for access + refresh tokens.",
+      "file_type": "rationale",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L38",
+      "id": "services_auth_rationale_38",
+      "community": 3,
+      "norm_label": "exchange oauth2 authorization code for access + refresh tokens."
+    },
+    {
+      "label": "Fetch Google user profile using the access token.",
+      "file_type": "rationale",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L57",
+      "id": "services_auth_rationale_57",
+      "community": 3,
+      "norm_label": "fetch google user profile using the access token."
+    },
+    {
+      "label": "Create or update a user from Google profile data. Assign super_admin if email ma",
+      "file_type": "rationale",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L69",
+      "id": "services_auth_rationale_69",
+      "community": 3,
+      "norm_label": "create or update a user from google profile data. assign super_admin if email ma"
+    },
+    {
+      "label": "Create a signed JWT for the app session containing user id and role.",
+      "file_type": "rationale",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L101",
+      "id": "services_auth_rationale_101",
+      "community": 3,
+      "norm_label": "create a signed jwt for the app session containing user id and role."
+    },
+    {
+      "label": "Decode and verify the app JWT. Returns None if invalid or expired.",
+      "file_type": "rationale",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L113",
+      "id": "services_auth_rationale_113",
+      "community": 3,
+      "norm_label": "decode and verify the app jwt. returns none if invalid or expired."
+    },
+    {
+      "label": "graphify_service.py",
+      "file_type": "code",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L1",
+      "id": "backend_services_graphify_service_py",
+      "community": 7,
+      "norm_label": "graphify_service.py"
+    },
+    {
+      "label": "build_audit_graph()",
+      "file_type": "code",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L20",
+      "id": "services_graphify_service_build_audit_graph",
+      "community": 7,
+      "norm_label": "build_audit_graph()"
+    },
+    {
+      "label": "_run_graphify_pipeline()",
+      "file_type": "code",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L47",
+      "id": "services_graphify_service_run_graphify_pipeline",
+      "community": 7,
+      "norm_label": "_run_graphify_pipeline()"
+    },
+    {
+      "label": "_write_corpus_files()",
+      "file_type": "code",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L91",
+      "id": "services_graphify_service_write_corpus_files",
+      "community": 7,
+      "norm_label": "_write_corpus_files()"
+    },
+    {
+      "label": "_extract()",
+      "file_type": "code",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L146",
+      "id": "services_graphify_service_extract",
+      "community": 7,
+      "norm_label": "_extract()"
+    },
+    {
+      "label": "Graphify service \u2014 converts audit output into a knowledge graph.  Flow:   audit",
+      "file_type": "rationale",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L1",
+      "id": "services_graphify_service_rationale_1",
+      "community": 7,
+      "norm_label": "graphify service \u2014 converts audit output into a knowledge graph.  flow:   audit"
+    },
+    {
+      "label": "Run graphify on an audit result dict and return (graph_json, graph_html_string).",
+      "file_type": "rationale",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L25",
+      "id": "services_graphify_service_rationale_25",
+      "community": 7,
+      "norm_label": "run graphify on an audit result dict and return (graph_json, graph_html_string)."
+    },
+    {
+      "label": "Internal \u2014 writes audit data to temp files and runs the graphify pipeline.",
+      "file_type": "rationale",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L48",
+      "id": "services_graphify_service_rationale_48",
+      "community": 7,
+      "norm_label": "internal \u2014 writes audit data to temp files and runs the graphify pipeline."
+    },
+    {
+      "label": "Write audit data as structured markdown files for graphify to process.",
+      "file_type": "rationale",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L92",
+      "id": "services_graphify_service_rationale_92",
+      "community": 7,
+      "norm_label": "write audit data as structured markdown files for graphify to process."
+    },
+    {
+      "label": "Run AST extraction (skips for markdown) \u2014 semantic extraction via graphify CLI.",
+      "file_type": "rationale",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L147",
+      "id": "services_graphify_service_rationale_147",
+      "community": 7,
+      "norm_label": "run ast extraction (skips for markdown) \u2014 semantic extraction via graphify cli."
+    },
+    {
+      "label": "observability.py",
+      "file_type": "code",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L1",
+      "id": "backend_services_observability_py",
+      "community": 12,
+      "norm_label": "observability.py"
+    },
+    {
+      "label": "get_callbacks()",
+      "file_type": "code",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L18",
+      "id": "services_observability_get_callbacks",
+      "community": 12,
+      "norm_label": "get_callbacks()"
+    },
+    {
+      "label": "_configure_langsmith()",
+      "file_type": "code",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L38",
+      "id": "services_observability_configure_langsmith",
+      "community": 12,
+      "norm_label": "_configure_langsmith()"
+    },
+    {
+      "label": "_build_langfuse_handler()",
+      "file_type": "code",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L45",
+      "id": "services_observability_build_langfuse_handler",
+      "community": 12,
+      "norm_label": "_build_langfuse_handler()"
+    },
+    {
+      "label": "ObservabilityManager \u2014 builds LangChain callback list from env toggle.  Usage:",
+      "file_type": "rationale",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L1",
+      "id": "services_observability_rationale_1",
+      "community": 12,
+      "norm_label": "observabilitymanager \u2014 builds langchain callback list from env toggle.  usage:"
+    },
+    {
+      "label": "Return active observability callback handlers based on OBSERVABILITY_BACKENDS en",
+      "file_type": "rationale",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L19",
+      "id": "services_observability_rationale_19",
+      "community": 12,
+      "norm_label": "return active observability callback handlers based on observability_backends en"
+    },
+    {
+      "label": "Set LangSmith env vars \u2014 LangSmith uses env vars rather than a callback handler.",
+      "file_type": "rationale",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L39",
+      "id": "services_observability_rationale_39",
+      "community": 12,
+      "norm_label": "set langsmith env vars \u2014 langsmith uses env vars rather than a callback handler."
+    },
+    {
+      "label": "Instantiate Langfuse callback handler, return None if import fails.",
+      "file_type": "rationale",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L46",
+      "id": "services_observability_rationale_46",
+      "community": 12,
+      "norm_label": "instantiate langfuse callback handler, return none if import fails."
+    },
+    {
+      "label": "drive.py",
+      "file_type": "code",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L1",
+      "id": "backend_services_drive_py",
+      "community": 8,
+      "norm_label": "drive.py"
+    },
+    {
+      "label": "_build_drive_client()",
+      "file_type": "code",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L16",
+      "id": "services_drive_build_drive_client",
+      "community": 8,
+      "norm_label": "_build_drive_client()"
+    },
+    {
+      "label": "_get_or_create_folder()",
+      "file_type": "code",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L26",
+      "id": "services_drive_get_or_create_folder",
+      "community": 8,
+      "norm_label": "_get_or_create_folder()"
+    },
+    {
+      "label": "upload_file()",
+      "file_type": "code",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L49",
+      "id": "services_drive_upload_file",
+      "community": 8,
+      "norm_label": "upload_file()"
+    },
+    {
+      "label": "fetch_file_bytes()",
+      "file_type": "code",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L86",
+      "id": "services_drive_fetch_file_bytes",
+      "community": 8,
+      "norm_label": "fetch_file_bytes()"
+    },
+    {
+      "label": "Google Drive service \u2014 creates per-user folders, uploads files, fetches content.",
+      "file_type": "rationale",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L1",
+      "id": "services_drive_rationale_1",
+      "community": 8,
+      "norm_label": "google drive service \u2014 creates per-user folders, uploads files, fetches content."
+    },
+    {
+      "label": "Build an authenticated Google Drive API client from stored tokens.",
+      "file_type": "rationale",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L17",
+      "id": "services_drive_rationale_17",
+      "community": 8,
+      "norm_label": "build an authenticated google drive api client from stored tokens."
+    },
+    {
+      "label": "Return folder ID for an existing folder, or create it if absent.",
+      "file_type": "rationale",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L27",
+      "id": "services_drive_rationale_27",
+      "community": 8,
+      "norm_label": "return folder id for an existing folder, or create it if absent."
+    },
+    {
+      "label": "Upload a file to the user's Drive under AI-Financial-Auditor/{YYYY-MM-DD}/filena",
+      "file_type": "rationale",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L57",
+      "id": "services_drive_rationale_57",
+      "community": 8,
+      "norm_label": "upload a file to the user's drive under ai-financial-auditor/{yyyy-mm-dd}/filena"
+    },
+    {
+      "label": "Download a file from Google Drive by its file ID. Returns raw bytes.",
+      "file_type": "rationale",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L91",
+      "id": "services_drive_rationale_91",
+      "community": 8,
+      "norm_label": "download a file from google drive by its file id. returns raw bytes."
+    },
+    {
+      "label": "Row Level Security Policy",
+      "file_type": "code",
+      "source_file": "migrations/003_rls.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "003_rls_row_level_security",
+      "community": 13,
+      "norm_label": "row level security policy"
+    },
+    {
+      "label": "pgvector Extension",
+      "file_type": "code",
+      "source_file": "migrations/001_extensions.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "001_extensions_pgvector_extension",
+      "community": 13,
+      "norm_label": "pgvector extension"
+    },
+    {
+      "label": "Database Schema",
+      "file_type": "code",
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "002_schema_database_schema",
+      "community": 13,
+      "norm_label": "database schema"
+    },
+    {
+      "label": "Users Table",
+      "file_type": "code",
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "002_schema_users_table",
+      "community": 13,
+      "norm_label": "users table"
+    },
+    {
+      "label": "Documents Table",
+      "file_type": "code",
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "002_schema_documents_table",
+      "community": 13,
+      "norm_label": "documents table"
+    },
+    {
+      "label": "Transactions Table",
+      "file_type": "code",
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "002_schema_transactions_table",
+      "community": 13,
+      "norm_label": "transactions table"
+    },
+    {
+      "label": "Audit Reports Table",
+      "file_type": "code",
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "002_schema_audit_reports_table",
+      "community": 13,
+      "norm_label": "audit reports table"
+    },
+    {
+      "label": "Chat Sessions Table",
+      "file_type": "code",
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "002_schema_chat_sessions_table",
+      "community": 13,
+      "norm_label": "chat sessions table"
+    },
+    {
+      "label": "React Router Setup",
+      "file_type": "code",
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "app_tsx_router",
+      "community": 5,
+      "norm_label": "react router setup"
+    },
+    {
+      "label": "ProtectedRoute Usage",
+      "file_type": "code",
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "app_tsx_protected_route",
+      "community": 5,
+      "norm_label": "protectedroute usage"
+    },
+    {
+      "label": "ProtectedRoute Component",
+      "file_type": "code",
+      "source_file": "frontend/src/components/auth/ProtectedRoute.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "protectedroute_tsx_protectedroute",
+      "community": 5,
+      "norm_label": "protectedroute component"
+    },
+    {
+      "label": "GraphifyPanel Component",
+      "file_type": "code",
+      "source_file": "frontend/src/components/audit/GraphifyPanel.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "graphifypanel_tsx_graphifypanel",
+      "community": 5,
+      "norm_label": "graphifypanel component"
+    },
+    {
+      "label": "useAuth Hook",
+      "file_type": "code",
+      "source_file": "frontend/src/hooks/useAuth.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "useauth_tsx_useauth",
+      "community": 5,
+      "norm_label": "useauth hook"
+    },
+    {
+      "label": "Login Page",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Login.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "login_tsx_login_page",
+      "community": 5,
+      "norm_label": "login page"
+    },
+    {
+      "label": "Dashboard Page",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Dashboard.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_tsx_dashboard_page",
+      "community": 5,
+      "norm_label": "dashboard page"
+    },
+    {
+      "label": "Upload Page",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Upload.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "upload_tsx_upload_page",
+      "community": 5,
+      "norm_label": "upload page"
+    },
+    {
+      "label": "Chat Page",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Chat.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "chat_tsx_chat_page",
+      "community": 5,
+      "norm_label": "chat page"
+    },
+    {
+      "label": "AuditReport Page",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/AuditReport.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "auditreport_tsx_auditreport_page",
+      "community": 5,
+      "norm_label": "auditreport page"
+    },
+    {
+      "label": "Admin Page",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/Admin.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "admin_tsx_admin_page",
+      "community": 5,
+      "norm_label": "admin page"
+    },
+    {
+      "label": "API Service",
+      "file_type": "code",
+      "source_file": "frontend/src/services/api.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "api_ts_api_service",
+      "community": 5,
+      "norm_label": "api service"
+    },
+    {
+      "label": "Settings (Config)",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "config_py_settings",
+      "community": 0,
+      "norm_label": "settings (config)"
+    },
+    {
+      "label": "get_settings (cached factory)",
+      "file_type": "code",
+      "source_file": "backend/config.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "config_py_get_settings",
+      "community": 0,
+      "norm_label": "get_settings (cached factory)"
+    },
+    {
+      "label": "Database Session Factory",
+      "file_type": "code",
+      "source_file": "backend/database.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "database_py_db_session",
+      "community": 32,
+      "norm_label": "database session factory"
+    },
+    {
+      "label": "FastAPI App Entry Point",
+      "file_type": "code",
+      "source_file": "backend/main.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "main_py_fastapi_app",
+      "community": 0,
+      "norm_label": "fastapi app entry point"
+    },
+    {
+      "label": "CORS Middleware",
+      "file_type": "code",
+      "source_file": "backend/main.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "main_py_cors_middleware",
+      "community": 0,
+      "norm_label": "cors middleware"
+    },
+    {
+      "label": "Static Graphs Mount",
+      "file_type": "code",
+      "source_file": "backend/main.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "main_py_static_graph_mount",
+      "community": 0,
+      "norm_label": "static graphs mount"
+    },
+    {
+      "label": "Auth Router",
+      "file_type": "code",
+      "source_file": "backend/routers/auth.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "routers_auth_py_auth_router",
+      "community": 0,
+      "norm_label": "auth router"
+    },
+    {
+      "label": "AuthMiddleware",
+      "file_type": "code",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "auth_py_authmiddleware",
+      "community": 0,
+      "norm_label": "authmiddleware"
+    },
+    {
+      "label": "AuditReport Model",
+      "file_type": "code",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "audit_report_py_auditreport_model",
+      "community": 0,
+      "norm_label": "auditreport model"
+    },
+    {
+      "label": "User Model",
+      "file_type": "code",
+      "source_file": "backend/models/user.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "user_py_user_model",
+      "community": 0,
+      "norm_label": "user model"
+    },
+    {
+      "label": "Transaction Model",
+      "file_type": "code",
+      "source_file": "backend/models/transaction.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "transaction_py_transaction_model",
+      "community": 0,
+      "norm_label": "transaction model"
+    },
+    {
+      "label": "ChatSession Model",
+      "file_type": "code",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "chat_session_py_chatsession_model",
+      "community": 0,
+      "norm_label": "chatsession model"
+    },
+    {
+      "label": "Document Model",
+      "file_type": "code",
+      "source_file": "backend/models/document.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "document_py_document_model",
+      "community": 0,
+      "norm_label": "document model"
+    },
+    {
+      "label": "SQLAlchemy Base",
+      "file_type": "code",
+      "source_file": "backend/models/base.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "base_py_sqlalchemy_base",
+      "community": 0,
+      "norm_label": "sqlalchemy base"
+    },
+    {
+      "label": "Audit Prompt Template",
+      "file_type": "code",
+      "source_file": "backend/prompts/audit_prompt.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "audit_prompt_py_audit_prompt",
+      "community": 0,
+      "norm_label": "audit prompt template"
+    },
+    {
+      "label": "run_audit Pipeline",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "audit_py_run_audit",
+      "community": 0,
+      "norm_label": "run_audit pipeline"
+    },
+    {
+      "label": "_build_llm (OpenRouter LLM)",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "audit_py_build_llm",
+      "community": 0,
+      "norm_label": "_build_llm (openrouter llm)"
+    },
+    {
+      "label": "_format_transactions",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "audit_py_format_transactions",
+      "community": 0,
+      "norm_label": "_format_transactions"
+    },
+    {
+      "label": "_parse_llm_response",
+      "file_type": "code",
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "audit_py_parse_llm_response",
+      "community": 0,
+      "norm_label": "_parse_llm_response"
+    },
+    {
+      "label": "Google OAuth Service",
+      "file_type": "code",
+      "source_file": "backend/services/auth.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "services_auth_py_google_oauth",
+      "community": 0,
+      "norm_label": "google oauth service"
+    },
+    {
+      "label": "build_audit_graph",
+      "file_type": "code",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "graphify_service_py_build_audit_graph",
+      "community": 0,
+      "norm_label": "build_audit_graph"
+    },
+    {
+      "label": "_run_graphify_pipeline",
+      "file_type": "code",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "graphify_service_py_run_graphify_pipeline",
+      "community": 0,
+      "norm_label": "_run_graphify_pipeline"
+    },
+    {
+      "label": "get_callbacks",
+      "file_type": "code",
+      "source_file": "backend/services/observability.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "observability_py_get_callbacks",
+      "community": 0,
+      "norm_label": "get_callbacks"
+    },
+    {
+      "label": "LangSmith Handler Config",
+      "file_type": "code",
+      "source_file": "backend/services/observability.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "observability_py_langsmith_handler",
+      "community": 0,
+      "norm_label": "langsmith handler config"
+    },
+    {
+      "label": "Langfuse Callback Handler",
+      "file_type": "code",
+      "source_file": "backend/services/observability.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "observability_py_langfuse_handler",
+      "community": 0,
+      "norm_label": "langfuse callback handler"
+    },
+    {
+      "label": "Google Drive Service",
+      "file_type": "code",
+      "source_file": "backend/services/drive.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "drive_py_google_drive_service",
+      "community": 0,
+      "norm_label": "google drive service"
+    },
+    {
+      "label": "Phase 1: Infrastructure",
+      "file_type": "document",
+      "source_file": "PROGRESS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "progress_md_phase1",
+      "community": 33,
+      "norm_label": "phase 1: infrastructure"
+    },
+    {
+      "label": "Phase 4: AI Pipeline",
+      "file_type": "document",
+      "source_file": "PROGRESS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "progress_md_phase4",
+      "community": 0,
+      "norm_label": "phase 4: ai pipeline"
+    },
+    {
+      "label": "Phase 5: Graphify Integration",
+      "file_type": "document",
+      "source_file": "PROGRESS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "progress_md_phase5",
+      "community": 0,
+      "norm_label": "phase 5: graphify integration"
+    },
+    {
+      "label": "Phase 6: LangGraph Chat",
+      "file_type": "document",
+      "source_file": "PROGRESS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "progress_md_phase6",
+      "community": 0,
+      "norm_label": "phase 6: langgraph chat"
+    },
+    {
+      "label": "Docker Compose Services",
+      "file_type": "document",
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docker_compose_services",
+      "community": 23,
+      "norm_label": "docker compose services"
+    },
+    {
+      "label": "System Architecture",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_architecture",
+      "community": 23,
+      "norm_label": "system architecture"
+    },
+    {
+      "label": "Auth & Roles Design",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_auth_roles",
+      "community": 0,
+      "norm_label": "auth & roles design"
+    },
+    {
+      "label": "Google Drive Storage Strategy",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_google_drive_storage",
+      "community": 0,
+      "norm_label": "google drive storage strategy"
+    },
+    {
+      "label": "AI Pipeline Design (LangChain+LangGraph)",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_ai_pipeline",
+      "community": 0,
+      "norm_label": "ai pipeline design (langchain+langgraph)"
+    },
+    {
+      "label": "Graphify Integration Design",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_graphify_integration",
+      "community": 0,
+      "norm_label": "graphify integration design"
+    },
+    {
+      "label": "Observability Toggle Design",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_observability_design",
+      "community": 0,
+      "norm_label": "observability toggle design"
+    },
+    {
+      "label": "Rationale: drive.file scope limits exposure",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_rationale_drive_file_scope",
+      "community": 0,
+      "norm_label": "rationale: drive.file scope limits exposure"
+    },
+    {
+      "label": "Rationale: OpenRouter as single LLM provider",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spec_rationale_openrouter_single_provider",
+      "community": 0,
+      "norm_label": "rationale: openrouter as single llm provider"
+    },
+    {
+      "label": "React Frontend Application",
+      "file_type": "code",
+      "source_file": "frontend/src/main.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "frontend_react_app",
+      "community": 2,
+      "norm_label": "react frontend application"
+    },
+    {
+      "label": "Vite Build Configuration",
+      "file_type": "code",
+      "source_file": "frontend/vite.config.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "frontend_vite_config",
+      "community": 2,
+      "norm_label": "vite build configuration"
+    },
+    {
+      "label": "Tailwind CSS Configuration",
+      "file_type": "code",
+      "source_file": "frontend/tailwind.config.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "frontend_tailwind_config",
+      "community": 17,
+      "norm_label": "tailwind css configuration"
+    },
+    {
+      "label": "PostCSS Configuration",
+      "file_type": "code",
+      "source_file": "frontend/postcss.config.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "frontend_postcss_config",
+      "community": 17,
+      "norm_label": "postcss configuration"
+    },
+    {
+      "label": "Frontend HTML Entry Point",
+      "file_type": "code",
+      "source_file": "frontend/index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "frontend_index_html",
+      "community": 2,
+      "norm_label": "frontend html entry point"
+    },
+    {
+      "label": "Backend ORM Models Package",
+      "file_type": "code",
+      "source_file": "backend/models/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_models_package",
+      "community": 2,
+      "norm_label": "backend orm models package"
+    },
+    {
+      "label": "SQLAlchemy Declarative Base",
+      "file_type": "code",
+      "source_file": "backend/models/base.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_model_base",
+      "community": 2,
+      "norm_label": "sqlalchemy declarative base"
+    },
+    {
+      "label": "User ORM Model",
+      "file_type": "code",
+      "source_file": "backend/models/user.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_model_user",
+      "community": 15,
+      "norm_label": "user orm model"
+    },
+    {
+      "label": "Document ORM Model",
+      "file_type": "code",
+      "source_file": "backend/models/document.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_model_document",
+      "community": 2,
+      "norm_label": "document orm model"
+    },
+    {
+      "label": "Transaction ORM Model",
+      "file_type": "code",
+      "source_file": "backend/models/transaction.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_model_transaction",
+      "community": 2,
+      "norm_label": "transaction orm model"
+    },
+    {
+      "label": "AuditReport ORM Model",
+      "file_type": "code",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_model_audit_report",
+      "community": 2,
+      "norm_label": "auditreport orm model"
+    },
+    {
+      "label": "ChatSession ORM Model",
+      "file_type": "code",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_model_chat_session",
+      "community": 2,
+      "norm_label": "chatsession orm model"
+    },
+    {
+      "label": "FastAPI Backend",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_fastapi",
+      "community": 2,
+      "norm_label": "fastapi backend"
+    },
+    {
+      "label": "LangChain Audit Pipeline",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_langchain_pipeline",
+      "community": 2,
+      "norm_label": "langchain audit pipeline"
+    },
+    {
+      "label": "LangGraph Multi-Agent Chat",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_langgraph_chat",
+      "community": 2,
+      "norm_label": "langgraph multi-agent chat"
+    },
+    {
+      "label": "PostgreSQL 15 with pgvector",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_postgresql_pgvector",
+      "community": 2,
+      "norm_label": "postgresql 15 with pgvector"
+    },
+    {
+      "label": "Observability Toggle (LangSmith + Langfuse)",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_observability",
+      "community": 2,
+      "norm_label": "observability toggle (langsmith + langfuse)"
+    },
+    {
+      "label": "Google Drive Per-User Storage",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_google_drive_storage",
+      "community": 2,
+      "norm_label": "google drive per-user storage"
+    },
+    {
+      "label": "OpenRouter LLM Provider (Llama 3.3, DeepSeek, Mistral)",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_openrouter_llm",
+      "community": 2,
+      "norm_label": "openrouter llm provider (llama 3.3, deepseek, mistral)"
+    },
+    {
+      "label": "Graphify Knowledge Graph Service",
+      "file_type": "code",
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "backend_graphify_service",
+      "community": 2,
+      "norm_label": "graphify knowledge graph service"
+    },
+    {
+      "label": "Role: super_admin",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_role_super_admin",
+      "community": 15,
+      "norm_label": "role: super_admin"
+    },
+    {
+      "label": "Role: admin",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_role_admin",
+      "community": 15,
+      "norm_label": "role: admin"
+    },
+    {
+      "label": "Role: user (Row Level Security)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_role_user",
+      "community": 15,
+      "norm_label": "role: user (row level security)"
+    },
+    {
+      "label": "OBSERVABILITY_BACKENDS Env Toggle",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_observability_toggle",
+      "community": 2,
+      "norm_label": "observability_backends env toggle"
+    },
+    {
+      "label": "Google OAuth2 Authentication (drive.file scope)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_google_oauth2",
+      "community": 2,
+      "norm_label": "google oauth2 authentication (drive.file scope)"
+    },
+    {
+      "label": "Vite Dev Server API Proxy to Port 8000",
+      "file_type": "code",
+      "source_file": "frontend/vite.config.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_vite_proxy",
+      "community": 2,
+      "norm_label": "vite dev server api proxy to port 8000"
+    },
+    {
+      "label": "Brand Color Palette (green-based)",
+      "file_type": "code",
+      "source_file": "frontend/tailwind.config.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_tailwind_brand_color",
+      "community": 17,
+      "norm_label": "brand color palette (green-based)"
+    },
+    {
+      "label": "Alembic Autogenerate Migration Support",
+      "file_type": "code",
+      "source_file": "backend/models/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_alembic_autogenerate",
+      "community": 2,
+      "norm_label": "alembic autogenerate migration support"
+    },
+    {
+      "label": "Row Level Security (user data isolation)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_row_level_security",
+      "community": 15,
+      "norm_label": "row level security (user data isolation)"
+    },
+    {
+      "label": "Single LLM Provider Strategy (OpenRouter)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_single_llm_provider",
+      "community": 2,
+      "norm_label": "single llm provider strategy (openrouter)"
+    },
+    {
+      "label": "Graphify for Post-Audit Spending Visualization",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_graphify_post_audit",
+      "community": 2,
+      "norm_label": "graphify for post-audit spending visualization"
+    },
+    {
+      "label": "React BrowserRouter SPA Routing",
+      "file_type": "code",
+      "source_file": "frontend/src/main.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_browser_router",
+      "community": 2,
+      "norm_label": "react browserrouter spa routing"
+    },
+    {
+      "label": "React StrictMode",
+      "file_type": "code",
+      "source_file": "frontend/src/main.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_strict_mode",
+      "community": 2,
+      "norm_label": "react strictmode"
+    },
+    {
+      "label": "UserRole Enum",
+      "file_type": "code",
+      "source_file": "backend/models/user.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_userrole_enum",
+      "community": 15,
+      "norm_label": "userrole enum"
+    },
+    {
+      "label": "DocumentStatus Enum",
+      "file_type": "code",
+      "source_file": "backend/models/document.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_documentstatus_enum",
+      "community": 2,
+      "norm_label": "documentstatus enum"
+    },
+    {
+      "label": "AI Personal Finance Auditor Project",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "project_ai_financial_auditor",
+      "community": 2,
+      "norm_label": "ai personal finance auditor project"
+    }
+  ],
+  "links": [
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "frontend_src_app_tsx",
+      "target": "hooks_useauth_authprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/App.tsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "frontend_src_app_tsx",
+      "target": "auth_protectedroute_protectedroute",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/auth/ProtectedRoute.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "frontend_src_components_auth_protectedroute_tsx",
+      "target": "hooks_useauth_useauth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/auth/ProtectedRoute.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "frontend_src_components_auth_protectedroute_tsx",
+      "target": "auth_protectedroute_protectedroute",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "frontend/src/components/auth/ProtectedRoute.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "auth_protectedroute_protectedroute",
+      "target": "hooks_useauth_useauth"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/audit/GraphifyPanel.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "frontend_src_components_audit_graphifypanel_tsx",
+      "target": "audit_graphifypanel_graphifypanel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/AuditReport.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "frontend_src_pages_auditreport_tsx",
+      "target": "audit_graphifypanel_graphifypanel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/hooks/useAuth.tsx",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "frontend_src_hooks_useauth_tsx",
+      "target": "hooks_useauth_authprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/hooks/useAuth.tsx",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "frontend_src_hooks_useauth_tsx",
+      "target": "hooks_useauth_useauth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/Login.tsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "frontend_src_pages_login_tsx",
+      "target": "hooks_useauth_useauth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/Dashboard.tsx",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "hooks_useauth_useauth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "frontend/src/pages/Login.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "pages_login_login",
+      "target": "hooks_useauth_useauth"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "frontend/src/pages/Dashboard.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "pages_dashboard_dashboard",
+      "target": "hooks_useauth_useauth"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/Login.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "frontend_src_pages_login_tsx",
+      "target": "pages_login_login",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/Dashboard.tsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "pages_dashboard_dashboard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/Upload.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "frontend_src_pages_upload_tsx",
+      "target": "pages_upload_upload",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/Chat.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "frontend_src_pages_chat_tsx",
+      "target": "pages_chat_chat",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/pages/Admin.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "frontend_src_pages_admin_tsx",
+      "target": "pages_admin_admin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "backend_config_py",
+      "target": "backend_config_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "backend_config_py",
+      "target": "backend_config_active_backends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "backend_config_py",
+      "target": "backend_config_langsmith_enabled",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L59",
+      "weight": 1.0,
+      "source": "backend_config_py",
+      "target": "backend_config_langfuse_enabled",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L65",
+      "weight": 1.0,
+      "source": "backend_config_py",
+      "target": "backend_config_get_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "backend_config_rationale_1",
+      "target": "backend_config_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "backend_config_settings",
+      "target": "basesettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L67",
+      "weight": 1.0,
+      "source": "backend_config_get_settings",
+      "target": "backend_config_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "backend_config_rationale_12",
+      "target": "backend_config_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/config.py",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "backend_config_rationale_66",
+      "target": "backend_config_get_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/database.py",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "backend_database_make_engine",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "chains_audit_build_llm",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L101",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/auth.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "services_auth_get_google_auth_url",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/auth.py",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "services_auth_exchange_code_for_tokens",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/auth.py",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "services_auth_upsert_user",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/auth.py",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "services_auth_create_app_jwt",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/auth.py",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "services_auth_decode_app_jwt",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/observability.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "services_observability_get_callbacks",
+      "target": "backend_config_get_settings"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "backend_database_py",
+      "target": "backend_database_make_engine",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "backend_database_py",
+      "target": "backend_database_get_db",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "backend_database_py",
+      "target": "backend_database_set_rls_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "backend_database_rationale_1",
+      "target": "backend_database_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "backend_database_rationale_14",
+      "target": "backend_database_make_engine",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "backend_database_rationale_24",
+      "target": "backend_database_get_db",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/database.py",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "backend_database_rationale_33",
+      "target": "backend_database_set_rls_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "backend_main_py",
+      "target": "backend_main_health_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "backend_main_rationale_1",
+      "target": "backend_main_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "backend_main_rationale_38",
+      "target": "backend_main_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "backend_main_rationale_39",
+      "target": "backend_main_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "backend_main_rationale_40",
+      "target": "backend_main_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "backend_main_rationale_41",
+      "target": "backend_main_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/main.py",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "backend_main_rationale_46",
+      "target": "backend_main_health_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "backend_routers_auth_py",
+      "target": "routers_auth_google_login",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "backend_routers_auth_py",
+      "target": "routers_auth_google_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L58",
+      "weight": 1.0,
+      "source": "backend_routers_auth_py",
+      "target": "routers_auth_logout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L65",
+      "weight": 1.0,
+      "source": "backend_routers_auth_py",
+      "target": "routers_auth_get_me",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "routers_auth_rationale_1",
+      "target": "backend_routers_auth_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "routers_auth_rationale_24",
+      "target": "routers_auth_google_login",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "routers_auth_google_login",
+      "target": "services_auth_get_google_auth_url"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "routers_auth_rationale_30",
+      "target": "routers_auth_google_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "routers_auth_google_callback",
+      "target": "services_auth_exchange_code_for_tokens"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "routers_auth_google_callback",
+      "target": "services_auth_get_google_user_info"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "routers_auth_google_callback",
+      "target": "services_auth_upsert_user"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "routers_auth_google_callback",
+      "target": "services_auth_create_app_jwt"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L59",
+      "weight": 1.0,
+      "source": "routers_auth_rationale_59",
+      "target": "routers_auth_logout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/routers/auth.py",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "routers_auth_rationale_66",
+      "target": "routers_auth_get_me",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "backend_middleware_auth_py",
+      "target": "middleware_auth_get_current_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "backend_middleware_auth_py",
+      "target": "middleware_auth_require_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "middleware_auth_rationale_1",
+      "target": "backend_middleware_auth_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "middleware_auth_rationale_24",
+      "target": "middleware_auth_get_current_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "middleware_auth_get_current_user",
+      "target": "services_auth_decode_app_jwt"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/middleware/auth.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "middleware_auth_rationale_48",
+      "target": "middleware_auth_require_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "backend_models_audit_report_py",
+      "target": "models_audit_report_auditreport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "models_audit_report_rationale_1",
+      "target": "backend_models_audit_report_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "models_audit_report_auditreport",
+      "target": "base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "models_audit_report_rationale_14",
+      "target": "models_audit_report_auditreport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "backend/models/audit_report.py",
+      "source_location": "L10",
+      "weight": 0.8,
+      "source": "models_audit_report_auditreport",
+      "target": "models_base_base",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L143",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "models_audit_report_auditreport"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "models_user_user",
+      "target": "base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "models_transaction_transaction",
+      "target": "base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "models_chat_session_chatsession",
+      "target": "base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "models_document_document",
+      "target": "base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "backend_models_user_py",
+      "target": "models_user_userrole",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "backend_models_user_py",
+      "target": "models_user_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "models_user_rationale_1",
+      "target": "backend_models_user_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "models_user_userrole",
+      "target": "str",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "models_user_rationale_15",
+      "target": "models_user_userrole",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "source": "models_user_userrole",
+      "target": "models_base_base",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "models_document_documentstatus",
+      "target": "str",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "models_user_rationale_22",
+      "target": "models_user_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "backend/models/user.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "source": "models_user_user",
+      "target": "models_base_base",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/auth.py",
+      "source_location": "L80",
+      "weight": 1.0,
+      "source": "services_auth_upsert_user",
+      "target": "models_user_user"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "backend_models_transaction_py",
+      "target": "models_transaction_transaction",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "models_transaction_rationale_1",
+      "target": "backend_models_transaction_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "models_transaction_rationale_17",
+      "target": "models_transaction_transaction",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "backend/models/transaction.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "source": "models_transaction_transaction",
+      "target": "models_base_base",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/__init__.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "models_init_rationale_1",
+      "target": "backend_models_init_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "backend_models_chat_session_py",
+      "target": "models_chat_session_chatsession",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "models_chat_session_rationale_1",
+      "target": "backend_models_chat_session_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "models_chat_session_rationale_14",
+      "target": "models_chat_session_chatsession",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "backend/models/chat_session.py",
+      "source_location": "L10",
+      "weight": 0.8,
+      "source": "models_chat_session_chatsession",
+      "target": "models_base_base",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "backend_models_document_py",
+      "target": "models_document_documentstatus",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "backend_models_document_py",
+      "target": "models_document_document",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "models_document_rationale_1",
+      "target": "backend_models_document_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "models_document_rationale_15",
+      "target": "models_document_documentstatus",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "source": "models_document_documentstatus",
+      "target": "models_base_base",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "models_document_rationale_26",
+      "target": "models_document_document",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "backend/models/document.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "source": "models_document_document",
+      "target": "models_base_base",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/base.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "backend_models_base_py",
+      "target": "models_base_base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/base.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "models_base_rationale_1",
+      "target": "backend_models_base_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/base.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "models_base_base",
+      "target": "declarativebase",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/models/base.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "models_base_rationale_7",
+      "target": "models_base_base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/prompts/audit_prompt.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "prompts_audit_prompt_rationale_1",
+      "target": "backend_prompts_audit_prompt_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "backend_chains_audit_py",
+      "target": "chains_audit_build_llm",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "backend_chains_audit_py",
+      "target": "chains_audit_format_transactions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "backend_chains_audit_py",
+      "target": "chains_audit_parse_llm_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "backend_chains_audit_py",
+      "target": "chains_audit_run_audit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L174",
+      "weight": 1.0,
+      "source": "backend_chains_audit_py",
+      "target": "chains_audit_get_date_range",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L182",
+      "weight": 1.0,
+      "source": "backend_chains_audit_py",
+      "target": "chains_audit_save_graph_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "chains_audit_rationale_1",
+      "target": "backend_chains_audit_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "chains_audit_build_llm",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "chains_audit_rationale_37",
+      "target": "chains_audit_build_llm",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L110",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "chains_audit_format_transactions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "chains_audit_rationale_49",
+      "target": "chains_audit_format_transactions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L130",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "chains_audit_parse_llm_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "chains_audit_rationale_61",
+      "target": "chains_audit_parse_llm_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L109",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "chains_audit_get_date_range",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L140",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "chains_audit_save_graph_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L79",
+      "weight": 1.0,
+      "source": "chains_audit_rationale_79",
+      "target": "chains_audit_run_audit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L103",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "services_observability_get_callbacks"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L137",
+      "weight": 1.0,
+      "source": "chains_audit_run_audit",
+      "target": "services_graphify_service_build_audit_graph"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L175",
+      "weight": 1.0,
+      "source": "chains_audit_rationale_175",
+      "target": "chains_audit_get_date_range",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/chains/audit.py",
+      "source_location": "L183",
+      "weight": 1.0,
+      "source": "chains_audit_rationale_183",
+      "target": "chains_audit_save_graph_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "backend_services_auth_py",
+      "target": "services_auth_get_google_auth_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "backend_services_auth_py",
+      "target": "services_auth_exchange_code_for_tokens",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "backend_services_auth_py",
+      "target": "services_auth_get_google_user_info",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "backend_services_auth_py",
+      "target": "services_auth_upsert_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L100",
+      "weight": 1.0,
+      "source": "backend_services_auth_py",
+      "target": "services_auth_create_app_jwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L112",
+      "weight": 1.0,
+      "source": "backend_services_auth_py",
+      "target": "services_auth_decode_app_jwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "services_auth_rationale_1",
+      "target": "backend_services_auth_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "services_auth_rationale_23",
+      "target": "services_auth_get_google_auth_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "services_auth_rationale_38",
+      "target": "services_auth_exchange_code_for_tokens",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "services_auth_rationale_57",
+      "target": "services_auth_get_google_user_info",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L69",
+      "weight": 1.0,
+      "source": "services_auth_rationale_69",
+      "target": "services_auth_upsert_user",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L101",
+      "weight": 1.0,
+      "source": "services_auth_rationale_101",
+      "target": "services_auth_create_app_jwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/auth.py",
+      "source_location": "L113",
+      "weight": 1.0,
+      "source": "services_auth_rationale_113",
+      "target": "services_auth_decode_app_jwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "backend_services_graphify_service_py",
+      "target": "services_graphify_service_build_audit_graph",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "backend_services_graphify_service_py",
+      "target": "services_graphify_service_run_graphify_pipeline",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L91",
+      "weight": 1.0,
+      "source": "backend_services_graphify_service_py",
+      "target": "services_graphify_service_write_corpus_files",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L146",
+      "weight": 1.0,
+      "source": "backend_services_graphify_service_py",
+      "target": "services_graphify_service_extract",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "services_graphify_service_rationale_1",
+      "target": "backend_services_graphify_service_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "services_graphify_service_build_audit_graph",
+      "target": "services_graphify_service_run_graphify_pipeline",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "services_graphify_service_rationale_25",
+      "target": "services_graphify_service_build_audit_graph",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "services_graphify_service_run_graphify_pipeline",
+      "target": "services_graphify_service_write_corpus_files",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "services_graphify_service_run_graphify_pipeline",
+      "target": "services_graphify_service_extract",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "services_graphify_service_rationale_48",
+      "target": "services_graphify_service_run_graphify_pipeline",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L92",
+      "weight": 1.0,
+      "source": "services_graphify_service_rationale_92",
+      "target": "services_graphify_service_write_corpus_files",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": "L147",
+      "weight": 1.0,
+      "source": "services_graphify_service_rationale_147",
+      "target": "services_graphify_service_extract",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "backend_services_observability_py",
+      "target": "services_observability_get_callbacks",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "backend_services_observability_py",
+      "target": "services_observability_configure_langsmith",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "backend_services_observability_py",
+      "target": "services_observability_build_langfuse_handler",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "services_observability_rationale_1",
+      "target": "backend_services_observability_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "services_observability_get_callbacks",
+      "target": "services_observability_configure_langsmith",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "services_observability_get_callbacks",
+      "target": "services_observability_build_langfuse_handler",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "services_observability_rationale_19",
+      "target": "services_observability_get_callbacks",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "services_observability_rationale_39",
+      "target": "services_observability_configure_langsmith",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/observability.py",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "services_observability_rationale_46",
+      "target": "services_observability_build_langfuse_handler",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "backend_services_drive_py",
+      "target": "services_drive_build_drive_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "backend_services_drive_py",
+      "target": "services_drive_get_or_create_folder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "backend_services_drive_py",
+      "target": "services_drive_upload_file",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L86",
+      "weight": 1.0,
+      "source": "backend_services_drive_py",
+      "target": "services_drive_fetch_file_bytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "services_drive_rationale_1",
+      "target": "backend_services_drive_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "services_drive_upload_file",
+      "target": "services_drive_build_drive_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L92",
+      "weight": 1.0,
+      "source": "services_drive_fetch_file_bytes",
+      "target": "services_drive_build_drive_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "services_drive_rationale_17",
+      "target": "services_drive_build_drive_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "services_drive_upload_file",
+      "target": "services_drive_get_or_create_folder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "services_drive_rationale_27",
+      "target": "services_drive_get_or_create_folder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "services_drive_rationale_57",
+      "target": "services_drive_upload_file",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "backend/services/drive.py",
+      "source_location": "L91",
+      "weight": 1.0,
+      "source": "services_drive_rationale_91",
+      "target": "services_drive_fetch_file_bytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "migrations/003_rls.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "003_rls_row_level_security",
+      "target": "002_schema_users_table"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "migrations/003_rls.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "003_rls_row_level_security",
+      "target": "002_schema_transactions_table"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "migrations/003_rls.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "003_rls_row_level_security",
+      "target": "002_schema_documents_table"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "migrations/001_extensions.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "001_extensions_pgvector_extension",
+      "target": "002_schema_transactions_table"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "002_schema_database_schema",
+      "target": "002_schema_users_table"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "002_schema_database_schema",
+      "target": "002_schema_documents_table"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "002_schema_database_schema",
+      "target": "002_schema_transactions_table"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "002_schema_database_schema",
+      "target": "002_schema_audit_reports_table"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "migrations/002_schema.sql",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "002_schema_database_schema",
+      "target": "002_schema_chat_sessions_table"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "app_tsx_router",
+      "target": "app_tsx_protected_route"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "app_tsx_router",
+      "target": "login_tsx_login_page"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "app_tsx_router",
+      "target": "dashboard_tsx_dashboard_page"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "app_tsx_router",
+      "target": "upload_tsx_upload_page"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "app_tsx_router",
+      "target": "chat_tsx_chat_page"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "app_tsx_router",
+      "target": "auditreport_tsx_auditreport_page"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/App.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "app_tsx_router",
+      "target": "admin_tsx_admin_page"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/components/auth/ProtectedRoute.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "protectedroute_tsx_protectedroute",
+      "target": "useauth_tsx_useauth"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "frontend/src/components/audit/GraphifyPanel.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "graphifypanel_tsx_graphifypanel",
+      "target": "api_ts_api_service"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/pages/AuditReport.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "auditreport_tsx_auditreport_page",
+      "target": "graphifypanel_tsx_graphifypanel"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "frontend/src/hooks/useAuth.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "useauth_tsx_useauth",
+      "target": "api_ts_api_service"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/pages/Login.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "login_tsx_login_page",
+      "target": "useauth_tsx_useauth"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/pages/Dashboard.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "dashboard_tsx_dashboard_page",
+      "target": "useauth_tsx_useauth"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/pages/Admin.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "admin_tsx_admin_page",
+      "target": "useauth_tsx_useauth"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/pages/Upload.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "upload_tsx_upload_page",
+      "target": "api_ts_api_service"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/pages/Chat.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "chat_tsx_chat_page",
+      "target": "api_ts_api_service"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/config.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "config_py_get_settings",
+      "target": "config_py_settings"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/services/observability.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "observability_py_get_callbacks",
+      "target": "config_py_get_settings"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/main.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "main_py_fastapi_app",
+      "target": "config_py_get_settings"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/middleware/auth.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "auth_py_authmiddleware",
+      "target": "config_py_get_settings"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_build_llm",
+      "target": "config_py_get_settings"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/main.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "main_py_fastapi_app",
+      "target": "main_py_cors_middleware"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/main.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "main_py_fastapi_app",
+      "target": "main_py_static_graph_mount"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/main.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "main_py_fastapi_app",
+      "target": "routers_auth_py_auth_router"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/middleware/auth.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "auth_py_authmiddleware",
+      "target": "user_py_user_model"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "spec_auth_roles",
+      "target": "auth_py_authmiddleware"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/audit_report.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_report_py_auditreport_model",
+      "target": "base_py_sqlalchemy_base"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "audit_report_py_auditreport_model"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "graphify_service_py_run_graphify_pipeline",
+      "target": "audit_report_py_auditreport_model"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/user.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "user_py_user_model",
+      "target": "base_py_sqlalchemy_base"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/services/auth.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "services_auth_py_google_oauth",
+      "target": "user_py_user_model"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/transaction.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "transaction_py_transaction_model",
+      "target": "base_py_sqlalchemy_base"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "transaction_py_transaction_model"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/chat_session.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "chat_session_py_chatsession_model",
+      "target": "base_py_sqlalchemy_base"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "PROGRESS.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "progress_md_phase6",
+      "target": "chat_session_py_chatsession_model"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/document.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "document_py_document_model",
+      "target": "base_py_sqlalchemy_base"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "backend/services/drive.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "drive_py_google_drive_service",
+      "target": "document_py_document_model"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "audit_prompt_py_audit_prompt"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "audit_py_build_llm"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "audit_py_format_transactions"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "audit_py_parse_llm_response"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "graphify_service_py_build_audit_graph"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/chains/audit.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "audit_py_run_audit",
+      "target": "observability_py_get_callbacks"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "PROGRESS.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "progress_md_phase4",
+      "target": "audit_py_run_audit"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "spec_ai_pipeline",
+      "target": "audit_py_run_audit"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "spec_rationale_openrouter_single_provider",
+      "target": "audit_py_build_llm"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/services/auth.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "services_auth_py_google_oauth",
+      "target": "drive_py_google_drive_service"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/services/graphify_service.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "graphify_service_py_build_audit_graph",
+      "target": "graphify_service_py_run_graphify_pipeline"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "PROGRESS.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "progress_md_phase5",
+      "target": "graphify_service_py_build_audit_graph"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "spec_graphify_integration",
+      "target": "graphify_service_py_build_audit_graph"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/services/observability.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "observability_py_get_callbacks",
+      "target": "observability_py_langsmith_handler"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/services/observability.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "observability_py_get_callbacks",
+      "target": "observability_py_langfuse_handler"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "spec_observability_design",
+      "target": "observability_py_get_callbacks"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "backend/services/observability.py",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "observability_py_langsmith_handler",
+      "target": "observability_py_langfuse_handler"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "spec_rationale_drive_file_scope",
+      "target": "drive_py_google_drive_service"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "spec_google_drive_storage",
+      "target": "drive_py_google_drive_service"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docker/docker-compose.yml",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "docker_compose_services",
+      "target": "spec_architecture"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/index.html",
+      "source_location": "line 11",
+      "weight": 1.0,
+      "source": "frontend_index_html",
+      "target": "frontend_react_app"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/main.tsx",
+      "source_location": "line 9",
+      "weight": 1.0,
+      "source": "frontend_react_app",
+      "target": "concept_browser_router"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/main.tsx",
+      "source_location": "line 8",
+      "weight": 1.0,
+      "source": "frontend_react_app",
+      "target": "concept_strict_mode"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "line 8",
+      "weight": 1.0,
+      "source": "project_ai_financial_auditor",
+      "target": "frontend_react_app"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "frontend/vite.config.ts",
+      "source_location": "lines 8-14",
+      "weight": 0.9,
+      "source": "frontend_react_app",
+      "target": "backend_fastapi"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/vite.config.ts",
+      "source_location": "lines 8-14",
+      "weight": 1.0,
+      "source": "frontend_vite_config",
+      "target": "concept_vite_proxy"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/tailwind.config.ts",
+      "source_location": "lines 8-13",
+      "weight": 1.0,
+      "source": "frontend_tailwind_config",
+      "target": "concept_tailwind_brand_color"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/postcss.config.js",
+      "source_location": "line 3",
+      "weight": 1.0,
+      "source": "frontend_postcss_config",
+      "target": "frontend_tailwind_config"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 3",
+      "weight": 1.0,
+      "source": "backend_models_package",
+      "target": "backend_model_base"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 4",
+      "weight": 1.0,
+      "source": "backend_models_package",
+      "target": "backend_model_user"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 5",
+      "weight": 1.0,
+      "source": "backend_models_package",
+      "target": "backend_model_document"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 6",
+      "weight": 1.0,
+      "source": "backend_models_package",
+      "target": "backend_model_transaction"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 7",
+      "weight": 1.0,
+      "source": "backend_models_package",
+      "target": "backend_model_audit_report"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 8",
+      "weight": 1.0,
+      "source": "backend_models_package",
+      "target": "backend_model_chat_session"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 1",
+      "weight": 1.0,
+      "source": "backend_models_package",
+      "target": "concept_alembic_autogenerate"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 4",
+      "weight": 1.0,
+      "source": "backend_model_user",
+      "target": "concept_userrole_enum"
+    },
+    {
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "CLAUDE.md",
+      "source_location": "lines 41-43",
+      "weight": 0.85,
+      "source": "backend_model_user",
+      "target": "concept_role_super_admin"
+    },
+    {
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "CLAUDE.md",
+      "source_location": "lines 41-43",
+      "weight": 0.85,
+      "source": "backend_model_user",
+      "target": "concept_role_admin"
+    },
+    {
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "CLAUDE.md",
+      "source_location": "lines 41-43",
+      "weight": 0.85,
+      "source": "backend_model_user",
+      "target": "concept_role_user"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py",
+      "source_location": "line 5",
+      "weight": 1.0,
+      "source": "backend_model_document",
+      "target": "concept_documentstatus_enum"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "backend/models/__init__.py",
+      "source_location": null,
+      "weight": 0.7,
+      "source": "backend_model_transaction",
+      "target": "backend_model_document"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend/models/__init__.py",
+      "source_location": null,
+      "weight": 0.8,
+      "source": "backend_model_audit_report",
+      "target": "backend_model_transaction"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 0.8,
+      "source": "backend_langchain_pipeline",
+      "target": "backend_model_audit_report"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "backend_langgraph_chat",
+      "target": "backend_model_chat_session"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "frontend/vite.config.ts",
+      "source_location": "line 10",
+      "weight": 0.95,
+      "source": "concept_vite_proxy",
+      "target": "backend_fastapi"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "backend_fastapi",
+      "target": "backend_langchain_pipeline"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "backend_fastapi",
+      "target": "backend_langgraph_chat"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "weight": 0.9,
+      "source": "backend_fastapi",
+      "target": "backend_postgresql_pgvector"
+    },
+    {
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "backend_fastapi",
+      "target": "concept_google_oauth2"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "backend_fastapi",
+      "target": "backend_observability"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "line 9",
+      "weight": 1.0,
+      "source": "project_ai_financial_auditor",
+      "target": "backend_fastapi"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "weight": 0.9,
+      "source": "backend_langchain_pipeline",
+      "target": "backend_openrouter_llm"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "README.md",
+      "source_location": "line 17",
+      "weight": 0.75,
+      "source": "backend_langchain_pipeline",
+      "target": "backend_graphify_service"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "backend/requirements.txt",
+      "source_location": null,
+      "weight": 0.9,
+      "source": "backend_langgraph_chat",
+      "target": "backend_openrouter_llm"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "backend/models/__init__.py",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "concept_alembic_autogenerate",
+      "target": "backend_postgresql_pgvector"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "lines 38-48",
+      "weight": 1.0,
+      "source": "concept_observability_toggle",
+      "target": "backend_observability"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": "line 17",
+      "weight": 1.0,
+      "source": "concept_google_oauth2",
+      "target": "backend_google_drive_storage"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": "line 13",
+      "weight": 1.0,
+      "source": "concept_single_llm_provider",
+      "target": "backend_openrouter_llm"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "line 17",
+      "weight": 1.0,
+      "source": "concept_graphify_post_audit",
+      "target": "backend_graphify_service"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": "line 43",
+      "weight": 1.0,
+      "source": "concept_role_user",
+      "target": "concept_row_level_security"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "db_migration_pipeline",
+      "label": "Ordered DB Migration Pipeline",
+      "nodes": [
+        "001_extensions_pgvector_extension",
+        "002_schema_database_schema",
+        "003_rls_row_level_security"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "migrations/001_extensions.sql"
+    },
+    {
+      "id": "frontend_page_auth_guard",
+      "label": "Auth-Guarded Frontend Pages",
+      "nodes": [
+        "dashboard_tsx_dashboard_page",
+        "upload_tsx_upload_page",
+        "chat_tsx_chat_page",
+        "admin_tsx_admin_page"
+      ],
+      "relation": "implement",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "frontend/src/App.tsx"
+    },
+    {
+      "id": "sqlalchemy_orm_models",
+      "label": "SQLAlchemy ORM Models",
+      "nodes": [
+        "user_py_user_model",
+        "document_py_document_model",
+        "transaction_py_transaction_model",
+        "audit_report_py_auditreport_model",
+        "chat_session_py_chatsession_model"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "backend/models/base.py"
+    },
+    {
+      "id": "audit_pipeline_flow",
+      "label": "Full Audit Pipeline Flow",
+      "nodes": [
+        "audit_py_run_audit",
+        "graphify_service_py_build_audit_graph",
+        "observability_py_get_callbacks",
+        "audit_prompt_py_audit_prompt"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": "backend/chains/audit.py"
+    },
+    {
+      "id": "observability_backends",
+      "label": "Dual Observability Backends",
+      "nodes": [
+        "observability_py_langsmith_handler",
+        "observability_py_langfuse_handler",
+        "observability_py_get_callbacks"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "backend/services/observability.py"
+    },
+    {
+      "id": "frontend_build_toolchain",
+      "label": "Frontend Build Toolchain (Vite + Tailwind + PostCSS)",
+      "nodes": [
+        "frontend_vite_config",
+        "frontend_tailwind_config",
+        "frontend_postcss_config"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/vite.config.ts"
+    },
+    {
+      "id": "backend_orm_models_group",
+      "label": "All SQLAlchemy ORM Models",
+      "nodes": [
+        "backend_model_base",
+        "backend_model_user",
+        "backend_model_document",
+        "backend_model_transaction",
+        "backend_model_audit_report",
+        "backend_model_chat_session"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/models/__init__.py"
+    },
+    {
+      "id": "ai_pipeline_stack",
+      "label": "AI Pipeline Stack (LangChain + LangGraph + OpenRouter)",
+      "nodes": [
+        "backend_langchain_pipeline",
+        "backend_langgraph_chat",
+        "backend_openrouter_llm"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md"
+    },
+    {
+      "id": "observability_backends",
+      "label": "Dual Observability Backends (LangSmith + Langfuse)",
+      "nodes": [
+        "backend_observability",
+        "concept_observability_toggle"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md"
+    },
+    {
+      "id": "rbac_roles_group",
+      "label": "RBAC Role Hierarchy",
+      "nodes": [
+        "concept_role_super_admin",
+        "concept_role_admin",
+        "concept_role_user"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md"
+    }
+  ],
+  "built_at_commit": "7a510177b55dde2dc58e7fbf266fe6d50c05745b"
+}

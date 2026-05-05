@@ -32,3 +32,6 @@ docker/volumes/
 .pytest_cache/
 htmlcov/
 .coverage
+
+
+graphify-out/cache

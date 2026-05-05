@@ -63,8 +63,49 @@ Copy `.env.example` to `.env` and fill in:
 - `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` (optional, used if self-hosted Langfuse is running)
 - `OBSERVABILITY_BACKENDS` — comma-separated: `langsmith`, `langfuse`, or `langsmith,langfuse`
 
+## Graphify — Codebase Knowledge Graph
+
+`graphify-out/` contains a persistent knowledge graph of this codebase. **Use it before making changes.**
+
+### On every new session — run this first:
+```bash
+# If graph exists, do an incremental update (fast, no LLM for code-only changes)
+if [ -f graphify-out/graph.json ]; then
+  graphify . --update
+else
+  graphify .
+fi
+```
+
+### Before touching any file — query the graph:
+```bash
+# Understand what a module connects to before editing it
+graphify explain "<ClassName or function name>"
+
+# Find the path between two concepts
+graphify path "audit chain" "graphify service"
+
+# Answer a question using the graph
+graphify query "where is the observability toggle handled?"
+```
+
+### What lives in graphify-out/:
+| File | Purpose |
+|---|---|
+| `graph.json` | Full knowledge graph — nodes, edges, communities |
+| `graph.html` | Interactive browser visualization (open directly) |
+| `GRAPH_REPORT.md` | God nodes, surprising connections, suggested questions |
+| `cache/` | Extraction cache — speeds up incremental updates |
+
+### Rules:
+- **Never delete `graphify-out/graph.json`** — it is the persistent graph built over time
+- `graphify-out/cache` is gitignored — it is local only
+- After adding a significant new module, run `graphify . --update` to keep the graph current
+- Use `graphify query` to answer "where is X", "what calls Y", "how does Z work" before grepping
+
 ## Resume Context
-If starting a new session, read:
+If starting a new session, read in order:
 1. This file (CLAUDE.md)
-2. `docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md` — full design
-3. `PROGRESS.md` — implementation progress tracker
+2. `graphify-out/GRAPH_REPORT.md` — current codebase graph (god nodes + surprising connections)
+3. `docs/superpowers/specs/2026-05-05-ai-financial-auditor-design.md` — full design spec
+4. `PROGRESS.md` — implementation progress tracker
