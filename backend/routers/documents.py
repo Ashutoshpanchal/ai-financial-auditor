@@ -251,9 +251,11 @@ async def upload_document(
         db.rollback()
         logger.exception("Failed to update document status to parsing: %s", exc)
 
+    safe_bank_name = bank_name.strip() if bank_name else "Unknown Bank"
+
     try:
         if file_type == "csv":
-            raw_transactions = parse_csv(file_bytes, bank_name=bank_name.strip())
+            raw_transactions = parse_csv(file_bytes, bank_name=safe_bank_name)
         else:
             # PDF parsing: import dynamically since pdf_parser may not exist yet
             try:
@@ -261,7 +263,9 @@ async def upload_document(
 
                 raw_transactions = parse_pdf(
                     file_bytes,
-                    bank_name=bank_name.strip() if bank_name else None,
+                    bank_name=safe_bank_name
+                    if safe_bank_name != "Unknown Bank"
+                    else None,
                     password=pdf_password or None,
                 )
             except ImportError as imp_exc:
@@ -299,7 +303,7 @@ async def upload_document(
                 id=str(uuid.uuid4()),
                 user_id=current_user.id,
                 document_id=document_id,
-                bank_name=txn_dict.get("bank_name", bank_name.strip()),
+                bank_name=txn_dict.get("bank_name") or safe_bank_name,
                 transaction_date=txn_dict["date"],
                 description=txn_dict["description"],
                 debit=float(txn_dict.get("debit", 0.0)),
