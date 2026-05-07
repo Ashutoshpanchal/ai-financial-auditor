@@ -175,7 +175,7 @@ def embed_transactions(
         texts = [_build_text(t) for t in batch]
 
         logger.debug(
-            "Requesting embeddings for batch %d–%d (size %d).",
+            "Requesting embeddings for batch %d-%d (size %d).",
             batch_start,
             batch_start + len(batch) - 1,
             len(batch),

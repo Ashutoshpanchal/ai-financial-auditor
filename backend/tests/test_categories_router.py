@@ -740,14 +740,16 @@ class TestUpdateDescriptionCategory:
         user = MagicMock()
         user.id = "user-1"
 
-        with patch("backend.routers.categories.set_rls_user"):
-            with pytest.raises(HTTPException) as exc_info:
-                update_description_category(
-                    entry_id="ghost-id",
-                    body={"payment_method": "Cash"},
-                    db=db,
-                    current_user=user,
-                )
+        with (
+            patch("backend.routers.categories.set_rls_user"),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            update_description_category(
+                entry_id="ghost-id",
+                body={"payment_method": "Cash"},
+                db=db,
+                current_user=user,
+            )
 
         assert exc_info.value.status_code == 404
 
@@ -762,7 +764,7 @@ class TestUpdateDescriptionCategory:
 
         # 'unknown_field' is not in updatable_fields and must not raise
         with patch("backend.routers.categories.set_rls_user"):
-            result = update_description_category(
+            update_description_category(
                 entry_id="dc-1",
                 body={"payment_method": "Cash", "unknown_field": "should-be-ignored"},
                 db=db,
@@ -926,16 +928,14 @@ class TestAnalyzeAndCategorize:
         mock_prompt = MagicMock()
         mock_prompt.__or__ = MagicMock(return_value=mock_chain)
 
-        with pytest.raises(HTTPException) as exc_info:
-            with (
-                patch("backend.routers.categories.set_rls_user"),
-                patch("backend.routers.categories.get_settings", return_value=settings),
-                patch(
-                    "backend.routers.categories._build_llm", return_value=MagicMock()
-                ),
-                patch("backend.routers.categories.category_prompt", mock_prompt),
-            ):
-                await analyze_and_categorize(db=db, current_user=user)
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+            patch("backend.routers.categories.get_settings", return_value=settings),
+            patch("backend.routers.categories._build_llm", return_value=MagicMock()),
+            patch("backend.routers.categories.category_prompt", mock_prompt),
+        ):
+            await analyze_and_categorize(db=db, current_user=user)
 
         assert exc_info.value.status_code == 500
         assert "failed" in exc_info.value.detail.lower()
@@ -966,16 +966,14 @@ class TestAnalyzeAndCategorize:
         mock_prompt = MagicMock()
         mock_prompt.__or__ = MagicMock(return_value=mock_chain)
 
-        with pytest.raises(HTTPException) as exc_info:
-            with (
-                patch("backend.routers.categories.set_rls_user"),
-                patch("backend.routers.categories.get_settings", return_value=settings),
-                patch(
-                    "backend.routers.categories._build_llm", return_value=MagicMock()
-                ),
-                patch("backend.routers.categories.category_prompt", mock_prompt),
-            ):
-                await analyze_and_categorize(db=db, current_user=user)
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+            patch("backend.routers.categories.get_settings", return_value=settings),
+            patch("backend.routers.categories._build_llm", return_value=MagicMock()),
+            patch("backend.routers.categories.category_prompt", mock_prompt),
+        ):
+            await analyze_and_categorize(db=db, current_user=user)
 
         assert exc_info.value.status_code == 500
         assert "failed" in exc_info.value.detail.lower()

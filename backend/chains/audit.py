@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from langchain_openai import ChatOpenAI
@@ -194,6 +195,3 @@ def _save_graph_html(html_content: str, document_id: str) -> str:
     return f"/static/graphs/{document_id}.html"
 
 
-from pathlib import (
-    Path,  # imported here to avoid circular reference with top-level imports
-)

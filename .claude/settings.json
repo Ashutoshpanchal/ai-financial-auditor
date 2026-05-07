@@ -31,7 +31,13 @@
       "Bash(npx vitest *)",
       "Bash(bash .claude/hooks/*)",
       "Bash(docker info *)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "Bash(python -m pytest backend/tests/ --ignore=backend/tests/test_upload_integration.py -v --tb=short -q)",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(python -m py_compile backend/agents/chat.py backend/agents/nodes.py backend/agents/tools.py)",
+      "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor log --oneline -3)",
+      "Bash(npm test *)",
+      "Bash(graphify . --update)"
     ]
   },
   "hooks": {

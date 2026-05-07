@@ -145,8 +145,9 @@ export default function Dashboard() {
         ]);
         setDocuments(docsRes.data);
         setAudits(auditsRes.data);
-      } catch (err: any) {
-        setError(err?.response?.data?.detail ?? "Failed to load dashboard data.");
+      } catch (err: unknown) {
+        type ApiErr = { response?: { data?: { detail?: string } } };
+        setError((err as ApiErr)?.response?.data?.detail ?? "Failed to load dashboard data.");
       } finally {
         setLoading(false);
       }

@@ -11,7 +11,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.models.base import Base
 
 
-
 class DocumentStatus(enum.StrEnum):
     """Processing lifecycle of an uploaded document."""
 

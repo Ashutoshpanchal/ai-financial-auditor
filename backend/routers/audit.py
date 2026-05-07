@@ -78,7 +78,7 @@ def list_audit_reports(
 
     Args:
         skip:         Number of records to skip; must be >= 0.
-        limit:        Maximum number of records to return; 1–100.
+        limit:        Maximum number of records to return; 1-100.
         current_user: Authenticated user injected by the auth dependency.
         db:           SQLAlchemy session injected by the DB dependency.
 

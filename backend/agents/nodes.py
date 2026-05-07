@@ -12,12 +12,12 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from sqlalchemy.orm import Session
 from typing_extensions import TypedDict
-from typing import TYPE_CHECKING
 
 from backend.agents.tools import (
     compare_months,

@@ -8,7 +8,7 @@ interface Props {
   documentId: string;
 }
 
-export function GraphifyPanel({ graphJson, graphHtmlPath, documentId }: Props) {
+export function GraphifyPanel({ graphJson, graphHtmlPath, documentId: _documentId }: Props) {
   const [tab, setTab] = useState<"graph" | "stats">("graph");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 

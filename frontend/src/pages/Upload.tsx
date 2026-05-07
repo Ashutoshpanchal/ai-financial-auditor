@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api";
 
+type ApiErr = { response?: { status?: number; data?: { detail?: string } } };
+type DupDetail = { filename?: string; upload_date?: string; message?: string };
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type DocumentStatus =
@@ -153,21 +156,22 @@ function UploadModal({
         headers: { "Content-Type": "multipart/form-data" },
       });
       setUpload((prev) => ({ ...prev, state: "parsing", documentId: res.data.document_id }));
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      if (err?.response?.status === 409) {
+    } catch (err: unknown) {
+      const apiErr = err as ApiErr;
+      if (apiErr?.response?.status === 409) {
+        const dup = (apiErr?.response?.data as unknown as { detail?: DupDetail })?.detail;
         setUpload({
           state: "failed",
           documentId: null,
           auditId: null,
-          errorMsg: `Duplicate: "${detail?.filename}" was already uploaded on ${detail?.upload_date ? new Date(detail.upload_date).toLocaleDateString() : "a previous date"}.`,
+          errorMsg: `Duplicate: "${dup?.filename}" was already uploaded on ${dup?.upload_date ? new Date(dup.upload_date).toLocaleDateString() : "a previous date"}.`,
         });
       } else {
         setUpload({
           state: "failed",
           documentId: null,
           auditId: null,
-          errorMsg: (typeof detail === "string" ? detail : detail?.message) ?? "Upload failed.",
+          errorMsg: apiErr?.response?.data?.detail ?? "Upload failed.",
         });
       }
     }
@@ -390,8 +394,8 @@ function EditDocumentModal({ doc, open, onClose, onSaved }: { doc: DocumentRow |
       await api.patch(`/documents/${doc.id}`, { bank_name: bankName.trim(), filename: filename.trim() });
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail ?? "Failed to save changes.");
+    } catch (err: unknown) {
+      setError((err as ApiErr)?.response?.data?.detail ?? "Failed to save changes.");
     } finally {
       setSaving(false);
     }
@@ -438,8 +442,8 @@ function ConfirmDeleteModal({ doc, open, onClose, onConfirm }: { doc: DocumentRo
       await api.delete(`/documents/${doc.id}`);
       onConfirm();
       onClose();
-    } catch (err: any) {
-      alert(err?.response?.data?.detail ?? "Failed to delete document.");
+    } catch (err: unknown) {
+      alert((err as ApiErr)?.response?.data?.detail ?? "Failed to delete document.");
     } finally {
       setDeleting(false);
     }
@@ -501,8 +505,8 @@ export default function Upload() {
       const res = await api.get<DocumentRow[]>("/documents");
       setDocuments(res.data);
       setError(null);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail ?? "Failed to load documents.");
+    } catch (err: unknown) {
+      setError((err as ApiErr)?.response?.data?.detail ?? "Failed to load documents.");
     } finally {
       setLoading(false);
     }
@@ -547,8 +551,8 @@ export default function Upload() {
       await api.delete(`/transactions/${txnId}`);
       fetchTransactions();
       fetchDocuments();
-    } catch (err: any) {
-      alert(err?.response?.data?.detail ?? "Failed to delete transaction.");
+    } catch (err: unknown) {
+      alert((err as ApiErr)?.response?.data?.detail ?? "Failed to delete transaction.");
     } finally {
       setDeletingTxnId(null);
     }
@@ -560,8 +564,8 @@ export default function Upload() {
       await api.patch(`/transactions/${txn.id}`, { description: newDesc });
       setAllTransactions((prev) => prev.map((t) => (t.id === txn.id ? { ...t, description: newDesc } : t)));
       setEditingTxn(null);
-    } catch (err: any) {
-      alert(err?.response?.data?.detail ?? "Failed to update transaction.");
+    } catch (err: unknown) {
+      alert((err as ApiErr)?.response?.data?.detail ?? "Failed to update transaction.");
     }
   }, []);
 

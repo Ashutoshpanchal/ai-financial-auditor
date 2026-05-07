@@ -11,7 +11,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.models.base import Base
 
 
-
 class UserRole(enum.StrEnum):
     """Role hierarchy: super_admin > admin > user."""
 

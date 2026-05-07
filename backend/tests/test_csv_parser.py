@@ -256,7 +256,7 @@ class TestParseCsvErrors:
 
     def test_empty_bytes_raises(self):
         """Empty bytes input should raise (CSV parse failure)."""
-        with pytest.raises(Exception):
+        with pytest.raises((ValueError, Exception)):
             parse_csv(b"", bank_name="Test Bank")
 
     def test_category_is_always_none(self):

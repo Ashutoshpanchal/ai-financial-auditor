@@ -45,12 +45,16 @@ async def google_callback(code: str, response: Response, db: Session = Depends(g
     try:
         tokens = await exchange_code_for_tokens(code)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e
 
     try:
         google_user = await get_google_user_info(tokens["access_token"])
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e
 
     user = upsert_user(db, google_user, tokens)
     app_token = create_app_jwt(user)
@@ -100,8 +104,12 @@ async def dev_login_endpoint(
     except ValueError as exc:
         msg = str(exc)
         if "development" in msg or "DEV_LOGIN_PASSWORD" in msg:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=msg)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=msg)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail=msg
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=msg
+        ) from exc
 
     app_token = create_app_jwt(user)
 

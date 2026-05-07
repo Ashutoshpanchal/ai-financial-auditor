@@ -10,7 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.models.base import Base
 
 
-
 class ChatSession(Base):
     """One session per user conversation thread with the finance agent."""
 

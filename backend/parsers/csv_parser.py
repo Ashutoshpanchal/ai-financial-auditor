@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
+from datetime import date as date_type
 
 import pandas as pd
 
