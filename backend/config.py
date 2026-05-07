@@ -10,7 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # App
     secret_key: str
@@ -43,6 +45,12 @@ class Settings(BaseSettings):
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
     langfuse_host: str = "http://localhost:3001"
+
+    # Local file storage fallback (used when Google Drive creds are absent)
+    local_storage_path: str = "storage"
+
+    # Dev-only bypass login (ignored in production)
+    dev_login_password: str | None = None
 
     @property
     def active_backends(self) -> list[str]:

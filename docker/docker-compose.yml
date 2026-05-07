@@ -1,24 +1,9 @@
 version: "3.9"
 
-services:
-  postgres:
-    image: pgvector/pgvector:pg15
-    container_name: finance_postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-finance_auditor}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ../migrations:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+# PostgreSQL and Langfuse run separately — point DATABASE_URL and LANGFUSE_HOST
+# in .env at your external instances before starting these services.
 
+services:
   backend:
     build:
       context: ..
@@ -28,16 +13,11 @@ services:
       - "8000:8000"
     env_file:
       - ../.env
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-finance_auditor}
-      - LANGFUSE_HOST=http://langfuse:3000
-    depends_on:
-      postgres:
-        condition: service_healthy
-      langfuse:
-        condition: service_started
     volumes:
       - ../backend:/app/backend
+    networks:
+      - default
+      - langfuse_network
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
@@ -46,7 +26,7 @@ services:
       dockerfile: docker/Dockerfile.frontend
     container_name: finance_frontend
     ports:
-      - "3000:3000"
+      - "3002:3002"
     env_file:
       - ../.env
     volumes:
@@ -55,19 +35,6 @@ services:
     depends_on:
       - backend
 
-  langfuse:
-    image: langfuse/langfuse:latest
-    container_name: finance_langfuse
-    ports:
-      - "3001:3000"
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/langfuse
-      - NEXTAUTH_SECRET=${SECRET_KEY:-changeme}
-      - NEXTAUTH_URL=http://localhost:3001
-      - SALT=${SECRET_KEY:-changeme}
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-volumes:
-  postgres_data:
+networks:
+  langfuse_network:
+    external: true

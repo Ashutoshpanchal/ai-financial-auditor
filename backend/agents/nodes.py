@@ -150,7 +150,9 @@ async def intake_node(state: AgentState) -> AgentState:
             config={"callbacks": callbacks},
         )
     except Exception as exc:
-        raise RuntimeError(f"intake_node: LLM intent extraction failed — {exc}") from exc
+        raise RuntimeError(
+            f"intake_node: LLM intent extraction failed — {exc}"
+        ) from exc
 
     raw = response.content.strip()
     # Strip accidental markdown fences if the model adds them
@@ -165,7 +167,12 @@ async def intake_node(state: AgentState) -> AgentState:
             "intake_node: could not parse LLM intent JSON — falling back to general. raw=%s",
             raw[:200],
         )
-        intent_data = {"intent": "general", "query": user_message, "month1": None, "month2": None}
+        intent_data = {
+            "intent": "general",
+            "query": user_message,
+            "month1": None,
+            "month2": None,
+        }
 
     tool_calls: list[dict] = []
     intent = intent_data.get("intent", "general")
@@ -227,17 +234,13 @@ async def rag_node(state: AgentState, db: Session) -> AgentState:
 
         try:
             if tool_name == "search_transactions":
-                result = search_transactions.invoke(
-                    {
-                        "query": call.get("query", ""),
-                        "user_id": user_id,
-                        "db": db,
-                    }
+                result = search_transactions(
+                    query=call.get("query", ""),
+                    user_id=user_id,
+                    db=db,
                 )
             elif tool_name == "get_spending_summary":
-                result = get_spending_summary.invoke(
-                    {"user_id": user_id, "db": db}
-                )
+                result = get_spending_summary(user_id=user_id, db=db)
             elif tool_name == "compare_months":
                 month1 = call.get("month1") or ""
                 month2 = call.get("month2") or ""
@@ -247,18 +250,14 @@ async def rag_node(state: AgentState, db: Session) -> AgentState:
                         "in YYYY-MM format. Please specify which months to compare."
                     )
                 else:
-                    result = compare_months.invoke(
-                        {
-                            "month1": month1,
-                            "month2": month2,
-                            "user_id": user_id,
-                            "db": db,
-                        }
+                    result = compare_months(
+                        month1=month1,
+                        month2=month2,
+                        user_id=user_id,
+                        db=db,
                     )
             elif tool_name == "get_anomalies":
-                result = get_anomalies.invoke(
-                    {"user_id": user_id, "db": db}
-                )
+                result = get_anomalies(user_id=user_id, db=db)
             else:
                 result = f"Unknown tool '{tool_name}' — skipping."
                 logger.warning("rag_node: unknown tool '%s'", tool_name)
@@ -316,6 +315,7 @@ async def analysis_node(state: AgentState) -> AgentState:
             lc_messages.append(HumanMessage(content=content))
         else:
             from langchain_core.messages import AIMessage
+
             lc_messages.append(AIMessage(content=content))
 
     # Final user turn includes the retrieved context

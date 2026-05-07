@@ -111,7 +111,8 @@ class TestSearchTransactions:
         mock_row.bank_name = "Chase"
         mock_row.transaction_date = "2024-01-15"
         mock_row.description = "Starbucks"
-        mock_row.amount = 5.67
+        mock_row.debit = 5.67
+        mock_row.credit = 0.0
         mock_row.category = "Food & Drink"
         mock_db.execute.return_value.fetchall.return_value = [mock_row]
 
@@ -145,9 +146,12 @@ class TestSearchTransactions:
 
     def test_search_transactions_embed_failure(self, mock_db):
         """search_transactions should raise RuntimeError when embedding fails."""
-        with patch(
-            "backend.agents.tools._embed_query", side_effect=RuntimeError("fail")
-        ), pytest.raises(RuntimeError, match="could not embed query"):
+        with (
+            patch(
+                "backend.agents.tools._embed_query", side_effect=RuntimeError("fail")
+            ),
+            pytest.raises(RuntimeError, match="could not embed query"),
+        ):
             search_transactions.run(
                 {
                     "query": "test",

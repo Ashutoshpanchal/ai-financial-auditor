@@ -55,7 +55,9 @@ def mock_llm() -> Generator[MagicMock, None, None]:
     with patch("backend.agents.nodes.ChatOpenAI") as mock_cls:
         mock_instance = MagicMock()
         mock_response = MagicMock()
-        mock_response.content = '{"intent": "general", "query": null, "month1": null, "month2": null}'
+        mock_response.content = (
+            '{"intent": "general", "query": null, "month1": null, "month2": null}'
+        )
         mock_instance.ainvoke = AsyncMock(return_value=mock_response)
         mock_cls.return_value = mock_instance
         yield mock_instance
@@ -75,8 +77,10 @@ def mock_embeddings() -> Generator[MagicMock, None, None]:
 @pytest.fixture
 def mock_settings() -> Generator[MagicMock, None, None]:
     """Mock get_settings so tests don't need a real .env."""
-    with patch("backend.agents.nodes.get_settings") as mock_nodes, \
-         patch("backend.agents.tools.get_settings") as mock_tools:
+    with (
+        patch("backend.agents.nodes.get_settings") as mock_nodes,
+        patch("backend.agents.tools.get_settings") as mock_tools,
+    ):
         settings = MagicMock()
         settings.openrouter_model = "test-model"
         settings.openrouter_api_key = "test-key"
@@ -107,7 +111,8 @@ def sample_transactions() -> list[dict]:
             "bank_name": "Chase",
             "transaction_date": "2024-01-15",
             "description": "Starbucks",
-            "amount": 5.67,
+            "debit": 5.67,
+            "credit": 0.0,
             "category": "Food & Drink",
         },
         {
@@ -115,7 +120,8 @@ def sample_transactions() -> list[dict]:
             "bank_name": "Chase",
             "transaction_date": "2024-01-16",
             "description": "Whole Foods",
-            "amount": 45.23,
+            "debit": 45.23,
+            "credit": 0.0,
             "category": "Groceries",
         },
         {
@@ -123,7 +129,8 @@ def sample_transactions() -> list[dict]:
             "bank_name": "Chase",
             "transaction_date": "2024-01-17",
             "description": "Netflix",
-            "amount": 15.99,
+            "debit": 15.99,
+            "credit": 0.0,
             "category": "Entertainment",
         },
     ]

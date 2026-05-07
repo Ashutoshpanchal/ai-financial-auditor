@@ -1,10 +1,11 @@
 """LangChain tools for the AI Finance Agent.
 
-Each tool queries the database scoped to the current authenticated user.
-Tools are decorated with @tool so LangGraph can bind and invoke them automatically.
+Each tool is a plain function that queries the database scoped to the current
+authenticated user. They are called directly by rag_node — not via LLM tool-calling —
+so no @tool decorator is needed (and Session cannot be serialized to JSON schema anyway).
 
 All SQL uses SQLAlchemy text() with parameterized bindings — never string interpolation.
-Embeddings use the same OpenRouter model as the rest of the pipeline (openai/text-embedding-3-small).
+Embeddings use the same OpenRouter model as the rest of the pipeline.
 """
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.tools import tool
 from langchain_openai import OpenAIEmbeddings
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -56,7 +56,6 @@ def _embed_query(query: str) -> list[float]:
         raise RuntimeError(f"Embedding query failed: {exc}") from exc
 
 
-@tool
 def search_transactions(query: str, user_id: str, db: Session) -> str:
     """Find transactions relevant to a natural language query using pgvector cosine similarity.
 
@@ -76,9 +75,10 @@ def search_transactions(query: str, user_id: str, db: Session) -> str:
     try:
         query_embedding = _embed_query(query)
     except RuntimeError as exc:
-        raise RuntimeError(f"search_transactions: could not embed query — {exc}") from exc
+        raise RuntimeError(
+            f"search_transactions: could not embed query — {exc}"
+        ) from exc
 
-    # pgvector cosine distance operator: <=>
     sql = text(
         """
         SELECT id, bank_name, transaction_date, description, amount, category
@@ -89,22 +89,28 @@ def search_transactions(query: str, user_id: str, db: Session) -> str:
         """
     )
     try:
-        rows = db.execute(sql, {"uid": user_id, "qemb": str(query_embedding)}).fetchall()
+        rows = db.execute(
+            sql, {"uid": user_id, "qemb": str(query_embedding)}
+        ).fetchall()
     except Exception as exc:
-        raise RuntimeError(f"search_transactions: database query failed — {exc}") from exc
+        raise RuntimeError(
+            f"search_transactions: database query failed — {exc}"
+        ) from exc
 
     if not rows:
         return "No transactions found matching that query."
 
     lines: list[str] = [
-        f"{'Date':<12} {'Bank':<20} {'Amount':>10}  {'Category':<20}  Description",
-        "-" * 90,
+        f"{'Date':<12} {'Bank':<20} {'Debit':>10}  {'Credit':>10}  {'Category':<20}  Description",
+        "-" * 100,
     ]
     for row in rows:
+        debit_str = f"${row.debit:>9.2f}" if row.debit > 0 else " " * 10
+        credit_str = f"${row.credit:>9.2f}" if row.credit > 0 else " " * 10
         lines.append(
             f"{row.transaction_date!s:<12} "
             f"{(row.bank_name or ''):<20} "
-            f"${row.amount:>9.2f}  "
+            f"{debit_str}  {credit_str}  "
             f"{(row.category or 'Uncategorized'):<20}  "
             f"{row.description}"
         )
@@ -112,7 +118,6 @@ def search_transactions(query: str, user_id: str, db: Session) -> str:
     return "\n".join(lines)
 
 
-@tool
 def get_spending_summary(user_id: str, db: Session) -> str:
     """Aggregate total spend per category for all of the user's transactions.
 
@@ -141,7 +146,9 @@ def get_spending_summary(user_id: str, db: Session) -> str:
     try:
         rows = db.execute(sql, {"uid": user_id}).fetchall()
     except Exception as exc:
-        raise RuntimeError(f"get_spending_summary: database query failed — {exc}") from exc
+        raise RuntimeError(
+            f"get_spending_summary: database query failed — {exc}"
+        ) from exc
 
     if not rows:
         return "No transactions found for this user."
@@ -156,7 +163,6 @@ def get_spending_summary(user_id: str, db: Session) -> str:
     return "\n".join(lines)
 
 
-@tool
 def compare_months(month1: str, month2: str, user_id: str, db: Session) -> str:
     """Compare total spend and category breakdown between two calendar months.
 
@@ -199,7 +205,6 @@ def compare_months(month1: str, month2: str, user_id: str, db: Session) -> str:
     except Exception as exc:
         raise RuntimeError(f"compare_months: database query failed — {exc}") from exc
 
-    # Organise results into {month: {category: total}}
     data: dict[str, dict[str, float]] = {month1: {}, month2: {}}
     for row in rows:
         data[row.month][row.category] = float(row.total)
@@ -229,14 +234,11 @@ def compare_months(month1: str, month2: str, user_id: str, db: Session) -> str:
         v1 = data[month1].get(cat, 0.0)
         v2 = data[month2].get(cat, 0.0)
         diff = v2 - v1
-        lines.append(
-            f"  {cat:<25} ${v1:>9,.2f}  ${v2:>9,.2f}  ${diff:>+10,.2f}"
-        )
+        lines.append(f"  {cat:<25} ${v1:>9,.2f}  ${v2:>9,.2f}  ${diff:>+10,.2f}")
 
     return "\n".join(lines)
 
 
-@tool
 def get_anomalies(user_id: str, db: Session) -> str:
     """Fetch all audit reports for the user and extract anomalies from their insights JSON.
 
@@ -270,19 +272,21 @@ def get_anomalies(user_id: str, db: Session) -> str:
     all_anomalies: list[str] = []
     for row in rows:
         insights: Any = row.insights
-        # insights may already be a dict (SQLAlchemy JSON column) or a raw string
         if isinstance(insights, str):
             try:
                 insights = json.loads(insights)
             except json.JSONDecodeError:
-                logger.warning("Audit report %s has non-JSON insights field; skipping", row.id)
+                logger.warning(
+                    "Audit report %s has non-JSON insights field; skipping", row.id
+                )
                 continue
 
-        anomalies: list[Any] = insights.get("anomalies", []) if isinstance(insights, dict) else []
+        anomalies: list[Any] = (
+            insights.get("anomalies", []) if isinstance(insights, dict) else []
+        )
         if anomalies:
             all_anomalies.append(f"Report for document {row.document_id}:")
             for item in anomalies:
-                # Anomalies may be dicts or strings depending on the LLM output schema
                 if isinstance(item, dict):
                     desc = item.get("description") or item.get("detail") or str(item)
                 else:

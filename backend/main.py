@@ -2,15 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from backend.config import get_settings
-from backend.routers import auth
+from backend.database import engine
+from backend.models import (  # noqa: F401 — side-effect: registers models with Base
+    audit_report,
+    chat_session,
+    document,
+    transaction,
+    user,
+)
+from backend.models.base import Base
+from backend.routers import admin, audit, auth, chat, documents, transactions
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 app = FastAPI(
@@ -21,8 +33,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,  # required for httpOnly cookie auth
+    allow_origins=["http://localhost:3002"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -32,12 +44,22 @@ _static_graphs = Path("static/graphs")
 _static_graphs.mkdir(parents=True, exist_ok=True)
 app.mount("/static/graphs", StaticFiles(directory=str(_static_graphs)), name="graphs")
 
-# Routers — additional routers added here as phases complete
 app.include_router(auth.router)
-# TODO: app.include_router(documents.router)
-# TODO: app.include_router(audit.router)
-# TODO: app.include_router(chat.router)
-# TODO: app.include_router(admin.router)
+app.include_router(documents.router)
+app.include_router(audit.router)
+app.include_router(chat.router)
+app.include_router(admin.router)
+app.include_router(transactions.router)
+
+
+@app.on_event("startup")
+def _init_db() -> None:
+    """Create all tables and enable pgvector on startup if they don't exist yet."""
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables verified / created.")
 
 
 @app.get("/health")

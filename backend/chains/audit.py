@@ -43,12 +43,14 @@ def _build_llm() -> ChatOpenAI:
 
 def _format_transactions(transactions: list[dict]) -> str:
     """Convert transaction dicts to a readable text block for the LLM prompt."""
-    lines = ["Date | Description | Amount | Category"]
+    lines = ["Date | Description | Debit | Credit | Category"]
     lines.append("-" * 60)
     for t in transactions:
+        debit = t.get("debit", 0.0)
+        credit = t.get("credit", 0.0)
         lines.append(
             f"{t.get('date', '')} | {t.get('description', '')} | "
-            f"${t.get('amount', 0):.2f} | {t.get('category', 'Uncategorized')}"
+            f"${debit:.2f} | ${credit:.2f} | {t.get('category', 'Uncategorized')}"
         )
     return "\n".join(lines)
 
@@ -63,7 +65,9 @@ def _parse_llm_response(response_text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"LLM returned invalid JSON: {exc}\nResponse: {response_text[:500]}") from exc
+        raise ValueError(
+            f"LLM returned invalid JSON: {exc}\nResponse: {response_text[:500]}"
+        ) from exc
 
 
 async def run_audit(

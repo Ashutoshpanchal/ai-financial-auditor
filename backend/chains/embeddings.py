@@ -30,13 +30,17 @@ def _build_text(t: dict) -> str:
         A formatted string suitable for passing to the embeddings model.
     """
     category_part = t["category"] or ""
+    debit = t.get("debit", 0.0)
+    credit = t.get("credit", 0.0)
+    amount_str = f"-${debit:.2f}" if debit > 0 else f"+${credit:.2f}"
     return (
-        f"{t['date']} {t['description']} {category_part} "
-        f"${t['amount']:.2f} {t['bank_name']}"
+        f"{t['date']} {t['description']} {category_part} {amount_str} {t['bank_name']}"
     ).strip()
 
 
-def _get_embeddings_batch(client: OpenAI, texts: list[str], model: str) -> list[list[float]]:
+def _get_embeddings_batch(
+    client: OpenAI, texts: list[str], model: str
+) -> list[list[float]]:
     """Request embeddings for a single batch of texts from OpenRouter.
 
     Args:
@@ -94,7 +98,8 @@ def _upsert_transaction(
             Transaction.document_id == document_id,
             Transaction.description == tx_data["description"],
             Transaction.transaction_date == tx_data["date"],
-            Transaction.amount == tx_data["amount"],
+            Transaction.debit == float(tx_data.get("debit", 0.0)),
+            Transaction.credit == float(tx_data.get("credit", 0.0)),
         )
         .first()
     )
@@ -112,7 +117,8 @@ def _upsert_transaction(
                 bank_name=tx_data["bank_name"],
                 transaction_date=tx_data["date"],
                 description=tx_data["description"],
-                amount=tx_data["amount"],
+                debit=float(tx_data.get("debit", 0.0)),
+                credit=float(tx_data.get("credit", 0.0)),
                 category=tx_data.get("category"),
                 embedding=embedding,
             )
@@ -147,7 +153,9 @@ def embed_transactions(
         ValueError: If the API returns an unexpected number of embeddings.
     """
     if not transactions:
-        logger.info("embed_transactions called with an empty transaction list — nothing to do.")
+        logger.info(
+            "embed_transactions called with an empty transaction list — nothing to do."
+        )
         return 0
 
     settings = get_settings()
@@ -170,7 +178,9 @@ def embed_transactions(
             len(batch),
         )
 
-        vectors = _get_embeddings_batch(client, texts, settings.openrouter_embedding_model)
+        vectors = _get_embeddings_batch(
+            client, texts, settings.openrouter_embedding_model
+        )
 
         for tx_data, embedding in zip(batch, vectors):
             _upsert_transaction(

@@ -2,29 +2,35 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import (
     APIRouter,
     BackgroundTasks,
+    Body,
     Depends,
     Form,
     HTTPException,
+    Response,
     UploadFile,
     status,
 )
-from sqlalchemy.orm import Session
 
 from backend.database import get_db, set_rls_user
 from backend.middleware.auth import get_current_user
 from backend.models.document import Document, DocumentStatus
 from backend.models.transaction import Transaction
-from backend.models.user import User
 from backend.parsers.csv_parser import parse_csv
 from backend.services.drive import upload_file as drive_upload_file
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from backend.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +83,14 @@ async def _run_audit_background(
         document = db.query(Document).filter(Document.id == document_id).first()
         if document is None:
             logger.error(
-                "Background audit: document %s not found for user %s", document_id, user_id
+                "Background audit: document %s not found for user %s",
+                document_id,
+                user_id,
             )
             return
-        await run_audit(db=db, document=document, transactions=transactions, user_id=user_id)
+        await run_audit(
+            db=db, document=document, transactions=transactions, user_id=user_id
+        )
         logger.info("Background audit completed for document %s", document_id)
     except Exception as exc:
         logger.exception(
@@ -106,7 +116,8 @@ async def _run_audit_background(
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile,
-    bank_name: str = Form(...),
+    bank_name: str | None = Form(default=None),
+    pdf_password: str | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -148,6 +159,8 @@ async def upload_document(
             ),
         )
 
+    # bank_name is optional for all uploads; defaults to "Unknown Bank" when omitted.
+
     # --- Read file bytes ---
     try:
         file_bytes: bytes = await file.read()
@@ -164,7 +177,28 @@ async def upload_document(
             detail="Uploaded file is empty.",
         )
 
-    # --- Upload to Google Drive ---
+    # --- Duplicate detection via file hash ---
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    set_rls_user(db, current_user.id)
+    existing_doc = (
+        db.query(Document)
+        .filter(Document.user_id == current_user.id, Document.file_hash == file_hash)
+        .first()
+    )
+    if existing_doc is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "This file has already been uploaded.",
+                "document_id": existing_doc.id,
+                "filename": existing_doc.filename,
+                "upload_date": existing_doc.upload_date.isoformat()
+                if existing_doc.upload_date
+                else None,
+            },
+        )
+
+    # --- Upload to Google Drive (or local storage if no creds) ---
     today = datetime.now(tz=UTC).date()
     try:
         drive_result = drive_upload_file(
@@ -174,12 +208,13 @@ async def upload_document(
             filename=file.filename or f"statement_{today}.{file_type}",
             mime_type=content_type.split(";")[0].strip(),
             upload_date=today,
+            user_id=current_user.id,
         )
     except Exception as exc:
-        logger.exception("Google Drive upload failed for user %s: %s", current_user.id, exc)
+        logger.exception("File upload failed for user %s: %s", current_user.id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Google Drive upload failed: {exc}",
+            detail=f"File upload failed: {exc}",
         ) from exc
 
     # --- Create Document record (status: uploaded) ---
@@ -188,11 +223,12 @@ async def upload_document(
         id=document_id,
         user_id=current_user.id,
         filename=file.filename or f"statement_{today}.{file_type}",
-        bank_name=bank_name.strip(),
+        bank_name=(bank_name.strip() if bank_name else "Unknown Bank"),
         file_type=file_type,
         drive_file_id=drive_result["drive_file_id"],
         drive_folder_id=drive_result["drive_folder_id"],
         drive_web_url=drive_result.get("drive_web_url"),
+        file_hash=file_hash,
         status=DocumentStatus.uploaded,
     )
     try:
@@ -222,7 +258,12 @@ async def upload_document(
             # PDF parsing: import dynamically since pdf_parser may not exist yet
             try:
                 from backend.parsers.pdf_parser import parse_pdf
-                raw_transactions = parse_pdf(file_bytes, bank_name=bank_name.strip())
+
+                raw_transactions = parse_pdf(
+                    file_bytes,
+                    bank_name=bank_name.strip() if bank_name else None,
+                    password=pdf_password or None,
+                )
             except ImportError as imp_exc:
                 raise ValueError(
                     "PDF parser is not available. Ensure backend.parsers.pdf_parser is installed."
@@ -240,6 +281,17 @@ async def upload_document(
             detail=f"Failed to parse document: {exc}",
         ) from exc
 
+    # --- Update bank_name if auto-detected from PDF ---
+    if file_type == "pdf" and raw_transactions:
+        detected = raw_transactions[0].get("bank_name", "").strip()
+        if detected and detected != "Unknown Bank":
+            document.bank_name = detected
+            bank_name = detected  # also update local var for transaction persistence
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+
     # --- Persist Transaction rows ---
     try:
         for txn_dict in raw_transactions:
@@ -250,8 +302,10 @@ async def upload_document(
                 bank_name=txn_dict.get("bank_name", bank_name.strip()),
                 transaction_date=txn_dict["date"],
                 description=txn_dict["description"],
-                amount=txn_dict["amount"],
+                debit=float(txn_dict.get("debit", 0.0)),
+                credit=float(txn_dict.get("credit", 0.0)),
                 category=txn_dict.get("category"),
+                remarks=txn_dict.get("remarks"),
             )
             db.add(txn)
         db.commit()
@@ -263,7 +317,9 @@ async def upload_document(
             db.commit()
         except Exception:
             db.rollback()
-        logger.exception("Failed to persist transactions for document %s: %s", document_id, exc)
+        logger.exception(
+            "Failed to persist transactions for document %s: %s", document_id, exc
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to persist transactions: {exc}",
@@ -287,6 +343,7 @@ async def upload_document(
 
     try:
         from backend.chains.embeddings import embed_transactions
+
         embed_transactions(
             transactions=raw_transactions,
             db=db,
@@ -361,7 +418,9 @@ def list_documents(
             .all()
         )
     except Exception as exc:
-        logger.exception("Failed to list documents for user %s: %s", current_user.id, exc)
+        logger.exception(
+            "Failed to list documents for user %s: %s", current_user.id, exc
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve documents: {exc}",
@@ -410,7 +469,10 @@ def get_document(
         )
     except Exception as exc:
         logger.exception(
-            "Failed to query document %s for user %s: %s", document_id, current_user.id, exc
+            "Failed to query document %s for user %s: %s",
+            document_id,
+            current_user.id,
+            exc,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -425,9 +487,7 @@ def get_document(
 
     try:
         transaction_count: int = (
-            db.query(Transaction)
-            .filter(Transaction.document_id == document_id)
-            .count()
+            db.query(Transaction).filter(Transaction.document_id == document_id).count()
         )
     except Exception as exc:
         logger.exception(
@@ -449,6 +509,276 @@ def get_document(
         "drive_web_url": document.drive_web_url,
         "status": document.status.value,
         "error_message": document.error_message,
-        "upload_date": document.upload_date.isoformat() if document.upload_date else None,
+        "upload_date": document.upload_date.isoformat()
+        if document.upload_date
+        else None,
         "transaction_count": transaction_count,
+    }
+
+
+@router.patch("/{document_id}", status_code=status.HTTP_200_OK)
+def update_document(
+    document_id: str,
+    body: dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Update editable fields (bank_name, filename) on a document.
+
+    Args:
+        document_id: UUID string of the document to update.
+        body:        JSON body with optional 'bank_name' and/or 'filename'.
+        current_user: Authenticated user injected by the auth dependency.
+        db:           SQLAlchemy session injected by the DB dependency.
+
+    Returns:
+        Dict with updated document fields.
+
+    Raises:
+        HTTPException 404: If the document is not found for this user.
+        HTTPException 500: If the update fails.
+    """
+    set_rls_user(db, current_user.id)
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document '{document_id}' not found.",
+        )
+
+    if "bank_name" in body:
+        document.bank_name = str(body["bank_name"]).strip()
+    if "filename" in body:
+        document.filename = str(body["filename"]).strip()
+
+    try:
+        db.commit()
+        db.refresh(document)
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Failed to update document %s: %s", document_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update document: {exc}",
+        ) from exc
+
+    return {
+        "id": document.id,
+        "filename": document.filename,
+        "bank_name": document.bank_name,
+        "status": document.status.value,
+        "upload_date": document.upload_date.isoformat()
+        if document.upload_date
+        else None,
+    }
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Delete a document and cascade-delete its transactions and audit report.
+
+    Args:
+        document_id:  UUID string of the document to delete.
+        current_user: Authenticated user injected by the auth dependency.
+        db:           SQLAlchemy session injected by the DB dependency.
+
+    Returns:
+        204 No Content on success.
+
+    Raises:
+        HTTPException 404: If the document is not found for this user.
+        HTTPException 500: If the deletion fails.
+    """
+    set_rls_user(db, current_user.id)
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document '{document_id}' not found.",
+        )
+
+    try:
+        # Transactions cascade via FK ON DELETE CASCADE; same for audit_reports.
+        db.delete(document)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Failed to delete document %s: %s", document_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete document: {exc}",
+        ) from exc
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{document_id}/transactions", status_code=status.HTTP_200_OK)
+def list_document_transactions(
+    document_id: str,
+    page: int = 1,
+    page_size: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Return paginated transactions for a specific document.
+
+    Args:
+        document_id: UUID of the document.
+        page:        Page number (1-indexed).
+        page_size:   Rows per page (max 200).
+        current_user: Authenticated user.
+        db:           SQLAlchemy session.
+
+    Returns:
+        Dict with 'items' list and 'total' count.
+
+    Raises:
+        HTTPException 404: If the document is not found for this user.
+    """
+    set_rls_user(db, current_user.id)
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document '{document_id}' not found.",
+        )
+
+    page_size = min(max(page_size, 1), 200)
+    offset = (max(page, 1) - 1) * page_size
+
+    try:
+        total: int = (
+            db.query(Transaction).filter(Transaction.document_id == document_id).count()
+        )
+        rows = (
+            db.query(Transaction)
+            .filter(Transaction.document_id == document_id)
+            .order_by(Transaction.transaction_date.desc())
+            .offset(offset)
+            .limit(page_size)
+            .all()
+        )
+    except Exception as exc:
+        logger.exception(
+            "Failed to list transactions for document %s: %s", document_id, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve transactions: {exc}",
+        ) from exc
+
+    return {
+        "items": [
+            {
+                "id": txn.id,
+                "bank_name": txn.bank_name,
+                "transaction_date": txn.transaction_date.isoformat(),
+                "description": txn.description,
+                "debit": float(txn.debit),
+                "credit": float(txn.credit),
+                "category": txn.category,
+                "remarks": txn.remarks,
+            }
+            for txn in rows
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.get("/transactions/all", status_code=status.HTTP_200_OK)
+def list_all_transactions(
+    page: int = 1,
+    page_size: int = 50,
+    search: str = "",
+    bank_name: str = "",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Return paginated transactions across ALL documents for the current user.
+
+    Supports optional search (matches description, remarks) and bank_name filter.
+
+    Args:
+        page:        Page number (1-indexed).
+        page_size:   Rows per page (max 200).
+        search:      Free-text search across description and remarks.
+        bank_name:   Filter by bank name.
+        current_user: Authenticated user.
+        db:           SQLAlchemy session.
+
+    Returns:
+        Dict with 'items' list, 'total' count, 'page', 'page_size'.
+    """
+    set_rls_user(db, current_user.id)
+    page_size = min(max(page_size, 1), 200)
+    offset = (max(page, 1) - 1) * page_size
+
+    try:
+        query = (
+            db.query(Transaction)
+            .join(Document, Transaction.document_id == Document.id)
+            .filter(Document.user_id == current_user.id)
+        )
+
+        if bank_name:
+            query = query.filter(Transaction.bank_name.ilike(f"%{bank_name}%"))
+
+        if search:
+            search_lower = f"%{search}%"
+            query = query.filter(
+                Transaction.description.ilike(search_lower)
+                | Transaction.bank_name.ilike(search_lower)
+            )
+
+        total: int = query.count()
+        rows = (
+            query.order_by(Transaction.transaction_date.desc())
+            .offset(offset)
+            .limit(page_size)
+            .all()
+        )
+    except Exception as exc:
+        logger.exception(
+            "Failed to list all transactions for user %s: %s", current_user.id, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve transactions: {exc}",
+        ) from exc
+
+    return {
+        "items": [
+            {
+                "id": txn.id,
+                "bank_name": txn.bank_name,
+                "transaction_date": txn.transaction_date.isoformat(),
+                "description": txn.description,
+                "debit": float(txn.debit),
+                "credit": float(txn.credit),
+                "category": txn.category,
+                "remarks": txn.remarks,
+            }
+            for txn in rows
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
     }

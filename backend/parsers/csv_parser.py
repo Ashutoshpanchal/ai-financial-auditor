@@ -9,37 +9,48 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Candidate column names for each logical field, in priority order.
-_DATE_CANDIDATES = ["date", "Date", "DATE", "Trans Date", "Transaction Date", "Value Date"]
-_DESC_CANDIDATES = [
+# Candidate keywords for each logical field — matched as case-insensitive substrings
+# of the actual column header, so "Withdrawal (Dr)" matches "withdrawal".
+_DATE_KEYWORDS = ["date", "trans date", "transaction date", "value date"]
+_DESC_KEYWORDS = [
     "description",
-    "Description",
-    "DESCRIPTION",
-    "Narration",
-    "Details",
-    "Particulars",
-    "Remarks",
-    "Transaction Details",
+    "narration",
+    "details",
+    "particulars",
+    "remarks",
+    "transaction details",
 ]
-_AMOUNT_CANDIDATES = ["amount", "Amount", "AMOUNT", "Transaction Amount"]
-_DEBIT_CANDIDATES = ["debit", "Debit", "DEBIT", "Withdrawal", "Dr"]
-_CREDIT_CANDIDATES = ["credit", "Credit", "CREDIT", "Deposit", "Cr"]
+_AMOUNT_KEYWORDS = ["amount", "transaction amount"]
+_DEBIT_KEYWORDS = ["debit", "withdrawal", "dr"]
+_CREDIT_KEYWORDS = ["credit", "deposit", "cr"]
 
 
-def _find_column(df_columns: list[str], candidates: list[str]) -> str | None:
-    """Return the first candidate column name present in *df_columns*, or None.
+def _find_column(df_columns: list[str], keywords: list[str]) -> str | None:
+    """Return the first column whose header contains any keyword (case-insensitive).
+
+    Tries exact match first, then substring match, so a column named exactly
+    "Date" is preferred over "Transaction Date" when both are candidates.
 
     Args:
         df_columns: Actual column names from the DataFrame.
-        candidates: Ordered list of column-name variations to look for.
+        keywords:   Ordered list of keyword strings to look for.
 
     Returns:
-        The matched column name, or None if none of the candidates are present.
+        The matched column name, or None if no keyword is found in any header.
     """
-    col_set = set(df_columns)
-    for candidate in candidates:
-        if candidate in col_set:
-            return candidate
+    lower_cols = {c.lower(): c for c in df_columns}
+
+    # 1. Exact match (case-insensitive)
+    for kw in keywords:
+        if kw.lower() in lower_cols:
+            return lower_cols[kw.lower()]
+
+    # 2. Substring match — prefer the keyword that appears earliest in the list
+    for kw in keywords:
+        for col_lower, col_orig in lower_cols.items():
+            if kw.lower() in col_lower:
+                return col_orig
+
     return None
 
 
@@ -69,16 +80,20 @@ def parse_csv(file_bytes: bytes, bank_name: str) -> list[dict]:
     """Parse a bank CSV statement into a list of transaction dicts.
 
     Supports common column-name variations for date, description, and amount.
-    When separate debit/credit columns are present the function combines them
-    into a single signed amount: ``amount = credit - debit``.
+    Column matching uses case-insensitive substring search so headers like
+    ``"Withdrawal (Dr)"`` and ``"Deposit (Cr)"`` are recognised automatically.
+
+    When separate debit/credit columns are present both values are stored
+    directly.  When only a combined amount column exists, positive values
+    become ``credit`` and negative values become ``debit``.
 
     Args:
         file_bytes: Raw bytes of the uploaded CSV file.
-        bank_name: Human-readable bank identifier stored on every transaction.
+        bank_name:  Human-readable bank identifier stored on every transaction.
 
     Returns:
-        A list of dicts with keys ``date``, ``description``, ``amount``,
-        ``bank_name``, and ``category`` (always ``None`` at parse time).
+        A list of dicts with keys ``date``, ``description``, ``debit``,
+        ``credit``, ``bank_name``, and ``category`` (always ``None``).
 
     Raises:
         ValueError: If required columns (date, description, amount) cannot be
@@ -91,59 +106,58 @@ def parse_csv(file_bytes: bytes, bank_name: str) -> list[dict]:
     actual_columns = df.columns.tolist()
 
     # --- Resolve date column ---
-    date_col = _find_column(actual_columns, _DATE_CANDIDATES)
+    date_col = _find_column(actual_columns, _DATE_KEYWORDS)
     if date_col is None:
         raise ValueError(
-            f"Cannot find a date column in CSV. Available columns: {actual_columns}. "
-            f"Expected one of: {_DATE_CANDIDATES}"
+            f"Cannot find a date column in CSV. Available columns: {actual_columns}."
         )
 
     # --- Resolve description column ---
-    desc_col = _find_column(actual_columns, _DESC_CANDIDATES)
+    desc_col = _find_column(actual_columns, _DESC_KEYWORDS)
     if desc_col is None:
         raise ValueError(
-            f"Cannot find a description column in CSV. Available columns: {actual_columns}. "
-            f"Expected one of: {_DESC_CANDIDATES}"
+            f"Cannot find a description column in CSV. Available columns: {actual_columns}."
         )
 
     # --- Resolve amount column(s) ---
-    amount_col = _find_column(actual_columns, _AMOUNT_CANDIDATES)
-    debit_col = _find_column(actual_columns, _DEBIT_CANDIDATES)
-    credit_col = _find_column(actual_columns, _CREDIT_CANDIDATES)
+    amount_col = _find_column(actual_columns, _AMOUNT_KEYWORDS)
+    debit_col = _find_column(actual_columns, _DEBIT_KEYWORDS)
+    credit_col = _find_column(actual_columns, _CREDIT_KEYWORDS)
 
-    has_combined_amount = amount_col is not None
-    has_split_amount = debit_col is not None or credit_col is not None
+    has_combined = amount_col is not None
+    has_split = debit_col is not None or credit_col is not None
 
-    if not has_combined_amount and not has_split_amount:
+    if not has_combined and not has_split:
         raise ValueError(
-            f"Cannot find an amount column in CSV. Available columns: {actual_columns}. "
-            f"Expected one of: {_AMOUNT_CANDIDATES} or separate debit/credit columns."
+            f"Cannot find an amount column in CSV. Available columns: {actual_columns}."
         )
 
-    # --- Build a working DataFrame with only the columns we need ---
-    if has_combined_amount:
-        df["_amount"] = pd.to_numeric(df[amount_col], errors="coerce")
-    else:
-        # Combine debit and credit into a single signed amount.
-        debit_series = (
-            pd.to_numeric(df[debit_col], errors="coerce").fillna(0.0)
+    # --- Compute per-row debit / credit series ---
+    if has_split:
+        raw_debit = (
+            pd.to_numeric(df[debit_col], errors="coerce").fillna(0.0).abs()
             if debit_col
             else pd.Series(0.0, index=df.index)
         )
-        credit_series = (
-            pd.to_numeric(df[credit_col], errors="coerce").fillna(0.0)
+        raw_credit = (
+            pd.to_numeric(df[credit_col], errors="coerce").fillna(0.0).abs()
             if credit_col
             else pd.Series(0.0, index=df.index)
         )
-        df["_amount"] = credit_series - debit_series
+        df["_debit"] = raw_debit
+        df["_credit"] = raw_credit
+    else:
+        combined = pd.to_numeric(df[amount_col], errors="coerce")
+        df["_debit"] = combined.where(combined < 0, 0.0).abs()
+        df["_credit"] = combined.where(combined >= 0, 0.0)
 
     # --- Clean text fields ---
     df["_date"] = df[date_col].astype(str).str.strip()
     df["_description"] = df[desc_col].astype(str).str.strip()
 
-    # --- Drop rows with zero or missing amounts ---
-    df = df.dropna(subset=["_amount"])
-    df = df[df["_amount"] != 0.0]
+    # --- Drop rows where both debit and credit are zero or missing ---
+    df = df.dropna(subset=["_debit", "_credit"], how="all")
+    df = df[(df["_debit"] != 0.0) | (df["_credit"] != 0.0)]
 
     # --- Assemble output dicts ---
     transactions: list[dict] = []
@@ -152,9 +166,11 @@ def parse_csv(file_bytes: bytes, bank_name: str) -> list[dict]:
             {
                 "date": row["_date"],
                 "description": row["_description"],
-                "amount": float(row["_amount"]),
+                "debit": float(row["_debit"]),
+                "credit": float(row["_credit"]),
                 "bank_name": bank_name.strip(),
                 "category": None,
+                "remarks": None,
             }
         )
 

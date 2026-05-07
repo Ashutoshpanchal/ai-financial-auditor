@@ -29,7 +29,9 @@
       "Bash(npx eslint *)",
       "Bash(npx tsc *)",
       "Bash(npx vitest *)",
-      "Bash(bash .claude/hooks/*)"
+      "Bash(bash .claude/hooks/*)",
+      "Bash(docker info *)",
+      "Bash(npm --version)"
     ]
   },
   "hooks": {
