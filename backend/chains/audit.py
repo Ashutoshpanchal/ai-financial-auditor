@@ -15,9 +15,9 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from typing import TYPE_CHECKING
 
 from langchain_openai import ChatOpenAI
-from sqlalchemy.orm import Session
 
 from backend.config import get_settings
 from backend.models.audit_report import AuditReport
@@ -25,6 +25,9 @@ from backend.models.document import Document, DocumentStatus
 from backend.prompts.audit_prompt import audit_prompt
 from backend.services.graphify_service import build_audit_graph
 from backend.services.observability import get_callbacks
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +101,7 @@ async def run_audit(
         ValueError: If the LLM returns malformed JSON.
         Exception:  Propagates unexpected errors after updating document status.
     """
-    settings = get_settings()
+    get_settings()
     llm = _build_llm()
     callbacks = get_callbacks()
 

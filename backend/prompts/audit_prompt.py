@@ -42,7 +42,9 @@ Transactions:
 
 Analyze these transactions and return the JSON audit report."""
 
-audit_prompt = ChatPromptTemplate.from_messages([
-    ("system", AUDIT_SYSTEM),
-    ("human", AUDIT_HUMAN),
-])
+audit_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", AUDIT_SYSTEM),
+        ("human", AUDIT_HUMAN),
+    ]
+)

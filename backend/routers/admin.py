@@ -13,16 +13,18 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.middleware.auth import require_admin, require_super_admin
 from backend.models.user import User, UserRole
 from backend.services.auth import hash_password
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 

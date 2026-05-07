@@ -68,9 +68,49 @@
 - [x] frontend/src/services/api.ts
 - [x] frontend/src/hooks/useAuth.tsx
 
-## Remaining / Nice-to-Have
+## Phase 8 — Smart Categorisation ✅
+- [x] migrations/007_categories.sql — `category_master` + `description_categories` tables
+- [x] migrations/008_rls_categories.sql — RLS on `description_categories`
+- [x] backend/models/category_master.py
+- [x] backend/models/description_category.py
+- [x] backend/prompts/category_prompt.py
+- [x] backend/routers/categories.py — 7 endpoints (GET/POST/DELETE master, analyze, PATCH mapping)
+- [x] frontend/src/pages/Categories.tsx — Category Dictionary + Description Mappings tabs
+- [x] frontend/src/App.tsx — /categories route wired
+- [x] backend/tests/test_categories_router.py — 49 tests
+- [x] frontend/src/pages/Categories.test.tsx — 38 tests
+
+## Phase 9 — Combined Chat + Dashboard (UX redesign) 🔴
+- [ ] Redesign Dashboard page as split-panel: charts (left) + AI chat (right)
+      → replaces separate Chat.tsx and AuditReport.tsx pages
+- [ ] Filter bar at top — date range, bank, category — all charts react to filters
+- [ ] Drag-and-drop widget layout (user can rearrange chart panels)
+- [ ] Charts driven by `category` column: pie by category, bar by month, spend trends
+- [ ] Chat panel wired to backend `routers/chat.py` (LangGraph agents)
+      → chat can interpret filter intent ("show food spends in March") and update charts
+- [ ] "Analyze" button on Upload page navigates to combined dashboard on completion
+      → pre-loads audit results for the uploaded document
+
+## Phase 10 — Polish & Ops 🟡
 - [ ] Admin.tsx — full user management UI (list users, change roles)
 - [ ] End-to-end test with real Google OAuth + Drive
 - [ ] Production Docker image optimisation (multi-stage builds)
 
-## Last Updated: 2026-05-06
+## Testing Improvements (deferred) 🟡
+- [ ] Replace mocked DB tests with `testcontainers-python` (spins up real PostgreSQL + pgvector in pytest)
+      → Catches runtime issues that mocks miss (e.g. TYPE_CHECKING NameError bugs)
+      → Add to `pyproject.toml` dev deps: `testcontainers>=4.0.0`
+- [ ] Playwright E2E tests against full Docker stack
+      → Real browser, real Google OAuth flow, real Drive upload
+      → Replaces mock-only coverage for critical user journeys
+
+## Decision Log
+- 2026-05-07: Use `description` column to LLM-categorize transactions → powers all dashboard charts
+- 2026-05-07: Merge Chat + Dashboard into one split-panel page (conversational BI pattern)
+- 2026-05-07: "Analyze" on Upload navigates to combined dashboard (no separate AuditReport page needed)
+- 2026-05-07: Chat.tsx as standalone page will be removed once Phase 9 is done
+- 2026-05-07: Disabled ruff TC001/TC002/TC003 rules globally — SQLAlchemy Mapped[] + LangGraph get_type_hints() require real runtime imports, not TYPE_CHECKING aliases
+- 2026-05-07: Category master table is global (admin-managed); description_categories is per-user with RLS
+- 2026-05-07: No confidence column or user_edited boolean on categories — keep schema minimal
+
+## Last Updated: 2026-05-07

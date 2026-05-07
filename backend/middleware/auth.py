@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models.user import User, UserRole
 from backend.services.auth import decode_app_jwt
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlalchemy.orm import Session
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -30,21 +34,28 @@ async def get_current_user(
         token = request.cookies.get("access_token")
 
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
 
     payload = decode_app_jwt(token)
     if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
+        )
 
     user = db.query(User).filter(User.id == payload["sub"]).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
 
     return user
 
 
 def require_roles(*roles: UserRole) -> Callable:
     """Dependency factory — raises 403 if the current user's role is not in allowed roles."""
+
     async def checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:
             raise HTTPException(
@@ -52,6 +63,7 @@ def require_roles(*roles: UserRole) -> Callable:
                 detail=f"Role '{current_user.role.value}' not permitted for this action",
             )
         return current_user
+
     return checker
 
 

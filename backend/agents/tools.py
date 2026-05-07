@@ -12,13 +12,15 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_openai import OpenAIEmbeddings
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from backend.config import get_settings
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 

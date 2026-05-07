@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import TYPE_CHECKING
 
 from openai import OpenAI
-from sqlalchemy.orm import Session
 
 from backend.config import get_settings
 from backend.models.transaction import Transaction
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +185,7 @@ def embed_transactions(
             client, texts, settings.openrouter_embedding_model
         )
 
-        for tx_data, embedding in zip(batch, vectors):
+        for tx_data, embedding in zip(batch, vectors, strict=False):
             _upsert_transaction(
                 db,
                 tx_data=tx_data,

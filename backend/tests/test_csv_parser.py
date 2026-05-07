@@ -75,7 +75,7 @@ class TestFindColumn:
 
 def _make_csv(header: str, *rows: str) -> bytes:
     """Build CSV bytes from a header line and data row strings."""
-    lines = [header] + list(rows)
+    lines = [header, *list(rows)]
     return "\n".join(lines).encode("utf-8")
 
 

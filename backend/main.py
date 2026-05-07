@@ -14,13 +14,23 @@ from backend.config import get_settings
 from backend.database import engine
 from backend.models import (  # noqa: F401 — side-effect: registers models with Base
     audit_report,
+    category_master,
     chat_session,
+    description_category,
     document,
     transaction,
     user,
 )
 from backend.models.base import Base
-from backend.routers import admin, audit, auth, chat, documents, transactions
+from backend.routers import (
+    admin,
+    audit,
+    auth,
+    categories,
+    chat,
+    documents,
+    transactions,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -50,6 +60,7 @@ app.include_router(audit.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
 app.include_router(transactions.router)
+app.include_router(categories.router)
 
 
 def _run_migrations() -> None:

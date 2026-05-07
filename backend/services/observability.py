@@ -8,10 +8,12 @@ Usage:
 from __future__ import annotations
 
 import os
-
-from langchain_core.callbacks import BaseCallbackHandler
+from typing import TYPE_CHECKING
 
 from backend.config import get_settings
+
+if TYPE_CHECKING:
+    from langchain_core.callbacks import BaseCallbackHandler
 
 
 def get_callbacks() -> list[BaseCallbackHandler]:
@@ -45,6 +47,7 @@ def _build_langfuse_handler(settings) -> BaseCallbackHandler | None:
     """Instantiate Langfuse callback handler, return None if import fails."""
     try:
         from langfuse.callback import CallbackHandler as LangfuseHandler  # type: ignore
+
         return LangfuseHandler(
             public_key=settings.langfuse_public_key,
             secret_key=settings.langfuse_secret_key,
@@ -53,5 +56,8 @@ def _build_langfuse_handler(settings) -> BaseCallbackHandler | None:
     except ImportError:
         # Langfuse not installed — skip silently only at import level, log a warning
         import logging
-        logging.getLogger(__name__).warning("langfuse package not installed; skipping Langfuse handler")
+
+        logging.getLogger(__name__).warning(
+            "langfuse package not installed; skipping Langfuse handler"
+        )
         return None

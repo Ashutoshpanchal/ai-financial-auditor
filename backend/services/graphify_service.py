@@ -39,7 +39,12 @@ def build_audit_graph(
     try:
         return _run_graphify_pipeline(audit_result, document_id)
     except Exception as exc:
-        logger.error("Graphify pipeline failed for document %s: %s", document_id, exc, exc_info=True)
+        logger.error(
+            "Graphify pipeline failed for document %s: %s",
+            document_id,
+            exc,
+            exc_info=True,
+        )
         return {}, ""
 
 
@@ -77,11 +82,17 @@ def _run_graphify_pipeline(audit_result: dict, document_id: str) -> tuple[dict, 
         to_html(G, communities, str(out_path / "graph.html"))
 
         graph_json = json.loads((out_path / "graph.json").read_text())
-        graph_html = (out_path / "graph.html").read_text() if (out_path / "graph.html").exists() else ""
+        graph_html = (
+            (out_path / "graph.html").read_text()
+            if (out_path / "graph.html").exists()
+            else ""
+        )
 
         logger.info(
             "Graphify complete: %d nodes, %d edges, %d communities",
-            G.number_of_nodes(), G.number_of_edges(), len(communities),
+            G.number_of_nodes(),
+            G.number_of_edges(),
+            len(communities),
         )
         return graph_json, graph_html
 
@@ -91,12 +102,12 @@ def _write_corpus_files(audit_result: dict, out_dir: Path) -> None:
     # Summary document
     summary_text = f"""# Financial Audit Summary
 
-{audit_result.get('summary', '')}
+{audit_result.get("summary", "")}
 
 ## Key Metrics
-- Total transactions: {audit_result.get('total_transactions', 0)}
-- Date range: {audit_result.get('date_range', 'unknown')}
-- Bank: {audit_result.get('bank_name', 'unknown')}
+- Total transactions: {audit_result.get("total_transactions", 0)}
+- Date range: {audit_result.get("date_range", "unknown")}
+- Bank: {audit_result.get("bank_name", "unknown")}
 """
     (out_dir / "summary.md").write_text(summary_text)
 
@@ -150,7 +161,13 @@ def _extract(input_path: Path, detection: dict) -> dict:
 
     doc_files = [Path(f) for f in detection.get("files", {}).get("document", [])]
     if not doc_files:
-        return {"nodes": [], "edges": [], "hyperedges": [], "input_tokens": 0, "output_tokens": 0}
+        return {
+            "nodes": [],
+            "edges": [],
+            "hyperedges": [],
+            "input_tokens": 0,
+            "output_tokens": 0,
+        }
 
     result = extract(doc_files)
     return result

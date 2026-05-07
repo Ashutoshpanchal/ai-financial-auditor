@@ -6,13 +6,16 @@ import hashlib
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import httpx
 from jose import jwt
-from sqlalchemy.orm import Session
 
 from backend.config import get_settings
 from backend.models.user import User, UserRole
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"

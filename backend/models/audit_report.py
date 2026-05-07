@@ -16,8 +16,12 @@ class AuditReport(Base):
     __tablename__ = "audit_reports"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
-    document_id: Mapped[str] = mapped_column(String, ForeignKey("documents.id"), nullable=False, unique=True)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id"), nullable=False, index=True
+    )
+    document_id: Mapped[str] = mapped_column(
+        String, ForeignKey("documents.id"), nullable=False, unique=True
+    )
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     # Structured audit output: categories, anomalies, recommendations
     insights: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

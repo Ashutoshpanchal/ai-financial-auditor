@@ -88,6 +88,7 @@ function Navbar() {
           <div className="hidden sm:flex items-center gap-1">
             <NavLink to="/dashboard">Dashboard</NavLink>
             <NavLink to="/upload">Upload</NavLink>
+            <NavLink to="/categories">Categories</NavLink>
             <NavLink to="/chat">Chat</NavLink>
             {isAdmin && <NavLink to="/admin">Admin</NavLink>}
           </div>

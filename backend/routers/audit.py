@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
 
 from backend.database import get_db, set_rls_user
 from backend.middleware.auth import get_current_user
 from backend.models.audit_report import AuditReport
-from backend.models.user import User
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from backend.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +62,12 @@ def _serialize_report_summary(report: AuditReport) -> dict[str, Any]:
 
 @router.get("", status_code=status.HTTP_200_OK)
 def list_audit_reports(
-    skip: int = Query(default=0, ge=0, description="Number of records to skip (offset)."),
-    limit: int = Query(default=20, ge=1, le=_MAX_PAGE_LIMIT, description="Max records to return."),
+    skip: int = Query(
+        default=0, ge=0, description="Number of records to skip (offset)."
+    ),
+    limit: int = Query(
+        default=20, ge=1, le=_MAX_PAGE_LIMIT, description="Max records to return."
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
@@ -92,7 +99,9 @@ def list_audit_reports(
             .all()
         )
     except Exception as exc:
-        logger.exception("Failed to list audit reports for user %s: %s", current_user.id, exc)
+        logger.exception(
+            "Failed to list audit reports for user %s: %s", current_user.id, exc
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve audit reports: {exc}",

@@ -68,6 +68,9 @@ select = [
 ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in defaults (FastAPI pattern)
+    "TC001",  # move first-party imports into TYPE_CHECKING — breaks SQLAlchemy/LangGraph runtime resolution
+    "TC002",  # move third-party imports into TYPE_CHECKING — breaks SQLAlchemy/LangGraph runtime resolution
+    "TC003",  # move stdlib imports into TYPE_CHECKING — breaks SQLAlchemy/LangGraph runtime resolution
 ]
 
 [tool.ruff.lint.isort]

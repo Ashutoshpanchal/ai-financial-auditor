@@ -11,17 +11,22 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from backend.agents.chat import run_chat
 from backend.database import get_db
 from backend.middleware.auth import get_current_user
 from backend.models.chat_session import ChatSession
-from backend.models.user import User
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from sqlalchemy.orm import Session
+
+    from backend.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -116,13 +121,17 @@ async def create_session(
         db.refresh(session)
     except Exception as exc:
         db.rollback()
-        logger.exception("create_session: failed to persist session for user=%s", current_user.id)
+        logger.exception(
+            "create_session: failed to persist session for user=%s", current_user.id
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create chat session.",
         ) from exc
 
-    logger.info("create_session: created session=%s for user=%s", session.id, current_user.id)
+    logger.info(
+        "create_session: created session=%s for user=%s", session.id, current_user.id
+    )
     return CreateSessionResponse(
         id=session.id,
         title=session.title,

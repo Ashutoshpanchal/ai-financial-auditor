@@ -17,6 +17,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from sqlalchemy.orm import Session
 from typing_extensions import TypedDict
+from typing import TYPE_CHECKING
 
 from backend.agents.tools import (
     compare_months,
@@ -26,6 +27,9 @@ from backend.agents.tools import (
 )
 from backend.config import get_settings
 from backend.services.observability import get_callbacks
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +360,7 @@ async def response_node(state: AgentState) -> AgentState:
         Updated state with messages extended by the new user + assistant turns.
     """
     now_iso = datetime.now(UTC).isoformat()
-    user_message = _last_user_message(state["messages"]) or ""
+    _last_user_message(state["messages"]) or ""
 
     # The user message is already in state["messages"]; add the assistant reply
     assistant_entry = {
@@ -365,7 +369,7 @@ async def response_node(state: AgentState) -> AgentState:
         "timestamp": now_iso,
     }
 
-    updated_messages = list(state["messages"]) + [assistant_entry]
+    updated_messages = [*list(state["messages"]), assistant_entry]
 
     logger.info(
         "response_node: response ready for user=%s session=%s len(messages)=%d",

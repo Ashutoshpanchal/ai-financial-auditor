@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import get_settings
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 def _make_engine():

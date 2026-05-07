@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.middleware.auth import get_current_user
-from backend.models.user import User
 from backend.services.auth import (
     create_app_jwt,
     dev_login,
@@ -17,6 +17,11 @@ from backend.services.auth import (
     get_google_user_info,
     upsert_user,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from backend.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
