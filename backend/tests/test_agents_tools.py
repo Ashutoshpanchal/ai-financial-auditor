@@ -116,13 +116,7 @@ class TestSearchTransactions:
         mock_row.category = "Food & Drink"
         mock_db.execute.return_value.fetchall.return_value = [mock_row]
 
-        result = search_transactions.run(
-            {
-                "query": "coffee",
-                "user_id": "user-123",
-                "db": mock_db,
-            }
-        )
+        result = search_transactions(query="coffee", user_id="user-123", db=mock_db)
 
         assert "Starbucks" in result
         assert "Chase" in result
@@ -134,12 +128,8 @@ class TestSearchTransactions:
         mock_embed.return_value = [0.01] * 1536
         mock_db.execute.return_value.fetchall.return_value = []
 
-        result = search_transactions.run(
-            {
-                "query": "nonexistent",
-                "user_id": "user-123",
-                "db": mock_db,
-            }
+        result = search_transactions(
+            query="nonexistent", user_id="user-123", db=mock_db
         )
 
         assert "No transactions found" in result
@@ -152,13 +142,7 @@ class TestSearchTransactions:
             ),
             pytest.raises(RuntimeError, match="could not embed query"),
         ):
-            search_transactions.run(
-                {
-                    "query": "test",
-                    "user_id": "user-123",
-                    "db": mock_db,
-                }
-            )
+            search_transactions(query="test", user_id="user-123", db=mock_db)
 
 
 # ---------------------------------------------------------------------------
@@ -183,12 +167,7 @@ class TestGetSpendingSummary:
         row2.total = 300.00
         mock_db.execute.return_value.fetchall.return_value = [row1, row2]
 
-        result = get_spending_summary.run(
-            {
-                "user_id": "user-123",
-                "db": mock_db,
-            }
-        )
+        result = get_spending_summary(user_id="user-123", db=mock_db)
 
         assert "Food & Drink" in result
         assert "Groceries" in result
@@ -200,12 +179,7 @@ class TestGetSpendingSummary:
         """get_spending_summary should return a message when no transactions."""
         mock_db.execute.return_value.fetchall.return_value = []
 
-        result = get_spending_summary.run(
-            {
-                "user_id": "user-123",
-                "db": mock_db,
-            }
-        )
+        result = get_spending_summary(user_id="user-123", db=mock_db)
 
         assert "No transactions found" in result
 
@@ -234,13 +208,8 @@ class TestCompareMonths:
         row2.total = 150.0
         mock_db.execute.return_value.fetchall.return_value = [row1, row2]
 
-        result = compare_months.run(
-            {
-                "month1": "2024-01",
-                "month2": "2024-02",
-                "user_id": "user-123",
-                "db": mock_db,
-            }
+        result = compare_months(
+            month1="2024-01", month2="2024-02", user_id="user-123", db=mock_db
         )
 
         assert "2024-01" in result
@@ -250,13 +219,8 @@ class TestCompareMonths:
     def test_compare_months_invalid_format(self, mock_db):
         """compare_months should raise ValueError for invalid month format."""
         with pytest.raises(ValueError, match="YYYY-MM format"):
-            compare_months.run(
-                {
-                    "month1": "invalid",
-                    "month2": "2024-02",
-                    "user_id": "user-123",
-                    "db": mock_db,
-                }
+            compare_months(
+                month1="invalid", month2="2024-02", user_id="user-123", db=mock_db
             )
 
 
@@ -280,12 +244,7 @@ class TestGetAnomalies:
         row.insights = {"anomalies": [{"description": "Unusual $5000 charge"}]}
         mock_db.execute.return_value.fetchall.return_value = [row]
 
-        result = get_anomalies.run(
-            {
-                "user_id": "user-123",
-                "db": mock_db,
-            }
-        )
+        result = get_anomalies(user_id="user-123", db=mock_db)
 
         assert "Unusual $5000 charge" in result
 
@@ -293,12 +252,7 @@ class TestGetAnomalies:
         """get_anomalies should return a message when no reports exist."""
         mock_db.execute.return_value.fetchall.return_value = []
 
-        result = get_anomalies.run(
-            {
-                "user_id": "user-123",
-                "db": mock_db,
-            }
-        )
+        result = get_anomalies(user_id="user-123", db=mock_db)
 
         assert "No audit reports found" in result
 
@@ -310,11 +264,6 @@ class TestGetAnomalies:
         row.insights = {"anomalies": []}
         mock_db.execute.return_value.fetchall.return_value = [row]
 
-        result = get_anomalies.run(
-            {
-                "user_id": "user-123",
-                "db": mock_db,
-            }
-        )
+        result = get_anomalies(user_id="user-123", db=mock_db)
 
         assert "No anomalies found" in result

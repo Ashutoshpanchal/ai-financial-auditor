@@ -45,8 +45,11 @@ def _find_column(df_columns: list[str], keywords: list[str]) -> str | None:
         if kw.lower() in lower_cols:
             return lower_cols[kw.lower()]
 
-    # 2. Substring match — prefer the keyword that appears earliest in the list
+    # 2. Substring match — only for keywords >= 4 chars to avoid short tokens
+    #    like "dr" or "cr" false-matching words like "description".
     for kw in keywords:
+        if len(kw) < 4:
+            continue
         for col_lower, col_orig in lower_cols.items():
             if kw.lower() in col_lower:
                 return col_orig
