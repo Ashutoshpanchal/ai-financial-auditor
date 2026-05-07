@@ -116,6 +116,28 @@ def _init_db() -> None:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
     _run_migrations()
+    # Ensure critical constraints exist even if migrations were applied out of order
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conrelid = 'description_categories'::regclass
+                          AND contype = 'u'
+                          AND conname = 'uq_description_categories_user_description'
+                    ) THEN
+                        ALTER TABLE description_categories
+                            ADD CONSTRAINT uq_description_categories_user_description
+                            UNIQUE (user_id, description);
+                    END IF;
+                END
+                $$;
+                """
+            )
+        )
     Base.metadata.create_all(bind=engine)
     logger.info("Database ready.")
 

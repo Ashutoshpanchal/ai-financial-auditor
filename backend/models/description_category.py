@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.models.base import Base
@@ -18,6 +18,13 @@ class DescriptionCategory(Base):
     """
 
     __tablename__ = "description_categories"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "description",
+            name="uq_description_categories_user_description",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(

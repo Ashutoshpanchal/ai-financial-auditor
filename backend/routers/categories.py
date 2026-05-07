@@ -303,7 +303,7 @@ async def analyze_and_categorize(
             (id, user_id, description, parent_category, sub_category, payment_method, created_at)
         VALUES
             (:id, :user_id, :description, :parent_category, :sub_category, :payment_method, now())
-        ON CONFLICT ON CONSTRAINT uq_description_categories_user_description
+        ON CONFLICT (user_id, description)
         DO UPDATE SET
             parent_category = EXCLUDED.parent_category,
             sub_category    = EXCLUDED.sub_category,
