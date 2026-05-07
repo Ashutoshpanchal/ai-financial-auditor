@@ -155,8 +155,14 @@ def parse_csv(file_bytes: bytes, bank_name: str) -> list[dict]:
         df["_credit"] = combined.where(combined >= 0, 0.0)
 
     # --- Clean text fields ---
-    df["_date"] = df[date_col].astype(str).str.strip()
+    df["_date_str"] = df[date_col].astype(str).str.strip()
     df["_description"] = df[desc_col].astype(str).str.strip()
+
+    # Parse dates to datetime.date — use "mixed" format to handle DD/MM/YYYY and
+    # YYYY-MM-DD in the same column without ambiguity warnings (pandas >= 2.0).
+    df["_date"] = pd.to_datetime(
+        df["_date_str"], errors="coerce", format="mixed", dayfirst=True
+    )
 
     # --- Drop rows where both debit and credit are zero or missing ---
     df = df.dropna(subset=["_debit", "_credit"], how="all")
@@ -165,9 +171,14 @@ def parse_csv(file_bytes: bytes, bank_name: str) -> list[dict]:
     # --- Assemble output dicts ---
     transactions: list[dict] = []
     for _, row in df.iterrows():
+        parsed_date: date_type | str
+        if pd.notna(row["_date"]):
+            parsed_date = row["_date"].date()
+        else:
+            parsed_date = row["_date_str"]
         transactions.append(
             {
-                "date": row["_date"],
+                "date": parsed_date,
                 "description": row["_description"],
                 "debit": float(row["_debit"]),
                 "credit": float(row["_credit"]),

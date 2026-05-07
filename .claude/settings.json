@@ -46,6 +46,10 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/ui-lint.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/test-runner.sh"
           }
         ]
       }
@@ -67,6 +71,17 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/run-tests.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/graphify-update.sh",
+            "statusMessage": "Updating knowledge graph..."
           }
         ]
       }

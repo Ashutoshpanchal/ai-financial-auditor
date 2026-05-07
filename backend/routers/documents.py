@@ -297,21 +297,38 @@ async def upload_document(
                 db.rollback()
 
     # --- Persist Transaction rows ---
+    _DATE_PARSE_FMTS = ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y")
+
     try:
         for txn_dict in raw_transactions:
-            txn = Transaction(
-                id=str(uuid.uuid4()),
-                user_id=current_user.id,
-                document_id=document_id,
-                bank_name=txn_dict.get("bank_name") or safe_bank_name,
-                transaction_date=txn_dict["date"],
-                description=txn_dict["description"],
-                debit=float(txn_dict.get("debit", 0.0)),
-                credit=float(txn_dict.get("credit", 0.0)),
-                category=txn_dict.get("category"),
-                remarks=txn_dict.get("remarks"),
-            )
-            db.add(txn)
+            raw_date = txn_dict["date"]
+            # Parsers return datetime.date; fallback-convert strings if needed.
+            if isinstance(raw_date, str):
+                for fmt in _DATE_PARSE_FMTS:
+                    try:
+                        raw_date = datetime.strptime(raw_date, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+
+            txn_kwargs: dict = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user.id,
+                "document_id": document_id,
+                "bank_name": txn_dict.get("bank_name") or safe_bank_name,
+                "transaction_date": raw_date,
+                "description": txn_dict["description"],
+                "debit": float(txn_dict.get("debit", 0.0)),
+                "credit": float(txn_dict.get("credit", 0.0)),
+                "category": txn_dict.get("category"),
+            }
+            # Skip remarks when None — avoids SQLAlchemy JSON null serialization bug
+            # in insertmanyvalues batch mode (SQLAlchemy 2.0.x + psycopg2).
+            remarks = txn_dict.get("remarks")
+            if remarks is not None:
+                txn_kwargs["remarks"] = remarks
+            db.add(Transaction(**txn_kwargs))
+
         db.commit()
     except Exception as exc:
         db.rollback()

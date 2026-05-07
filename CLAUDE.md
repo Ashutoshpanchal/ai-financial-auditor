@@ -98,17 +98,9 @@ Copy `.env.example` to `.env` and fill in:
 
 ## Graphify — Codebase Knowledge Graph
 
-`graphify-out/` contains a persistent knowledge graph of this codebase. **Use it before making changes.**
+`graphify-out/` is your **primary codebase reference**. The `SessionStart` hook auto-updates it and injects `GRAPH_REPORT.md` into your context before every session.
 
-### On every new session — run this first:
-```bash
-# If graph exists, do an incremental update (fast, no LLM for code-only changes)
-if [ -f graphify-out/graph.json ]; then
-  graphify . --update
-else
-  graphify .
-fi
-```
+**Rule: check the graph BEFORE reading source files.** Only open a `.py` or `.tsx` file when the graph context is insufficient.
 
 ### Before touching any file — query the graph:
 ```bash

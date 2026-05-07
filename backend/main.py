@@ -52,14 +52,61 @@ app.include_router(admin.router)
 app.include_router(transactions.router)
 
 
+def _run_migrations() -> None:
+    """Apply any pending SQL migration files in order.
+
+    Migrations live in /migrations and are named NNN_<name>.sql.
+    Applied migrations are tracked in the schema_migrations table so each
+    script runs exactly once, even across container restarts.
+    """
+    migrations_dir = Path(__file__).parent.parent / "migrations"
+    if not migrations_dir.is_dir():
+        return
+
+    sql_files = sorted(migrations_dir.glob("*.sql"))
+    if not sql_files:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    filename TEXT PRIMARY KEY,
+                    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+        )
+        applied: set[str] = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT filename FROM schema_migrations")
+            ).fetchall()
+        }
+
+        for sql_file in sql_files:
+            name = sql_file.name
+            if name in applied:
+                continue
+            logger.info("Applying migration: %s", name)
+            conn.execute(text(sql_file.read_text()))
+            conn.execute(
+                text("INSERT INTO schema_migrations (filename) VALUES (:n)"),
+                {"n": name},
+            )
+            logger.info("Migration applied: %s", name)
+
+
 @app.on_event("startup")
 def _init_db() -> None:
-    """Create all tables and enable pgvector on startup if they don't exist yet."""
+    """Enable extensions, run pending migrations, then create any missing tables."""
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+    _run_migrations()
     Base.metadata.create_all(bind=engine)
-    logger.info("Database tables verified / created.")
+    logger.info("Database ready.")
 
 
 @app.get("/health")

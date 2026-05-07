@@ -40,4 +40,13 @@ fi
 
 echo ""
 echo "═══════════════════════════════════════"
+
+# Update knowledge graph so next session starts with fresh context
+if command -v graphify &>/dev/null && [ -f "graphify-out/graph.json" ]; then
+  echo ""
+  echo "--- Graphify update ---"
+  graphify update . 2>&1 | grep -E "Rebuilt|updated|nodes" | tail -3
+fi
+
+echo "═══════════════════════════════════════"
 exit 0
