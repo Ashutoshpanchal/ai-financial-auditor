@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-DEFAULT_WIDGETS: list[dict] = [
+from typing import Any
+
+DEFAULT_WIDGETS: list[dict[str, Any]] = [
     {
         "title": "Total Credits",
         "widget_type": "metric",
@@ -53,7 +55,7 @@ DEFAULT_WIDGETS: list[dict] = [
     },
 ]
 
-DEFAULT_LAYOUT: dict = {
+DEFAULT_LAYOUT: dict[str, Any] = {
     "cols": 3,
     "grid": [
         {"widget_index": 0, "row": 0, "col": 0, "col_span": 1},  # Total Credits
