@@ -16,10 +16,12 @@ from backend.models import (  # noqa: F401 — side-effect: registers models wit
     audit_report,
     category_master,
     chat_session,
+    dashboard,
     description_category,
     document,
     transaction,
     user,
+    widget,
 )
 from backend.models.base import Base
 from backend.routers import (
@@ -28,6 +30,7 @@ from backend.routers import (
     auth,
     categories,
     chat,
+    dashboard as dashboard_router,
     documents,
     transactions,
 )
@@ -61,6 +64,7 @@ app.include_router(chat.router)
 app.include_router(admin.router)
 app.include_router(transactions.router)
 app.include_router(categories.router)
+app.include_router(dashboard_router.router)
 
 
 def _run_migrations() -> None:
