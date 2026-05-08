@@ -22,8 +22,6 @@ from backend.models import (  # noqa: F401 — side-effect: registers models wit
     user,
 )
 from backend.models.base import Base
-from backend.models.dashboard import UserDashboard  # noqa: F401
-from backend.models.widget import UserWidget  # noqa: F401
 from backend.routers import (
     admin,
     audit,
