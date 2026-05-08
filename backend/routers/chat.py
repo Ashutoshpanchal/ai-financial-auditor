@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -22,8 +23,6 @@ from backend.middleware.auth import get_current_user
 from backend.models.chat_session import ChatSession
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from sqlalchemy.orm import Session
 
     from backend.models.user import User
@@ -63,6 +62,7 @@ class SendMessageResponse(BaseModel):
 
     response: str
     session_id: str
+    widget_suggestion: dict[str, Any] | None = None
 
 
 class SessionSummary(BaseModel):
@@ -194,7 +194,7 @@ async def send_message(
     )
 
     try:
-        response_text = await run_chat(session, body.content, db)
+        response_text, widget_suggestion = await run_chat(session, body.content, db)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -211,7 +211,11 @@ async def send_message(
             detail=f"Agent pipeline error: {exc}",
         ) from exc
 
-    return SendMessageResponse(response=response_text, session_id=session_id)
+    return SendMessageResponse(
+        response=response_text,
+        session_id=session_id,
+        widget_suggestion=widget_suggestion,
+    )
 
 
 @router.get(

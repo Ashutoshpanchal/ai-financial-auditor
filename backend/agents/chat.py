@@ -96,7 +96,9 @@ finance_graph = finance_graph.compile()
 # ---------------------------------------------------------------------------
 
 
-async def run_chat(session: ChatSession, user_message: str, db: Session) -> str:
+async def run_chat(
+    session: ChatSession, user_message: str, db: Session
+) -> tuple[str, dict[str, Any] | None]:
     """Run the finance agent graph for one user turn and persist the updated history.
 
     Steps:
@@ -104,7 +106,7 @@ async def run_chat(session: ChatSession, user_message: str, db: Session) -> str:
       2. Build the initial AgentState from session data.
       3. Invoke the compiled LangGraph with that state.
       4. Persist the updated messages (including the assistant reply) back to the session.
-      5. Return the assistant's final_response string.
+      5. Return the assistant's final_response string and optional widget_suggestion.
 
     Args:
         session:      ChatSession ORM object for the current conversation.
@@ -112,7 +114,7 @@ async def run_chat(session: ChatSession, user_message: str, db: Session) -> str:
         db:           SQLAlchemy session (caller manages the transaction lifecycle).
 
     Returns:
-        The assistant's response string.
+        A tuple of (response_text, widget_suggestion) where widget_suggestion may be None.
 
     Raises:
         ValueError:   If user_message is empty.
@@ -167,9 +169,12 @@ async def run_chat(session: ChatSession, user_message: str, db: Session) -> str:
     if not response_text:
         raise RuntimeError("run_chat: graph completed but final_response is empty")
 
+    widget_suggestion: dict[str, Any] | None = final_state.get("widget_suggestion")
+
     logger.info(
-        "run_chat: completed for session=%s response_length=%d",
+        "run_chat: completed for session=%s response_length=%d widget=%s",
         session.id,
         len(response_text),
+        widget_suggestion is not None,
     )
-    return response_text
+    return response_text, widget_suggestion
