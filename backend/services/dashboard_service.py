@@ -30,12 +30,12 @@ def is_dashboard_bootstrapped(user_id: str, db: Session) -> bool:
     Returns:
         True if at least one default widget row exists for the user, else False.
     """
-    count: int = db.execute(
+    result = db.execute(
         select(func.count())
         .select_from(UserWidget)
         .where(UserWidget.user_id == user_id, UserWidget.is_default == True)  # noqa: E712
     ).scalar()
-    return count > 0
+    return (result or 0) > 0
 
 
 def bootstrap_default_dashboard(user_id: str, db: Session) -> None:
