@@ -92,6 +92,21 @@ async def _run_audit_background(
             db=db, document=document, transactions=transactions, user_id=user_id
         )
         logger.info("Background audit completed for document %s", document_id)
+
+        # Bootstrap the default dashboard after the first successful audit.
+        # Wrapped in its own try/except so a bootstrap failure never fails the
+        # audit pipeline — the audit result is already committed at this point.
+        try:
+            from backend.services.dashboard_service import bootstrap_default_dashboard
+
+            bootstrap_default_dashboard(user_id=user_id, db=db)
+        except Exception as bootstrap_exc:
+            logger.exception(
+                "Dashboard bootstrap failed for user %s after audit %s: %s",
+                user_id,
+                document_id,
+                bootstrap_exc,
+            )
     except Exception as exc:
         logger.exception(
             "Background audit failed for document %s: %s", document_id, exc
@@ -116,7 +131,7 @@ async def _run_audit_background(
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile,
-    bank_name: str | None = Form(default=None),
+    bank_name: str = Form(...),
     pdf_password: str | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -159,7 +174,11 @@ async def upload_document(
             ),
         )
 
-    # bank_name is optional for all uploads; defaults to "Unknown Bank" when omitted.
+    if not bank_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="bank_name is required and must not be empty.",
+        )
 
     # --- Read file bytes ---
     try:
@@ -223,7 +242,7 @@ async def upload_document(
         id=document_id,
         user_id=current_user.id,
         filename=file.filename or f"statement_{today}.{file_type}",
-        bank_name=(bank_name.strip() if bank_name else "Unknown Bank"),
+        bank_name=bank_name.strip(),
         file_type=file_type,
         drive_file_id=drive_result["drive_file_id"],
         drive_folder_id=drive_result["drive_folder_id"],
@@ -251,7 +270,7 @@ async def upload_document(
         db.rollback()
         logger.exception("Failed to update document status to parsing: %s", exc)
 
-    safe_bank_name = bank_name.strip() if bank_name else "Unknown Bank"
+    safe_bank_name = bank_name.strip()
 
     try:
         if file_type == "csv":
@@ -263,9 +282,7 @@ async def upload_document(
 
                 raw_transactions = parse_pdf(
                     file_bytes,
-                    bank_name=safe_bank_name
-                    if safe_bank_name != "Unknown Bank"
-                    else None,
+                    bank_name=safe_bank_name,
                     password=pdf_password or None,
                 )
             except ImportError as imp_exc:
