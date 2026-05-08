@@ -220,8 +220,8 @@ def delete_widget(
     ).scalar_one_or_none()
 
     if dashboard is not None:
-        layout = dashboard.layout or {"cols": 3, "grid": []}
-        grid: list[Any] = layout.get("grid", [])
+        layout: dict[str, Any] = dashboard.layout or {"cols": 3, "grid": []}
+        grid: list[Any] = list(layout.get("grid") or [])
         updated_grid = [item for item in grid if item.get("widget_id") != widget_id]
         if len(updated_grid) != len(grid):
             dashboard.layout = {**layout, "grid": updated_grid}
