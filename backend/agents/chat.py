@@ -1,7 +1,7 @@
 """LangGraph StateGraph for the AI Finance Agent.
 
 Builds and compiles the multi-node graph:
-    intake_node → rag_node → analysis_node → response_node → END
+    intake_node → rag_node → analysis_node → response_node → suggest_widget_node → END
 
 The compiled graph is exported as `finance_graph`.
 The public entry point for callers is `run_chat()`.
@@ -23,6 +23,7 @@ from backend.agents.nodes import (
     intake_node,
     rag_node,
     response_node,
+    suggest_widget_node,
 )
 from backend.models.chat_session import ChatSession
 
@@ -55,13 +56,15 @@ def _build_graph(db: Session) -> Any:
     graph.add_node("rag_node", rag_with_db)
     graph.add_node("analysis_node", analysis_node)
     graph.add_node("response_node", response_node)
+    graph.add_node("suggest_widget_node", suggest_widget_node)
 
     graph.set_entry_point("intake_node")
 
     graph.add_edge("intake_node", "rag_node")
     graph.add_edge("rag_node", "analysis_node")
     graph.add_edge("analysis_node", "response_node")
-    graph.add_edge("response_node", END)
+    graph.add_edge("response_node", "suggest_widget_node")
+    graph.add_edge("suggest_widget_node", END)
 
     return graph.compile()
 
@@ -78,11 +81,13 @@ finance_graph.add_node("intake_node", intake_node)
 finance_graph.add_node("rag_node", rag_node)
 finance_graph.add_node("analysis_node", analysis_node)
 finance_graph.add_node("response_node", response_node)
+finance_graph.add_node("suggest_widget_node", suggest_widget_node)
 finance_graph.set_entry_point("intake_node")
 finance_graph.add_edge("intake_node", "rag_node")
 finance_graph.add_edge("rag_node", "analysis_node")
 finance_graph.add_edge("analysis_node", "response_node")
-finance_graph.add_edge("response_node", END)
+finance_graph.add_edge("response_node", "suggest_widget_node")
+finance_graph.add_edge("suggest_widget_node", END)
 finance_graph = finance_graph.compile()
 
 
@@ -135,6 +140,7 @@ async def run_chat(session: ChatSession, user_message: str, db: Session) -> str:
         "tool_calls": [],
         "tool_results": [],
         "final_response": "",
+        "widget_suggestion": None,
     }
 
     logger.info(

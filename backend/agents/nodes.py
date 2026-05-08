@@ -4,15 +4,16 @@ Each node is an async function that accepts and returns AgentState.
 The graph is assembled in chat.py; nodes focus purely on their single responsibility.
 
 Node pipeline:
-    intake_node → rag_node → analysis_node → response_node
+    intake_node → rag_node → analysis_node → response_node → suggest_widget_node
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -43,12 +44,14 @@ class AgentState(TypedDict):
     """Shared state passed between LangGraph nodes.
 
     Attributes:
-        messages:       Full conversation history as list of {role, content, timestamp}.
-        user_id:        ID of the authenticated user owning this session.
-        session_id:     ID of the ChatSession record in the database.
-        tool_calls:     Pending tool-call descriptors set by intake_node / rag_node.
-        tool_results:   Collected tool outputs, each {tool, result}.
-        final_response: The assistant's final answer string, set by response_node.
+        messages:          Full conversation history as list of {role, content, timestamp}.
+        user_id:           ID of the authenticated user owning this session.
+        session_id:        ID of the ChatSession record in the database.
+        tool_calls:        Pending tool-call descriptors set by intake_node / rag_node.
+        tool_results:      Collected tool outputs, each {tool, result}.
+        final_response:    The assistant's final answer string, set by response_node.
+        widget_suggestion: Optional structured widget descriptor extracted from the last
+                           AI message by suggest_widget_node, or None if not applicable.
     """
 
     messages: list[dict]
@@ -57,6 +60,7 @@ class AgentState(TypedDict):
     tool_calls: list[dict]
     tool_results: list[dict]
     final_response: str
+    widget_suggestion: dict[str, Any] | None
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +83,16 @@ You are an expert AI personal finance auditor. Using the transaction data provid
 give a clear, accurate, and actionable insight. Be concise but thorough.
 If the data is empty, say so honestly. Never fabricate numbers.
 """
+
+# Required top-level keys for a valid widget suggestion block.
+_WIDGET_REQUIRED_KEYS: frozenset[str] = frozenset(
+    {"title", "widget_type", "query_config"}
+)
+
+# Allowed values for widget_type.
+_VALID_WIDGET_TYPES: frozenset[str] = frozenset(
+    {"metric", "bar_chart", "pie_chart", "line_chart"}
+)
 
 
 def _build_llm() -> ChatOpenAI:
@@ -110,6 +124,82 @@ def _last_user_message(messages: list[dict]) -> str | None:
         if msg.get("role") == "user":
             return msg.get("content")
     return None
+
+
+def _last_ai_message(messages: list[dict]) -> str | None:
+    """Return the content of the most recent assistant message in the history.
+
+    Args:
+        messages: Conversation history list.
+
+    Returns:
+        Content string of the last assistant message, or None if not found.
+    """
+    for msg in reversed(messages):
+        if msg.get("role") == "assistant":
+            return msg.get("content")
+    return None
+
+
+def _extract_widget_suggestion(text: str) -> dict[str, Any] | None:
+    """Scan *text* for a JSON code block that matches the widget suggestion shape.
+
+    Looks for the first ```json ... ``` block in *text*, parses it, and validates
+    that it contains the required widget fields.  Returns None if no valid block is
+    found or if JSON parsing fails.
+
+    Args:
+        text: Raw text (typically the last AI message) to scan.
+
+    Returns:
+        Parsed widget suggestion dict, or None if not found / invalid.
+    """
+    # Match the first ```json ... ``` block (non-greedy, DOTALL)
+    pattern = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL)
+    match = pattern.search(text)
+    if not match:
+        return None
+
+    raw_json = match.group(1).strip()
+    try:
+        candidate: Any = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        logger.debug(
+            "_extract_widget_suggestion: JSON parse failed — %s (snippet: %s)",
+            exc,
+            raw_json[:200],
+        )
+        return None
+
+    if not isinstance(candidate, dict):
+        return None
+
+    # Validate required top-level keys
+    if not _WIDGET_REQUIRED_KEYS.issubset(candidate.keys()):
+        missing = _WIDGET_REQUIRED_KEYS - candidate.keys()
+        logger.debug(
+            "_extract_widget_suggestion: block missing required keys %s — skipping",
+            missing,
+        )
+        return None
+
+    # Validate widget_type value
+    widget_type = candidate.get("widget_type")
+    if widget_type not in _VALID_WIDGET_TYPES:
+        logger.debug(
+            "_extract_widget_suggestion: invalid widget_type=%r — skipping",
+            widget_type,
+        )
+        return None
+
+    # Validate query_config is a dict
+    if not isinstance(candidate.get("query_config"), dict):
+        logger.debug(
+            "_extract_widget_suggestion: query_config is not a dict — skipping"
+        )
+        return None
+
+    return candidate  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
@@ -379,3 +469,49 @@ async def response_node(state: AgentState) -> AgentState:
     )
 
     return {**state, "messages": updated_messages}
+
+
+async def suggest_widget_node(state: AgentState) -> AgentState:
+    """Inspect the last AI message for an embedded widget suggestion JSON block.
+
+    Scans the most recent assistant message in state["messages"] for a ```json
+    code block matching the widget suggestion shape.  If a valid block is found,
+    it is parsed and stored in state["widget_suggestion"].  Otherwise,
+    state["widget_suggestion"] is set to None.
+
+    This node performs no additional LLM calls — it is a deterministic
+    post-processing step that extracts structured data already embedded by the
+    analysis_node LLM response.
+
+    Args:
+        state: Current graph state with messages populated by response_node.
+
+    Returns:
+        Updated state with widget_suggestion set to a structured dict or None.
+    """
+    last_ai_text = _last_ai_message(state["messages"])
+    if not last_ai_text:
+        logger.debug(
+            "suggest_widget_node: no assistant message found — widget_suggestion=None"
+        )
+        return {**state, "widget_suggestion": None}
+
+    widget: dict[str, Any] | None = _extract_widget_suggestion(last_ai_text)
+
+    if widget is not None:
+        logger.info(
+            "suggest_widget_node: widget suggestion extracted title=%r type=%r "
+            "for user=%s session=%s",
+            widget.get("title"),
+            widget.get("widget_type"),
+            state["user_id"],
+            state["session_id"],
+        )
+    else:
+        logger.debug(
+            "suggest_widget_node: no widget suggestion found for user=%s session=%s",
+            state["user_id"],
+            state["session_id"],
+        )
+
+    return {**state, "widget_suggestion": widget}
