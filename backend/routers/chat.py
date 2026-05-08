@@ -194,7 +194,10 @@ async def send_message(
     )
 
     try:
-        response_text, widget_suggestion = await run_chat(session, body.content, db)
+        _result: tuple[str, dict[str, Any] | None] = await run_chat(
+            session, body.content, db
+        )
+        response_text, widget_suggestion = _result
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
