@@ -85,7 +85,7 @@ export function PieChartWidget({
             </Pie>
             <Tooltip
               formatter={(value: number) => [
-                `$${value.toLocaleString()}`,
+                `₹${value.toLocaleString("en-IN")}`,
                 "Amount",
               ]}
               contentStyle={{

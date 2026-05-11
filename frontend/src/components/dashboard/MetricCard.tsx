@@ -8,7 +8,7 @@ interface MetricCardProps {
 
 function formatValue(value: number, format: "currency" | "number"): string {
   if (format === "currency") {
-    return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+    return value.toLocaleString("en-IN", { style: "currency", currency: "INR" });
   }
   return value.toLocaleString();
 }

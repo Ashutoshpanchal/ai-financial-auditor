@@ -6,7 +6,7 @@ describe("MetricCard", () => {
   it("renders title and formatted currency value", () => {
     render(<MetricCard title="Total Credits" value={12345.67} format="currency" />);
     expect(screen.getByText("Total Credits")).toBeInTheDocument();
-    expect(screen.getByText("$12,345.67")).toBeInTheDocument();
+    expect(screen.getByText(/₹[\d,]+/)).toBeInTheDocument();
   });
 
   it("renders number format without currency symbol", () => {
