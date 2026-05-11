@@ -65,7 +65,11 @@ class Settings(BaseSettings):
     @property
     def langfuse_enabled(self) -> bool:
         """True if Langfuse is in the active backends list."""
-        return "langfuse" in self.active_backends and bool(self.langfuse_public_key)
+        return (
+            "langfuse" in self.active_backends
+            and bool(self.langfuse_public_key)
+            and bool(self.langfuse_secret_key)
+        )
 
 
 @lru_cache

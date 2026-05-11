@@ -226,6 +226,27 @@ def _parse_amount(raw: str) -> float | None:
         Parsed float, or ``None`` if conversion fails.
     """
     stripped = raw.strip()
+    if not stripped:
+        return None
+
+    # Normalise PDF artifacts and symbols seen in bank statements.
+    stripped = stripped.replace("\u00a0", " ").replace("\u202f", " ").strip()
+    stripped = (
+        stripped.replace("₹", "").replace("$", "").replace("€", "").replace("£", "")
+    )
+
+    # Treat "(1,234.56)" as a negative value.
+    is_parenthesized_negative = stripped.startswith("(") and stripped.endswith(")")
+    if is_parenthesized_negative:
+        stripped = stripped[1:-1].strip()
+
+    # Remove debit/credit suffix tokens (e.g. "1,234.00 Dr", "500 Cr").
+    stripped = re.sub(r"\b(?:dr|cr)\b\.?", "", stripped, flags=re.IGNORECASE).strip()
+    # Remove all remaining spaces between digits/separators.
+    stripped = stripped.replace(" ", "")
+
+    if not stripped:
+        return None
     if "," in stripped and "." in stripped:
         if stripped.rindex(",") > stripped.rindex("."):
             stripped = stripped.replace(".", "").replace(",", ".")
@@ -234,7 +255,10 @@ def _parse_amount(raw: str) -> float | None:
     elif "," in stripped:
         stripped = stripped.replace(",", ".")
     try:
-        return float(stripped)
+        amount = float(stripped)
+        if is_parenthesized_negative:
+            return -abs(amount)
+        return amount
     except ValueError:
         return None
 
@@ -264,11 +288,48 @@ def _extract_bank_name(pdf: pdfplumber.PDF) -> str | None:
     return None
 
 
+_DEBIT_HEADER_KEYWORDS = ["debit", "withdrawal", "withdraw", "dr"]
+_CREDIT_HEADER_KEYWORDS = ["credit", "deposit", "cr"]
+
+
+def _detect_debit_credit_cols(
+    header_row: list[str | None],
+) -> tuple[int | None, int | None]:
+    """Scan a header row and return (debit_col_idx, credit_col_idx) or (None, None).
+
+    Args:
+        header_row: First row of a pdfplumber table, expected to contain column labels.
+
+    Returns:
+        Tuple of column indices for debit and credit, or (None, None) if not detected.
+    """
+    debit_idx: int | None = None
+    credit_idx: int | None = None
+    for i, cell in enumerate(header_row):
+        text = str(cell or "").lower()
+        if debit_idx is None and any(k in text for k in _DEBIT_HEADER_KEYWORDS):
+            debit_idx = i
+        elif credit_idx is None and any(k in text for k in _CREDIT_HEADER_KEYWORDS):
+            credit_idx = i
+    return debit_idx, credit_idx
+
+
+def _detect_date_col(row: list[str | None]) -> int | None:
+    """Return the index of the first cell that parses as a date, else None."""
+    for idx, cell in enumerate(row):
+        raw = str(cell or "").strip()
+        if raw and _try_parse_date(raw) is not None:
+            return idx
+    return None
+
+
 def _extract_from_tables(pdf: pdfplumber.PDF, bank_name: str) -> list[dict]:
     """Extract transactions from pdfplumber table structures across all pages.
 
-    A row is treated as a transaction when its first cell contains a parseable
-    date and its last cell contains a numeric amount.
+    Detects whether the table uses separate Debit/Credit columns (common in
+    Indian bank statements: Date | Description | Debit | Credit | Balance) or
+    a single signed Amount column. Falls back to single-column logic when
+    no debit/credit header labels are found.
 
     Args:
         pdf: An open ``pdfplumber.PDF`` object.
@@ -285,28 +346,76 @@ def _extract_from_tables(pdf: pdfplumber.PDF, bank_name: str) -> list[dict]:
             continue
 
         for table in tables:
-            for row in table:
+            if not table:
+                continue
+
+            # Detect column layout from the first few rows (header row can vary by bank).
+            debit_col: int | None = None
+            credit_col: int | None = None
+            data_start_idx = 0
+            for header_idx, row in enumerate(table[:5]):
+                row_debit_col, row_credit_col = _detect_debit_credit_cols(row)
+                if row_debit_col is None and row_credit_col is None:
+                    continue
+                if row_debit_col is None and row_credit_col is not None:
+                    if row_credit_col > 0:
+                        row_debit_col = row_credit_col - 1
+                if row_credit_col is None and row_debit_col is not None:
+                    if row_debit_col + 1 < len(row):
+                        row_credit_col = row_debit_col + 1
+                if row_debit_col is not None and row_credit_col is not None:
+                    debit_col = row_debit_col
+                    credit_col = row_credit_col
+                    data_start_idx = header_idx + 1
+                    break
+
+            has_split_cols = debit_col is not None and credit_col is not None
+
+            for row in table[data_start_idx:]:
                 if not row or len(row) < 3:
                     continue
 
-                raw_date = str(row[0] or "").strip()
+                date_col = _detect_date_col(row)
+                if date_col is None:
+                    continue
+                raw_date = str(row[date_col] or "").strip()
                 parsed_date = _try_parse_date(raw_date)
                 if parsed_date is None:
-                    continue
+                    continue  # header row or non-transaction row
 
-                raw_amount = str(row[-1] or "").strip()
-                if not raw_amount:
-                    continue
-                amount = _parse_amount(raw_amount)
-                if amount is None:
-                    continue
+                if has_split_cols:
+                    # Separate debit / credit columns (HDFC, ICICI, SBI, etc.)
+                    raw_debit = str(row[debit_col] or "").strip()  # type: ignore[index]
+                    raw_credit = str(row[credit_col] or "").strip()  # type: ignore[index]
+                    debit = _parse_amount(raw_debit) or 0.0
+                    credit = _parse_amount(raw_credit) or 0.0
+                    if debit == 0.0 and credit == 0.0:
+                        continue
+                    # Description = all columns between date and first amount col
+                    first_amt_col = min(debit_col, credit_col)  # type: ignore[arg-type]
+                    description = " ".join(
+                        str(cell or "").strip()
+                        for cell in row[date_col + 1 : first_amt_col]
+                    ).strip()
+                else:
+                    # Single signed amount in the right-most numeric-looking column.
+                    # Use second-last by default for statement layouts that end with Balance.
+                    amount_col = -1
+                    if len(row) >= 5:
+                        amount_col = -2
+                    raw_amount = str(row[amount_col] or "").strip()
+                    if not raw_amount:
+                        continue
+                    amount = _parse_amount(raw_amount)
+                    if amount is None:
+                        continue
+                    debit = abs(amount) if amount < 0 else 0.0
+                    credit = amount if amount >= 0 else 0.0
+                    description = " ".join(
+                        str(cell or "").strip()
+                        for cell in row[date_col + 1 : amount_col]
+                    ).strip()
 
-                description = " ".join(
-                    str(cell or "").strip() for cell in row[1:-1]
-                ).strip()
-
-                debit = abs(amount) if amount < 0 else 0.0
-                credit = amount if amount >= 0 else 0.0
                 transactions.append(
                     {
                         "date": parsed_date,

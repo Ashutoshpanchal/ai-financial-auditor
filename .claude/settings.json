@@ -37,7 +37,37 @@
       "Bash(python -m py_compile backend/agents/chat.py backend/agents/nodes.py backend/agents/tools.py)",
       "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor log --oneline -3)",
       "Bash(npm test *)",
-      "Bash(graphify . --update)"
+      "Bash(graphify . --update)",
+      "Bash(find /Users/ashutoshpanchal/.claude -maxdepth 3 -type f -name \"*.md\" | grep -i \"agent\\\\|subagent\" | sort && find /Users/ashutoshpanchal/.claude/plugins -name \"*.md\" 2>/dev/null | grep -i \"subagent\\\\|implementer\\\\|reviewer\" | sort | head -20)",
+      "Read(//Users/ashutoshpanchal/.claude/**)",
+      "Read(//Users/ashutoshpanchal/.claude/plugins/**)",
+      "Bash(mkdir -p /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/.claude/agents)",
+      "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor add .claude/agents/)",
+      "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor commit -m ' *)",
+      "Bash(python -c \"from backend.models.dashboard import UserDashboard; print\\('OK'\\)\")",
+      "Bash(python -m ruff check backend/services/widget_query.py)",
+      "Bash(python -m ruff format --check backend/services/widget_query.py)",
+      "Bash(python -m pyright backend/services/widget_query.py)",
+      "Bash(python -c \"from backend.routers.dashboard import router; print\\('import OK, routes:', [r.path for r in router.routes]\\)\")",
+      "Bash(python -c \"from backend.routers.dashboard import router; print\\('import OK'\\); print\\('routes:'\\); [print\\(' ', r.methods, r.path\\) for r in router.routes]\")",
+      "Bash(python -c \"from backend.main import app; print\\('app OK, total routes:', len\\(app.routes\\)\\)\")",
+      "Bash(python -m pyright backend/routers/documents.py)",
+      "Bash(python -m ruff check backend/agents/)",
+      "Bash(python -m pyright backend/agents/nodes.py)",
+      "Bash(python -m pyright backend/agents/chat.py)",
+      "Bash(python -m ruff check backend/routers/chat.py backend/agents/chat.py)",
+      "Bash(python -m pyright backend/routers/chat.py backend/agents/chat.py)",
+      "Bash(python -m ruff check backend/routers/chat.py)",
+      "Bash(python -m pyright backend/routers/chat.py)",
+      "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor diff HEAD backend/routers/chat.py)",
+      "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor diff HEAD backend/agents/chat.py)",
+      "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor add backend/routers/chat.py backend/agents/chat.py)",
+      "Bash(git commit *)",
+      "Bash(npm install *)",
+      "Bash(npm list *)"
+    ],
+    "additionalDirectories": [
+      "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/.claude"
     ]
   },
   "hooks": {
