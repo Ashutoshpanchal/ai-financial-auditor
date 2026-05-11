@@ -1,448 +1,310 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
-import { api } from "../services/api";
+import { useCallback, useEffect, useState } from "react";
+import { FilterBar, FilterState } from "../components/dashboard/FilterBar";
+import { WidgetGrid } from "../components/dashboard/WidgetGrid";
+import { EditModePanel } from "../components/dashboard/EditModePanel";
+import { ChatPanel } from "../components/dashboard/ChatPanel";
+
+const API = "http://localhost:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Document {
+interface Widget {
   id: string;
-  filename: string;
-  bank_name: string;
-  file_type: string;
-  status: "uploaded" | "parsing" | "parsed" | "embedding" | "auditing" | "completed" | "failed";
-  upload_date: string;
-  error_message?: string;
+  title: string;
+  widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
+  query_config: Record<string, unknown>;
+  is_default: boolean;
 }
 
-interface AuditReport {
-  id: string;
-  document_id: string;
-  summary: string;
-  insights: {
-    total_spend?: number;
-    top_category?: string;
-    anomaly_count?: number;
-    monthly_totals?: { month: string; total: number }[];
-    categories?: { name: string; value: number }[];
-  };
-  created_at: string;
+interface GridItem {
+  widget_id: string;
+  row: number;
+  col: number;
+  col_span: number;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const PIE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#8b5cf6", "#ec4899"];
-
-const STATUS_BADGE: Record<
-  Document["status"],
-  { label: string; classes: string }
-> = {
-  uploaded:  { label: "Uploaded",  classes: "bg-blue-100 text-blue-700" },
-  parsing:   { label: "Parsing",   classes: "bg-yellow-100 text-yellow-700" },
-  parsed:    { label: "Parsed",    classes: "bg-yellow-100 text-yellow-700" },
-  embedding: { label: "Embedding", classes: "bg-yellow-100 text-yellow-700" },
-  auditing:  { label: "Auditing",  classes: "bg-yellow-100 text-yellow-700" },
-  completed: { label: "Completed", classes: "bg-green-100 text-green-700" },
-  failed:    { label: "Failed",    classes: "bg-red-100 text-red-700" },
-};
-
-// ─── Skeleton helpers ─────────────────────────────────────────────────────────
-
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm animate-pulse">
-      <div className="h-4 w-28 bg-gray-200 rounded mb-3" />
-      <div className="h-8 w-20 bg-gray-300 rounded" />
-    </div>
-  );
+interface QueryConfig {
+  aggregation: string;
+  field: string;
+  group_by?: string;
+  filters?: Record<string, string | null>;
+  format?: string;
 }
 
-function SkeletonChart({ height = 240 }: { height?: number }) {
-  return (
-    <div
-      className="bg-white rounded-2xl p-6 shadow-sm animate-pulse"
-      style={{ height: height + 80 }}
-    >
-      <div className="h-4 w-36 bg-gray-200 rounded mb-4" />
-      <div className="bg-gray-100 rounded-xl" style={{ height }} />
-    </div>
-  );
+interface WidgetSuggestion {
+  title: string;
+  widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
+  query_config: QueryConfig;
 }
 
-function SkeletonTable({ rows = 5 }: { rows?: number }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden animate-pulse">
-      <div className="p-6 border-b border-gray-100">
-        <div className="h-5 w-32 bg-gray-200 rounded" />
-      </div>
-      <div className="divide-y divide-gray-50">
-        {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="flex gap-4 px-6 py-4">
-            <div className="h-4 w-40 bg-gray-100 rounded" />
-            <div className="h-4 w-24 bg-gray-100 rounded" />
-            <div className="h-4 w-20 bg-gray-100 rounded ml-auto" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`HTTP ${res.status}: ${body}`);
+  }
+  return res.json() as Promise<T>;
 }
 
-// ─── Summary Card ─────────────────────────────────────────────────────────────
-
-function SummaryCard({
-  label,
-  value,
-  sub,
-  color = "indigo",
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  color?: "indigo" | "emerald" | "amber" | "red";
-}) {
-  const colorMap = {
-    indigo: "text-indigo-600",
-    emerald: "text-emerald-600",
-    amber: "text-amber-600",
-    red: "text-red-600",
-  };
-  return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className={`text-3xl font-bold mt-1 ${colorMap[color]}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [audits, setAudits] = useState<AuditReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [widgets, setWidgets] = useState<Widget[]>([]);
+  const [grid, setGrid] = useState<GridItem[]>([]);
+  const [filters, setFilters] = useState<FilterState>({
+    dateFrom: "",
+    dateTo: "",
+    bankName: "",
+    category: "",
+  });
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isLoadingLayout, setIsLoadingLayout] = useState(true);
 
+  // Load widgets + layout on mount
   useEffect(() => {
-    const fetchAll = async () => {
+    const load = async () => {
       try {
-        const [docsRes, auditsRes] = await Promise.all([
-          api.get<Document[]>("/documents"),
-          api.get<AuditReport[]>("/audit"),
+        const [widgetList, layout] = await Promise.all([
+          apiFetch<Widget[]>("/dashboard/widgets"),
+          apiFetch<{ cols: number; grid: GridItem[] }>("/dashboard/layout"),
         ]);
-        setDocuments(docsRes.data);
-        setAudits(auditsRes.data);
-      } catch (err: unknown) {
-        type ApiErr = { response?: { data?: { detail?: string } } };
-        setError((err as ApiErr)?.response?.data?.detail ?? "Failed to load dashboard data.");
+        setWidgets(widgetList);
+        setGrid(layout.grid ?? []);
+      } catch {
+        // silently handle — widget grid shows empty state
       } finally {
-        setLoading(false);
+        setIsLoadingLayout(false);
       }
     };
-    fetchAll();
+    void load();
   }, []);
 
-  const latestAudit = audits[0] ?? null;
-  const totalSpend = latestAudit?.insights?.total_spend ?? null;
-  const topCategory = latestAudit?.insights?.top_category ?? null;
-  const anomalyCount = latestAudit?.insights?.anomaly_count ?? null;
-  const monthlyData: { month: string; total: number }[] =
-    latestAudit?.insights?.monthly_totals ?? [];
-  const categoryData: { name: string; value: number }[] =
-    latestAudit?.insights?.categories ?? [];
+  // Create or load a chat session on mount
+  useEffect(() => {
+    const initSession = async () => {
+      try {
+        const sessions = await apiFetch<{ id: string }[]>("/chat/sessions");
+        if (sessions.length > 0) {
+          setSessionId(sessions[0].id);
+        } else {
+          const newSession = await apiFetch<{ id: string }>("/chat/sessions", {
+            method: "POST",
+            body: JSON.stringify({ title: "Dashboard Chat" }),
+          });
+          setSessionId(newSession.id);
+        }
+      } catch {
+        // no session — ChatPanel shows placeholder
+      }
+    };
+    void initSession();
+  }, []);
+
+  // Persist layout to backend whenever grid changes (after initial load)
+  const saveLayout = useCallback(async (newGrid: GridItem[]) => {
+    try {
+      await apiFetch("/dashboard/layout", {
+        method: "PUT",
+        body: JSON.stringify({ layout: { cols: 3, grid: newGrid } }),
+      });
+    } catch {
+      // best-effort save
+    }
+  }, []);
+
+  const handleGridChange = useCallback(
+    (newGrid: GridItem[]) => {
+      setGrid(newGrid);
+      void saveLayout(newGrid);
+    },
+    [saveLayout]
+  );
+
+  // Remove widget from grid (not from library)
+  const handleRemoveFromGrid = useCallback(
+    (widgetId: string) => {
+      const newGrid = grid.filter((g) => g.widget_id !== widgetId);
+      setGrid(newGrid);
+      void saveLayout(newGrid);
+    },
+    [grid, saveLayout]
+  );
+
+  // Add widget to grid from the edit panel
+  const handleAddToGrid = useCallback(
+    (widgetId: string) => {
+      if (grid.find((g) => g.widget_id === widgetId)) return;
+      const newItem: GridItem = {
+        widget_id: widgetId,
+        row: Math.floor(grid.length / 3),
+        col: grid.length % 3,
+        col_span: 1,
+      };
+      const newGrid = [...grid, newItem];
+      setGrid(newGrid);
+      void saveLayout(newGrid);
+    },
+    [grid, saveLayout]
+  );
+
+  // Delete widget from library (and remove from grid)
+  const handleDeleteWidget = useCallback(
+    async (widgetId: string) => {
+      try {
+        await apiFetch(`/dashboard/widgets/${widgetId}`, { method: "DELETE" });
+        setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
+        setGrid((prev) => prev.filter((g) => g.widget_id !== widgetId));
+      } catch {
+        // ignore
+      }
+    },
+    []
+  );
+
+  // Add suggested widget to library, then to grid
+  const handleAddSuggestedWidget = useCallback(
+    async (suggestion: WidgetSuggestion) => {
+      try {
+        const created = await apiFetch<Widget>("/dashboard/widgets", {
+          method: "POST",
+          body: JSON.stringify({
+            title: suggestion.title,
+            widget_type: suggestion.widget_type,
+            query_config: suggestion.query_config,
+          }),
+        });
+        setWidgets((prev) => [...prev, created]);
+        handleAddToGrid(created.id);
+      } catch {
+        // ignore
+      }
+    },
+    [handleAddToGrid]
+  );
+
+  const placedIds = grid.map((g) => g.widget_id);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Financial Overview</h1>
-          <p className="text-sm text-gray-500 mt-1">Your AI-powered finance audit at a glance</p>
-        </div>
-
-        {/* Summary cards */}
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <SummaryCard
-              label="Total Spend (latest)"
-              value={totalSpend !== null ? `$${totalSpend.toLocaleString()}` : "—"}
-              sub="from most recent audit"
-              color="indigo"
-            />
-            <SummaryCard
-              label="Top Category"
-              value={topCategory ?? "—"}
-              sub="highest spend bucket"
-              color="emerald"
-            />
-            <SummaryCard
-              label="Anomalies Detected"
-              value={anomalyCount !== null ? anomalyCount : "—"}
-              sub="unusual transactions flagged"
-              color={anomalyCount && anomalyCount > 0 ? "red" : "amber"}
-            />
-          </div>
-        )}
-
-        {/* Charts row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {loading ? (
-            <>
-              <SkeletonChart height={240} />
-              <SkeletonChart height={240} />
-            </>
-          ) : (
-            <>
-              {/* Monthly Bar Chart */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h2 className="text-base font-semibold text-gray-800 mb-4">Monthly Spend</h2>
-                {monthlyData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 12, fill: "#6b7280" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12, fill: "#6b7280" }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(v: number) => `$${v}`}
-                      />
-                      <Tooltip
-                        formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
-                        contentStyle={{
-                          borderRadius: 8,
-                          border: "none",
-                          boxShadow: "0 4px 16px rgba(0,0,0,.08)",
-                        }}
-                      />
-                      <Bar dataKey="total" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyChart message="No monthly data yet. Upload a bank statement to get started." />
-                )}
-              </div>
-
-              {/* Category Pie Chart */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h2 className="text-base font-semibold text-gray-800 mb-4">Spend by Category</h2>
-                {categoryData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={90}
-                        innerRadius={48}
-                        paddingAngle={2}
-                      >
-                        {categoryData.map((_, idx) => (
-                          <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
-                        contentStyle={{
-                          borderRadius: 8,
-                          border: "none",
-                          boxShadow: "0 4px 16px rgba(0,0,0,.08)",
-                        }}
-                      />
-                      <Legend
-                        iconType="circle"
-                        iconSize={8}
-                        formatter={(val: string) => (
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>{val}</span>
-                        )}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyChart message="No category data yet." />
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Error banner */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-5 py-4 text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Recent Audits table */}
-        <section>
-          <h2 className="text-base font-semibold text-gray-800 mb-3">Recent Audit Reports</h2>
-          {loading ? (
-            <SkeletonTable rows={4} />
-          ) : audits.length === 0 ? (
-            <EmptyState message="No audits yet. Upload a document to generate your first report." />
-          ) : (
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <Th>Summary</Th>
-                    <Th>Total Spend</Th>
-                    <Th>Anomalies</Th>
-                    <Th>Date</Th>
-                    <Th>Action</Th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {audits.slice(0, 8).map((a) => (
-                    <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate">
-                        {a.summary}
-                      </td>
-                      <Td>
-                        {a.insights?.total_spend != null
-                          ? `$${a.insights.total_spend.toLocaleString()}`
-                          : "—"}
-                      </Td>
-                      <Td>{a.insights?.anomaly_count ?? "—"}</Td>
-                      <Td>{new Date(a.created_at).toLocaleDateString()}</Td>
-                      <td className="px-6 py-4">
-                        <Link
-                          to={`/audit/${a.id}`}
-                          className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                        >
-                          View Report
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-gray-50">
+      {/* ── Left panel: widget grid ── */}
+      {!leftCollapsed && (
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-gray-200">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0">
+            <h1 className="text-base font-semibold text-gray-900">Dashboard</h1>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditMode(true)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeftCollapsed(true)}
+                className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-400 hover:bg-gray-50 transition"
+                title="Collapse dashboard"
+              >
+                ◀
+              </button>
             </div>
-          )}
-        </section>
+          </div>
 
-        {/* Recent Uploads table */}
-        <section>
-          <h2 className="text-base font-semibold text-gray-800 mb-3">Recent Uploads</h2>
-          {loading ? (
-            <SkeletonTable rows={4} />
-          ) : documents.length === 0 ? (
-            <EmptyState
-              message="No documents uploaded yet."
-              action={{ label: "Upload now", to: "/upload" }}
-            />
-          ) : (
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <Th>File</Th>
-                    <Th>Bank</Th>
-                    <Th>Type</Th>
-                    <Th>Status</Th>
-                    <Th>Uploaded</Th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {documents.slice(0, 8).map((doc) => {
-                    const badge = STATUS_BADGE[doc.status] ?? {
-                      label: doc.status,
-                      classes: "bg-gray-100 text-gray-600",
-                    };
-                    return (
-                      <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-800 font-medium max-w-xs truncate">
-                          {doc.filename}
-                        </td>
-                        <Td>{doc.bank_name}</Td>
-                        <Td>
-                          <span className="uppercase text-xs font-semibold text-gray-500">
-                            {doc.file_type}
-                          </span>
-                        </Td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.classes}`}
-                          >
-                            {badge.label}
-                          </span>
-                        </td>
-                        <Td>{new Date(doc.upload_date).toLocaleDateString()}</Td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-    </main>
-  );
-}
+          {/* Filter bar */}
+          <div className="shrink-0">
+            <FilterBar filters={filters} onChange={setFilters} />
+          </div>
 
-// ─── Micro helpers ────────────────────────────────────────────────────────────
+          {/* Widget grid */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {isLoadingLayout ? (
+              <div className="grid grid-cols-3 gap-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="bg-white rounded-2xl shadow-sm animate-pulse h-32" />
+                ))}
+              </div>
+            ) : (
+              <WidgetGrid
+                widgets={widgets}
+                grid={grid}
+                filters={filters}
+                isEditMode={isEditMode}
+                onGridChange={handleGridChange}
+                onRemove={handleRemoveFromGrid}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-      {children}
-    </th>
-  );
-}
-
-function Td({ children }: { children: React.ReactNode }) {
-  return <td className="px-6 py-4 text-sm text-gray-600">{children}</td>;
-}
-
-function EmptyChart({ message }: { message: string }) {
-  return (
-    <div className="flex items-center justify-center h-40 text-sm text-gray-400 text-center px-4">
-      {message}
-    </div>
-  );
-}
-
-function EmptyState({
-  message,
-  action,
-}: {
-  message: string;
-  action?: { label: string; to: string };
-}) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm p-10 flex flex-col items-center gap-3 text-center">
-      <p className="text-sm text-gray-500">{message}</p>
-      {action && (
-        <Link
-          to={action.to}
-          className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+      {/* Collapsed left expander */}
+      {leftCollapsed && (
+        <button
+          type="button"
+          onClick={() => setLeftCollapsed(false)}
+          className="flex items-center justify-center w-8 bg-white border-r border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition shrink-0"
+          title="Expand dashboard"
         >
-          {action.label}
-        </Link>
+          ▶
+        </button>
+      )}
+
+      {/* ── Right panel: chat ── */}
+      {!rightCollapsed && (
+        <div className="flex flex-col w-[380px] shrink-0 overflow-hidden bg-gray-50">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0">
+            <h2 className="text-base font-semibold text-gray-900">Finance Assistant</h2>
+            <button
+              type="button"
+              onClick={() => setRightCollapsed(true)}
+              className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-400 hover:bg-gray-50 transition"
+              title="Collapse chat"
+            >
+              ▶
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-hidden p-3">
+            <ChatPanel
+              sessionId={sessionId}
+              onAddWidget={(s) => void handleAddSuggestedWidget(s)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Collapsed right expander */}
+      {rightCollapsed && (
+        <button
+          type="button"
+          onClick={() => setRightCollapsed(false)}
+          className="flex items-center justify-center w-8 bg-white border-l border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition shrink-0"
+          title="Expand chat"
+        >
+          ◀
+        </button>
+      )}
+
+      {/* Edit mode panel (overlay drawer) */}
+      {isEditMode && (
+        <EditModePanel
+          widgets={widgets}
+          placedWidgetIds={placedIds}
+          onAdd={handleAddToGrid}
+          onDelete={(id) => void handleDeleteWidget(id)}
+          onClose={() => setIsEditMode(false)}
+        />
       )}
     </div>
   );

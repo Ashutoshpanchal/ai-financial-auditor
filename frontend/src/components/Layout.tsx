@@ -33,7 +33,6 @@ export function Layout() {
               <NavItem to="/dashboard">Dashboard</NavItem>
               <NavItem to="/upload">Upload</NavItem>
               <NavItem to="/categories">Categories</NavItem>
-              <NavItem to="/chat">Chat</NavItem>
               {isAdmin && <NavItem to="/admin">Admin</NavItem>}
             </div>
           </div>
