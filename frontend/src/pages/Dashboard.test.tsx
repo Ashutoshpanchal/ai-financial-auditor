@@ -71,18 +71,18 @@ describe("Dashboard (Phase 9 split-panel)", () => {
   });
 
   it("shows loading skeletons while fetching", () => {
-    global.fetch = vi.fn(() => new Promise(() => {})) as unknown as typeof fetch;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
     renderDashboard();
     const skeletons = document.querySelectorAll(".animate-pulse");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it("renders widget grid, filter bar, and chat panel after data loads", async () => {
-    global.fetch = makeFetch({
+    vi.stubGlobal("fetch", makeFetch({
       "/dashboard/widgets": WIDGETS,
       "/dashboard/layout": LAYOUT,
       "/chat/sessions": SESSIONS,
-    }) as unknown as typeof fetch;
+    }));
 
     renderDashboard();
 
@@ -92,50 +92,50 @@ describe("Dashboard (Phase 9 split-panel)", () => {
   });
 
   it("shows Dashboard and Finance Assistant headings", async () => {
-    global.fetch = makeFetch({
+    vi.stubGlobal("fetch", makeFetch({
       "/dashboard/widgets": WIDGETS,
       "/dashboard/layout": LAYOUT,
       "/chat/sessions": SESSIONS,
-    }) as unknown as typeof fetch;
+    }));
 
     renderDashboard();
     await waitFor(() => screen.getByText("Dashboard"));
     expect(screen.getByText("Finance Assistant")).toBeInTheDocument();
   });
 
-  it("clicking Edit opens EditModePanel", async () => {
-    global.fetch = makeFetch({
+  it("clicking '+ Add Widgets' opens EditModePanel", async () => {
+    vi.stubGlobal("fetch", makeFetch({
       "/dashboard/widgets": WIDGETS,
       "/dashboard/layout": LAYOUT,
       "/chat/sessions": SESSIONS,
-    }) as unknown as typeof fetch;
+    }));
 
     renderDashboard();
-    await waitFor(() => screen.getByText("Edit"));
-    fireEvent.click(screen.getByText("Edit"));
+    await waitFor(() => screen.getByText("+ Add Widgets"));
+    fireEvent.click(screen.getByText("+ Add Widgets"));
     expect(screen.getByTestId("edit-mode-panel")).toBeInTheDocument();
   });
 
-  it("Done button closes EditModePanel", async () => {
-    global.fetch = makeFetch({
+  it("Done button in EditModePanel closes it", async () => {
+    vi.stubGlobal("fetch", makeFetch({
       "/dashboard/widgets": WIDGETS,
       "/dashboard/layout": LAYOUT,
       "/chat/sessions": SESSIONS,
-    }) as unknown as typeof fetch;
+    }));
 
     renderDashboard();
-    await waitFor(() => screen.getByText("Edit"));
-    fireEvent.click(screen.getByText("Edit"));
+    await waitFor(() => screen.getByText("+ Add Widgets"));
+    fireEvent.click(screen.getByText("+ Add Widgets"));
     fireEvent.click(screen.getByText("Done"));
     expect(screen.queryByTestId("edit-mode-panel")).not.toBeInTheDocument();
   });
 
   it("collapse button hides left panel, expander re-shows it", async () => {
-    global.fetch = makeFetch({
+    vi.stubGlobal("fetch", makeFetch({
       "/dashboard/widgets": WIDGETS,
       "/dashboard/layout": LAYOUT,
       "/chat/sessions": SESSIONS,
-    }) as unknown as typeof fetch;
+    }));
 
     renderDashboard();
     await waitFor(() => screen.getByTitle("Collapse dashboard"));
@@ -146,11 +146,11 @@ describe("Dashboard (Phase 9 split-panel)", () => {
   });
 
   it("collapse button hides right chat panel, expander re-shows it", async () => {
-    global.fetch = makeFetch({
+    vi.stubGlobal("fetch", makeFetch({
       "/dashboard/widgets": WIDGETS,
       "/dashboard/layout": LAYOUT,
       "/chat/sessions": SESSIONS,
-    }) as unknown as typeof fetch;
+    }));
 
     renderDashboard();
     await waitFor(() => screen.getByTitle("Collapse chat"));

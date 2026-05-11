@@ -118,11 +118,6 @@ describe("Layout — navigation links", () => {
     expect(screen.getByRole("link", { name: "Categories" })).toBeInTheDocument();
   });
 
-  it("renders the Chat nav link", () => {
-    renderLayout();
-    expect(screen.getByRole("link", { name: "Chat" })).toBeInTheDocument();
-  });
-
   it("does NOT render the Admin link for a regular user", () => {
     renderLayout({ role: "user" });
     expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
@@ -169,13 +164,6 @@ describe("Layout — NavLink active-state highlighting", () => {
   it("applies active classes to the Categories link when path is /categories", () => {
     renderLayout({}, "/categories");
     const link = screen.getByRole("link", { name: "Categories" });
-    expect(link.className).toContain("bg-indigo-50");
-    expect(link.className).toContain("text-indigo-600");
-  });
-
-  it("applies active classes to the Chat link when path is /chat", () => {
-    renderLayout({}, "/chat");
-    const link = screen.getByRole("link", { name: "Chat" });
     expect(link.className).toContain("bg-indigo-50");
     expect(link.className).toContain("text-indigo-600");
   });

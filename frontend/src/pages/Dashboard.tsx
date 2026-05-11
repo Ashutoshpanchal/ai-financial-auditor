@@ -64,6 +64,7 @@ export default function Dashboard() {
     category: "",
   });
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -202,13 +203,28 @@ export default function Dashboard() {
           <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0">
             <h1 className="text-base font-semibold text-gray-900">Dashboard</h1>
             <div className="flex items-center gap-2">
+              {/* Add Widgets — opens library panel (no blocking overlay) */}
               <button
                 type="button"
-                onClick={() => setIsEditMode(true)}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+                onClick={() => setIsLibraryOpen(true)}
+                className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition"
               >
-                Edit
+                + Add Widgets
               </button>
+
+              {/* Edit / Done — toggles inline remove+drag controls on cards */}
+              <button
+                type="button"
+                onClick={() => setIsEditMode((v) => !v)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                  isEditMode
+                    ? "border-indigo-400 bg-indigo-600 text-white hover:bg-indigo-700"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {isEditMode ? "Done" : "Edit"}
+              </button>
+
               <button
                 type="button"
                 onClick={() => setLeftCollapsed(true)}
@@ -296,14 +312,14 @@ export default function Dashboard() {
         </button>
       )}
 
-      {/* Edit mode panel (overlay drawer) */}
-      {isEditMode && (
+      {/* Widget library panel — opens without blocking the grid */}
+      {isLibraryOpen && (
         <EditModePanel
           widgets={widgets}
           placedWidgetIds={placedIds}
           onAdd={handleAddToGrid}
           onDelete={(id) => void handleDeleteWidget(id)}
-          onClose={() => setIsEditMode(false)}
+          onClose={() => setIsLibraryOpen(false)}
         />
       )}
     </div>
