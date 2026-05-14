@@ -1183,29 +1183,38 @@ export default function Upload() {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   return (
-    <>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Page title */}
-        <div className="mb-2">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">Uploads</h1>
-            <button
-              onClick={handleRefreshAll}
-              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356m-1.636 13.645A9 9 0 1119.643 7.357l1.372 1.991" />
-              </svg>
-              Refresh
-            </button>
+    <div className="flex flex-col h-screen" data-upload-container>
+      {/* Header — shared across both panes */}
+      <div className="px-4 sm:px-6 lg:px-8 py-8 bg-white border-b border-gray-200 flex-shrink-0">
+        <div className="max-w-full">
+          {/* Page title */}
+          <div className="mb-2">
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">Uploads</h1>
+              <button
+                onClick={handleRefreshAll}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356m-1.636 13.645A9 9 0 1119.643 7.357l1.372 1.991" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">Manage your uploaded bank statements and transactions</p>
           </div>
-          <p className="text-sm text-gray-500 mt-1">Manage your uploaded bank statements and transactions</p>
         </div>
+      </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════════
-            DOCUMENTS SECTION
-        ═══════════════════════════════════════════════════════════════════════ */}
-        <section>
+      {/* Split-pane grid */}
+      <div className="flex-1 grid" style={{ gridTemplateColumns: `${leftPaneWidth}px 4px 1fr`, gap: 0 }}>
+        {/* LEFT PANE: Documents */}
+        <div className="overflow-y-auto border-r border-gray-200 bg-white">
+          <div className="px-4 sm:px-6 py-8 space-y-8">
+            {/* ═══════════════════════════════════════════════════════════════════════
+                DOCUMENTS SECTION
+            ═══════════════════════════════════════════════════════════════════════ */}
+            <section>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
             <h2 className="text-lg font-semibold text-gray-800 flex-1">Documents</h2>
             <div className="relative flex-1 max-w-sm">
@@ -1287,12 +1296,26 @@ export default function Upload() {
               </div>
             </div>
           )}
-        </section>
+            </section>
+          </div>
+        </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════════
-            TRANSACTIONS SECTION
-        ═══════════════════════════════════════════════════════════════════════ */}
-        <section>
+        {/* DIVIDER */}
+        <div
+          className={`bg-gray-200 cursor-col-resize hover:bg-indigo-400 transition-colors ${
+            isDragging ? "bg-indigo-500" : ""
+          }`}
+          onMouseDown={handleDividerMouseDown}
+          style={{ userSelect: "none" }}
+        />
+
+        {/* RIGHT PANE: Transactions */}
+        <div className="overflow-y-auto bg-white">
+          <div className="px-4 sm:px-6 py-8 space-y-8">
+            {/* ═══════════════════════════════════════════════════════════════════════
+                TRANSACTIONS SECTION
+            ═══════════════════════════════════════════════════════════════════════ */}
+            <section>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-3">
             <h2 className="text-lg font-semibold text-gray-800 flex-1">All Transactions</h2>
             {pageHasUncategorized && (
@@ -1711,8 +1734,10 @@ export default function Upload() {
               </div>
             </div>
           )}
-        </section>
-      </main>
+            </section>
+          </div>
+        </div>
+      </div>
 
       {/* Modals */}
       <UploadModal
@@ -1729,6 +1754,6 @@ export default function Upload() {
       />
       <EditDocumentModal doc={editDoc} open={!!editDoc} onClose={() => setEditDoc(null)} onSaved={fetchDocuments} />
       <ConfirmDeleteModal doc={deleteDoc} open={!!deleteDoc} onClose={() => setDeleteDoc(null)} onConfirm={fetchDocuments} />
-    </>
+    </div>
   );
 }
