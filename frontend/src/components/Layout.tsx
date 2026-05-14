@@ -2,10 +2,19 @@ import type { ReactNode } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
-function NavItem({ to, children }: { to: string; children: ReactNode }) {
+function NavItem({
+  to,
+  end,
+  children,
+}: {
+  to: string;
+  end?: boolean;
+  children: ReactNode;
+}) {
   return (
     <NavLink
       to={to}
+      end={end}
       className={({ isActive }) =>
         `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
           isActive
@@ -33,6 +42,9 @@ export function Layout() {
               <NavItem to="/dashboard">Dashboard</NavItem>
               <NavItem to="/upload">Upload</NavItem>
               <NavItem to="/categories">Categories</NavItem>
+              <NavItem to="/widget-studio" end>
+                Widget Studio
+              </NavItem>
               {isAdmin && <NavItem to="/admin">Admin</NavItem>}
             </div>
           </div>

@@ -74,6 +74,10 @@ function renderLayout(
             element={<div data-testid="outlet-child">Categories page</div>}
           />
           <Route
+            path="/widget-studio"
+            element={<div data-testid="outlet-child">Widget Studio page</div>}
+          />
+          <Route
             path="/chat"
             element={<div data-testid="outlet-child">Chat page</div>}
           />
@@ -116,6 +120,11 @@ describe("Layout — navigation links", () => {
   it("renders the Categories nav link", () => {
     renderLayout();
     expect(screen.getByRole("link", { name: "Categories" })).toBeInTheDocument();
+  });
+
+  it("renders the Widget Studio nav link", () => {
+    renderLayout();
+    expect(screen.getByRole("link", { name: "Widget Studio" })).toBeInTheDocument();
   });
 
   it("does NOT render the Admin link for a regular user", () => {
@@ -164,6 +173,13 @@ describe("Layout — NavLink active-state highlighting", () => {
   it("applies active classes to the Categories link when path is /categories", () => {
     renderLayout({}, "/categories");
     const link = screen.getByRole("link", { name: "Categories" });
+    expect(link.className).toContain("bg-indigo-50");
+    expect(link.className).toContain("text-indigo-600");
+  });
+
+  it("applies active classes to the Widget Studio link when path is /widget-studio", () => {
+    renderLayout({}, "/widget-studio");
+    const link = screen.getByRole("link", { name: "Widget Studio" });
     expect(link.className).toContain("bg-indigo-50");
     expect(link.className).toContain("text-indigo-600");
   });

@@ -14,6 +14,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.models.transaction import Transaction
+from backend.services.widget_metric_raw_sql import (
+    execute_raw_metric_sql,
+    validate_raw_metric_sql,
+)
 
 # --------------------------------------------------------------------------- #
 # Allowed enum values (domain constants — not config)
@@ -22,6 +26,116 @@ from backend.models.transaction import Transaction
 _ALLOWED_AGGREGATIONS: frozenset[str] = frozenset({"sum", "count", "avg", "max", "min"})
 _ALLOWED_FIELDS: frozenset[str] = frozenset({"credit", "debit"})
 _ALLOWED_GROUP_BY: frozenset[str] = frozenset({"month", "category", "bank_name"})
+_CHART_WIDGET_TYPES: frozenset[str] = frozenset(
+    {"bar_chart", "pie_chart", "line_chart"}
+)
+
+
+def validate_widget_query_config(widget_type: str, config: dict[str, Any]) -> None:
+    """Validate *config* for a widget of the given *widget_type* before save or preview.
+
+    Ensures aggregation/field/group_by enums match ``resolve_widget_data`` rules and
+    that ``group_by`` presence aligns with metric vs chart widget types.
+
+    Args:
+        widget_type: One of metric, bar_chart, pie_chart, line_chart.
+        config:       Same shape as accepted by ``resolve_widget_data``.
+
+    Raises:
+        ValueError: If any rule is violated.
+    """
+    if widget_type not in ({"metric"} | _CHART_WIDGET_TYPES):
+        raise ValueError(
+            f"Invalid widget_type '{widget_type}'. "
+            f"Allowed: metric, {', '.join(sorted(_CHART_WIDGET_TYPES))}"
+        )
+
+    raw_sql = config.get("raw_metric_sql")
+    if isinstance(raw_sql, str) and raw_sql.strip():
+        if widget_type != "metric":
+            raise ValueError("raw_metric_sql is only supported for metric widgets.")
+        if config.get("group_by") is not None:
+            raise ValueError("Do not set group_by when using raw_metric_sql.")
+        validate_raw_metric_sql(raw_sql.strip())
+        return
+
+    aggregation = config.get("aggregation", "")
+    field = config.get("field", "")
+    group_by: str | None = config.get("group_by")
+
+    if aggregation not in _ALLOWED_AGGREGATIONS:
+        raise ValueError(
+            f"Invalid aggregation '{aggregation}'. "
+            f"Allowed values: {sorted(_ALLOWED_AGGREGATIONS)}"
+        )
+    if field not in _ALLOWED_FIELDS:
+        raise ValueError(
+            f"Invalid field '{field}'. Allowed values: {sorted(_ALLOWED_FIELDS)}"
+        )
+    if group_by is not None and group_by not in _ALLOWED_GROUP_BY:
+        raise ValueError(
+            f"Invalid group_by '{group_by}'. "
+            f"Allowed values: {sorted(_ALLOWED_GROUP_BY)}"
+        )
+
+    cfg_filters: dict[str, Any] = config.get("filters", {}) or {}
+    txn_type = cfg_filters.get("transaction_type")
+    if txn_type is not None and txn_type not in ("credit", "debit"):
+        raise ValueError(
+            f"Invalid filters.transaction_type '{txn_type}'. "
+            "Allowed: 'credit', 'debit', or omit."
+        )
+
+    if widget_type == "metric":
+        if group_by is not None:
+            raise ValueError("Metric widgets must not include 'group_by'.")
+    elif widget_type in _CHART_WIDGET_TYPES and group_by is None:
+        raise ValueError(
+            f"Widget type '{widget_type}' requires 'group_by' "
+            f"({', '.join(sorted(_ALLOWED_GROUP_BY))})."
+        )
+
+
+def describe_widget_query_human(config: dict[str, Any]) -> str:
+    """Build a read-only pseudo-SQL description using an abstract table name.
+
+    Omits real table names; tenant scope is noted as applied server-side only.
+
+    Args:
+        config: Widget query_config dict.
+
+    Returns:
+        A short multi-line human-readable description for UI display.
+    """
+    raw_sql = config.get("raw_metric_sql")
+    if isinstance(raw_sql, str) and raw_sql.strip():
+        return raw_sql.strip()
+
+    aggregation = config.get("aggregation", "?")
+    field = config.get("field", "?")
+    group_by: str | None = config.get("group_by")
+    cfg_filters: dict[str, Any] = config.get("filters", {}) or {}
+
+    select_expr = f"{aggregation}({field})"
+    if group_by:
+        select_expr = f"{group_by}, {select_expr}"
+
+    lines = [f"SELECT {select_expr}", "FROM your_transactions"]
+
+    where_parts: list[str] = ["(only your transactions — applied by the app)"]
+    tt = cfg_filters.get("transaction_type")
+    if tt == "credit":
+        where_parts.append("credit > 0")
+    elif tt == "debit":
+        where_parts.append("debit > 0")
+    if cfg_filters.get("category"):
+        where_parts.append(f"category = '{cfg_filters['category']}'")
+    if cfg_filters.get("bank_name"):
+        where_parts.append(f"bank_name = '{cfg_filters['bank_name']}'")
+
+    lines.append("WHERE " + " AND ".join(where_parts))
+
+    return "\n".join(lines)
 
 
 def resolve_widget_data(
@@ -67,6 +181,14 @@ def resolve_widget_data(
                     respective allowed sets, or if ``group_by`` is present but not
                     in the allowed set.
     """
+    raw_sql = config.get("raw_metric_sql")
+    if isinstance(raw_sql, str) and raw_sql.strip():
+        group_by: str | None = config.get("group_by")
+        if group_by is not None:
+            raise ValueError("raw_metric_sql cannot be combined with group_by.")
+        value = execute_raw_metric_sql(raw_sql.strip(), user_id, db)
+        return {"value": value, "format": config.get("format", "number")}
+
     aggregation = config.get("aggregation", "")
     field = config.get("field", "")
     group_by: str | None = config.get("group_by")

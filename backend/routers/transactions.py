@@ -93,6 +93,9 @@ def update_transaction(
         "debit": float(txn.debit),
         "credit": float(txn.credit),
         "category": txn.category,
+        "parent_category": txn.parent_category,
+        "sub_category": txn.sub_category,
+        "category_master_id": txn.category_master_id,
         "remarks": txn.remarks,
     }
 

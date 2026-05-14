@@ -6,6 +6,8 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from backend.routers.categories import (
     PAYMENT_METHODS,
@@ -13,6 +15,7 @@ from backend.routers.categories import (
     _build_llm,
     _hierarchy_to_text,
     _parse_llm_json,
+    router as categories_router,
 )
 
 # ---------------------------------------------------------------------------
@@ -267,17 +270,29 @@ def _make_mock_db_with_master_rows(rows: list) -> MagicMock:
     return db
 
 
-def _make_mock_category_master_row(row_id: str, parent: str, sub: str) -> MagicMock:
+def _make_mock_category_master_row(
+    row_id: str,
+    parent: str,
+    sub: str,
+    *,
+    user_id: str | None = None,
+) -> MagicMock:
     """Create a minimal mock CategoryMaster row."""
     row = MagicMock()
     row.id = row_id
     row.parent_category = parent
     row.sub_category = sub
+    row.user_id = user_id
     return row
 
 
 class TestListCategoryMasterEndpoint:
     """Unit tests for list_category_master via direct function call."""
+
+    def _user(self, user_id: str = "user-1") -> MagicMock:
+        u = MagicMock()
+        u.id = user_id
+        return u
 
     def test_returns_grouped_by_parent(self) -> None:
         """list_category_master must group sub-categories under parent keys."""
@@ -290,33 +305,148 @@ class TestListCategoryMasterEndpoint:
         ]
         db = _make_mock_db_with_master_rows(rows)
 
-        result = list_category_master(db=db)
+        result = list_category_master(db=db, current_user=self._user())
 
         assert "Food & Dining" in result
         assert "Transport" in result
         assert len(result["Food & Dining"]) == 2
         assert len(result["Transport"]) == 1
 
-    def test_each_sub_entry_has_id_and_sub_category(self) -> None:
-        """Each item in the result must have 'id' and 'sub_category' keys."""
+    def test_each_sub_entry_has_id_sub_category_and_is_global(self) -> None:
+        """Each item in the result must have id, sub_category, and is_global keys."""
         from backend.routers.categories import list_category_master
 
         rows = [_make_mock_category_master_row("id-1", "Shopping", "Amazon")]
         db = _make_mock_db_with_master_rows(rows)
 
-        result = list_category_master(db=db)
+        result = list_category_master(db=db, current_user=self._user())
         entry = result["Shopping"][0]
 
         assert entry["id"] == "id-1"
         assert entry["sub_category"] == "Amazon"
+        assert entry["is_global"] is True
+
+    def test_user_row_overrides_global_for_same_parent_sub(self) -> None:
+        """When the same (parent, sub) exists globally and for the user, the user's id is returned."""
+        from backend.routers.categories import list_category_master
+
+        rows = [
+            _make_mock_category_master_row(
+                "global-1", "Food & Dining", "Swiggy", user_id=None
+            ),
+            _make_mock_category_master_row(
+                "user-1", "Food & Dining", "Swiggy", user_id="user-1"
+            ),
+        ]
+        db = _make_mock_db_with_master_rows(rows)
+
+        result = list_category_master(db=db, current_user=self._user("user-1"))
+        subs = result["Food & Dining"]
+        assert len(subs) == 1
+        assert subs[0]["id"] == "user-1"
+        assert subs[0]["is_global"] is False
 
     def test_empty_table_returns_empty_dict(self) -> None:
         """An empty category_master table should return an empty dict."""
         from backend.routers.categories import list_category_master
 
         db = _make_mock_db_with_master_rows([])
-        result = list_category_master(db=db)
+        result = list_category_master(db=db, current_user=self._user())
         assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# Endpoint: GET /categories/master/split  (direct function call)
+# ---------------------------------------------------------------------------
+
+
+class TestListCategoryMasterSplitEndpoint:
+    """Unit tests for list_category_master_split."""
+
+    def _user(self, user_id: str = "user-1") -> MagicMock:
+        u = MagicMock()
+        u.id = user_id
+        return u
+
+    def test_split_returns_merged_builtin_and_user_defined_keys(self) -> None:
+        """Split response must expose merged, builtin, and user_defined."""
+        from backend.routers.categories import list_category_master_split
+
+        rows = [
+            _make_mock_category_master_row(
+                "g-1", "Food & Dining", "Swiggy", user_id=None
+            ),
+            _make_mock_category_master_row(
+                "u-1", "Food & Dining", "Swiggy", user_id="user-1"
+            ),
+        ]
+        db = _make_mock_db_with_master_rows(rows)
+
+        result = list_category_master_split(db=db, current_user=self._user("user-1"))
+
+        assert set(result.keys()) == {"merged", "builtin", "user_defined"}
+
+    def test_builtin_lists_only_seed_rows(self) -> None:
+        """builtin must include global rows even when user overrides the same pair."""
+        from backend.routers.categories import list_category_master_split
+
+        rows = [
+            _make_mock_category_master_row(
+                "global-1", "Food & Dining", "Swiggy", user_id=None
+            ),
+            _make_mock_category_master_row(
+                "user-1", "Food & Dining", "Swiggy", user_id="user-1"
+            ),
+        ]
+        db = _make_mock_db_with_master_rows(rows)
+
+        result = list_category_master_split(db=db, current_user=self._user("user-1"))
+        builtin_subs = result["builtin"]["Food & Dining"]
+        assert len(builtin_subs) == 1
+        assert builtin_subs[0]["id"] == "global-1"
+        assert builtin_subs[0]["is_global"] is True
+
+    def test_user_defined_lists_only_current_user_rows(self) -> None:
+        """user_defined must list only rows owned by the current user."""
+        from backend.routers.categories import list_category_master_split
+
+        rows = [
+            _make_mock_category_master_row(
+                "global-1", "Food & Dining", "Swiggy", user_id=None
+            ),
+            _make_mock_category_master_row(
+                "user-1", "Food & Dining", "Swiggy", user_id="user-1"
+            ),
+        ]
+        db = _make_mock_db_with_master_rows(rows)
+
+        result = list_category_master_split(db=db, current_user=self._user("user-1"))
+        user_subs = result["user_defined"]["Food & Dining"]
+        assert len(user_subs) == 1
+        assert user_subs[0]["id"] == "user-1"
+        assert user_subs[0]["is_global"] is False
+
+    def test_merged_matches_list_category_master(self) -> None:
+        """merged view should match deduped GET /categories/master behavior."""
+        from backend.routers.categories import (
+            list_category_master,
+            list_category_master_split,
+        )
+
+        rows = [
+            _make_mock_category_master_row(
+                "global-1", "Food & Dining", "Swiggy", user_id=None
+            ),
+            _make_mock_category_master_row(
+                "user-1", "Food & Dining", "Swiggy", user_id="user-1"
+            ),
+        ]
+        db = _make_mock_db_with_master_rows(rows)
+        user = self._user("user-1")
+
+        merged = list_category_master_split(db=db, current_user=user)["merged"]
+        direct = list_category_master(db=db, current_user=user)
+        assert merged == direct
 
 
 # ---------------------------------------------------------------------------
@@ -472,6 +602,172 @@ class TestCreateCategoryMasterEntry:
 
 
 # ---------------------------------------------------------------------------
+# Endpoint: PATCH /categories/master/{entry_id}  (direct function call)
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateCategoryMasterEntry:
+    """Unit tests for update_category_master_entry."""
+
+    def test_renames_user_row_and_updates_descriptions(self) -> None:
+        """PATCH should update description_categories then master row and commit."""
+        from backend.routers.categories import update_category_master_entry
+
+        existing = MagicMock()
+        existing.id = "entry-1"
+        existing.user_id = "user-1"
+        existing.parent_category = "OldParent"
+        existing.sub_category = "OldSub"
+
+        select_entry = MagicMock()
+        select_entry.scalar_one_or_none.return_value = existing
+        select_dup = MagicMock()
+        select_dup.scalar_one_or_none.return_value = None
+        update_result = MagicMock()
+
+        db = MagicMock()
+        db.execute.side_effect = [select_entry, select_dup, update_result]
+        db.commit = MagicMock()
+        db.refresh = MagicMock()
+
+        user = MagicMock()
+        user.id = "user-1"
+
+        with patch("backend.routers.categories.set_rls_user"):
+            result = update_category_master_entry(
+                entry_id="entry-1",
+                body={"parent_category": "NewParent", "sub_category": "NewSub"},
+                db=db,
+                current_user=user,
+            )
+
+        assert result["parent_category"] == "NewParent"
+        assert result["sub_category"] == "NewSub"
+        assert db.execute.call_count == 3
+        db.commit.assert_called_once()
+
+    def test_raises_403_for_global_seed_entry(self) -> None:
+        """Seed rows (user_id NULL) cannot be renamed."""
+        from fastapi import HTTPException
+
+        from backend.routers.categories import update_category_master_entry
+
+        existing = MagicMock()
+        existing.user_id = None
+
+        select_result = MagicMock()
+        select_result.scalar_one_or_none.return_value = existing
+        db = MagicMock()
+        db.execute.return_value = select_result
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+        ):
+            update_category_master_entry(
+                entry_id="seed-id",
+                body={"parent_category": "A", "sub_category": "B"},
+                db=db,
+                current_user=user,
+            )
+
+        assert exc_info.value.status_code == 403
+
+    def test_raises_404_when_entry_missing(self) -> None:
+        """Unknown id should return 404."""
+        from fastapi import HTTPException
+
+        from backend.routers.categories import update_category_master_entry
+
+        select_result = MagicMock()
+        select_result.scalar_one_or_none.return_value = None
+        db = MagicMock()
+        db.execute.return_value = select_result
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+        ):
+            update_category_master_entry(
+                entry_id="missing",
+                body={"parent_category": "A", "sub_category": "B"},
+                db=db,
+                current_user=user,
+            )
+
+        assert exc_info.value.status_code == 404
+
+    def test_raises_409_when_duplicate_target_pair_exists(self) -> None:
+        """Renaming to an existing (parent, sub) for the same user should conflict."""
+        from fastapi import HTTPException
+
+        from backend.routers.categories import update_category_master_entry
+
+        existing = MagicMock()
+        existing.id = "entry-1"
+        existing.user_id = "user-1"
+        existing.parent_category = "P1"
+        existing.sub_category = "S1"
+
+        select_entry = MagicMock()
+        select_entry.scalar_one_or_none.return_value = existing
+        select_dup = MagicMock()
+        select_dup.scalar_one_or_none.return_value = MagicMock()
+
+        db = MagicMock()
+        db.execute.side_effect = [select_entry, select_dup]
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+        ):
+            update_category_master_entry(
+                entry_id="entry-1",
+                body={"parent_category": "P2", "sub_category": "S2"},
+                db=db,
+                current_user=user,
+            )
+
+        assert exc_info.value.status_code == 409
+
+    def test_noop_when_names_unchanged_still_refreshes(self) -> None:
+        """Same parent/sub should skip duplicate check and description update."""
+        from backend.routers.categories import update_category_master_entry
+
+        existing = MagicMock()
+        existing.id = "entry-1"
+        existing.user_id = "user-1"
+        existing.parent_category = "P1"
+        existing.sub_category = "S1"
+
+        select_result = MagicMock()
+        select_result.scalar_one_or_none.return_value = existing
+        db = MagicMock()
+        db.execute.return_value = select_result
+        db.refresh = MagicMock()
+        user = MagicMock()
+        user.id = "user-1"
+
+        with patch("backend.routers.categories.set_rls_user"):
+            result = update_category_master_entry(
+                entry_id="entry-1",
+                body={"parent_category": "P1", "sub_category": "S1"},
+                db=db,
+                current_user=user,
+            )
+
+        assert result["id"] == "entry-1"
+        assert db.execute.call_count == 1
+        db.refresh.assert_called_once_with(existing)
+
+
+# ---------------------------------------------------------------------------
 # Endpoint: DELETE /categories/master/{entry_id}  (direct function call)
 # ---------------------------------------------------------------------------
 
@@ -479,27 +775,84 @@ class TestCreateCategoryMasterEntry:
 class TestDeleteCategoryMasterEntry:
     """Unit tests for delete_category_master_entry."""
 
-    def _make_db_with_entry(self, entry: MagicMock | None = None) -> MagicMock:
-        db = MagicMock()
-        result = MagicMock()
-        result.scalar_one_or_none.return_value = entry
-        db.execute.return_value = result
-        db.delete = MagicMock()
-        db.commit = MagicMock()
-        return db
-
-    def test_deletes_existing_entry(self) -> None:
-        """Deleting an existing entry should call db.delete and db.commit."""
+    def test_deletes_user_owned_entry_after_clearing_descriptions(self) -> None:
+        """Deleting a user-owned entry should UPDATE descriptions then delete and commit."""
         from backend.routers.categories import delete_category_master_entry
 
         existing = MagicMock()
-        db = self._make_db_with_entry(existing)
+        existing.id = "entry-1"
+        existing.user_id = "user-1"
+        existing.parent_category = "Food & Dining"
+        existing.sub_category = "Custom"
+
+        select_result = MagicMock()
+        select_result.scalar_one_or_none.return_value = existing
+        update_result = MagicMock()
+
+        db = MagicMock()
+        db.execute.side_effect = [select_result, update_result]
+        db.delete = MagicMock()
+        db.commit = MagicMock()
+
         user = MagicMock()
+        user.id = "user-1"
 
-        delete_category_master_entry(entry_id="some-id", db=db, current_user=user)
+        with patch("backend.routers.categories.set_rls_user"):
+            delete_category_master_entry(entry_id="entry-1", db=db, current_user=user)
 
+        assert db.execute.call_count == 2
         db.delete.assert_called_once_with(existing)
         db.commit.assert_called_once()
+
+    def test_raises_403_for_global_seed_entry(self) -> None:
+        """Seed rows (user_id NULL) cannot be deleted."""
+        from fastapi import HTTPException
+
+        from backend.routers.categories import delete_category_master_entry
+
+        existing = MagicMock()
+        existing.user_id = None
+
+        select_result = MagicMock()
+        select_result.scalar_one_or_none.return_value = existing
+        db = MagicMock()
+        db.execute.return_value = select_result
+
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+        ):
+            delete_category_master_entry(entry_id="seed-id", db=db, current_user=user)
+
+        assert exc_info.value.status_code == 403
+
+    def test_raises_403_when_entry_owned_by_another_user(self) -> None:
+        """Users may not delete another user's category_master rows."""
+        from fastapi import HTTPException
+
+        from backend.routers.categories import delete_category_master_entry
+
+        existing = MagicMock()
+        existing.user_id = "other-user"
+
+        select_result = MagicMock()
+        select_result.scalar_one_or_none.return_value = existing
+        db = MagicMock()
+        db.execute.return_value = select_result
+
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+        ):
+            delete_category_master_entry(entry_id="entry-1", db=db, current_user=user)
+
+        assert exc_info.value.status_code == 403
 
     def test_raises_404_when_entry_not_found(self) -> None:
         """Deleting a non-existent entry should raise HTTP 404."""
@@ -507,10 +860,18 @@ class TestDeleteCategoryMasterEntry:
 
         from backend.routers.categories import delete_category_master_entry
 
-        db = self._make_db_with_entry(None)
-        user = MagicMock()
+        select_result = MagicMock()
+        select_result.scalar_one_or_none.return_value = None
+        db = MagicMock()
+        db.execute.return_value = select_result
 
-        with pytest.raises(HTTPException) as exc_info:
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            pytest.raises(HTTPException) as exc_info,
+            patch("backend.routers.categories.set_rls_user"),
+        ):
             delete_category_master_entry(entry_id="ghost-id", db=db, current_user=user)
 
         assert exc_info.value.status_code == 404
@@ -548,6 +909,10 @@ class TestListDescriptionCategories:
         row.id = row_id
         row.user_id = user_id
         row.description = description
+        row.pattern = description
+        row.match_type = "exact"
+        row.priority = 0
+        row.enabled = True
         row.parent_category = parent_category
         row.sub_category = sub_category
         row.payment_method = payment_method
@@ -645,7 +1010,11 @@ class TestUpdateDescriptionCategory:
         entry = MagicMock()
         entry.id = "dc-1"
         entry.user_id = "user-1"
+        entry.pattern = "Swiggy"
         entry.description = "Swiggy"
+        entry.match_type = "exact"
+        entry.priority = 0
+        entry.enabled = True
         entry.parent_category = "Food & Dining"
         entry.sub_category = "Food Delivery"
         entry.payment_method = "UPI"
@@ -802,27 +1171,39 @@ class TestUpdateDescriptionCategory:
 class TestAnalyzeAndCategorize:
     """Tests for the analyze_and_categorize endpoint."""
 
+    @pytest.fixture(autouse=True)
+    def _patch_apply_zero(self) -> None:
+        """Avoid ORM/query traffic on the mocked DB after upserts."""
+        with patch(
+            "backend.routers.categories.apply_category_rules_to_transactions",
+            return_value=0,
+        ):
+            yield
+
     def _make_db(
         self,
         desc_rows: list[str],
         master_rows: list,
-        upsert_side_effect=None,
     ) -> MagicMock:
-        """Return a mock DB with configurable query results."""
+        """Return a mock DB whose execute handles description query, master query, then ORM/upserts."""
         db = MagicMock()
+        counter = {"n": 0}
 
-        # We need execute to return different results for different queries.
-        # First call: distinct descriptions. Second call: master rows.
-        desc_result = MagicMock()
-        desc_result.scalars.return_value.all.return_value = desc_rows
+        def execute_side_effect(*_args, **_kwargs) -> MagicMock:
+            counter["n"] += 1
+            i = counter["n"]
+            r = MagicMock()
+            if i == 1:
+                r.scalars.return_value.all.return_value = desc_rows
+            elif i == 2:
+                r.scalars.return_value.all.return_value = master_rows
+            else:
+                r.scalar_one_or_none.return_value = None
+            return r
 
-        master_result = MagicMock()
-        master_result.scalars.return_value.all.return_value = master_rows
-
-        # text() upsert call returns a plain MagicMock
-        upsert_result = MagicMock()
-
-        db.execute.side_effect = [desc_result, master_result, *[upsert_result] * 50]
+        db.execute.side_effect = execute_side_effect
+        db.add = MagicMock()
+        db.flush = MagicMock()
         db.commit = MagicMock()
         return db
 
@@ -830,6 +1211,7 @@ class TestAnalyzeAndCategorize:
         row = MagicMock()
         row.parent_category = parent
         row.sub_category = sub
+        row.user_id = None
         return row
 
     @pytest.mark.asyncio
@@ -850,7 +1232,8 @@ class TestAnalyzeAndCategorize:
             result = await analyze_and_categorize(db=db, current_user=user)
 
         assert result["mapped"] == 0
-        assert "No transactions" in result["message"]
+        assert "description" in result["message"].lower()
+        assert result.get("transactions_updated") == 0
 
     @pytest.mark.asyncio
     async def test_invokes_llm_chain_with_correct_inputs(self) -> None:
@@ -903,6 +1286,53 @@ class TestAnalyzeAndCategorize:
             result = await analyze_and_categorize(db=db, current_user=user)
 
         assert result["mapped"] == 2
+        assert result["message"] == "Categorization complete"
+        assert result.get("transactions_updated") == 0
+
+    @pytest.mark.asyncio
+    async def test_accepts_list_shaped_message_content_from_llm(self) -> None:
+        """LangChain may return ``AIMessage.content`` as text blocks; normalize then parse JSON."""
+        from backend.routers.categories import analyze_and_categorize
+
+        master_rows = [self._make_master_row("Food & Dining", "Swiggy")]
+        db = self._make_db(
+            desc_rows=["Swiggy"],
+            master_rows=master_rows,
+        )
+
+        payload = [
+            {
+                "description": "Swiggy",
+                "parent_category": "Food & Dining",
+                "sub_category": "Swiggy",
+                "payment_method": "UPI",
+            }
+        ]
+        llm_response = MagicMock()
+        llm_response.content = [{"type": "text", "text": json.dumps(payload)}]
+
+        user = MagicMock()
+        user.id = "user-1"
+        settings = MagicMock()
+        settings.openrouter_model = "test-model"
+        settings.openrouter_api_key = "test-key"
+        settings.openrouter_base_url = "https://test.url"
+
+        mock_chain = MagicMock()
+        mock_chain.ainvoke = AsyncMock(return_value=llm_response)
+
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+
+        with (
+            patch("backend.routers.categories.set_rls_user"),
+            patch("backend.routers.categories.get_settings", return_value=settings),
+            patch("backend.routers.categories._build_llm", return_value=MagicMock()),
+            patch("backend.routers.categories.category_prompt", mock_prompt),
+        ):
+            result = await analyze_and_categorize(db=db, current_user=user)
+
+        assert result["mapped"] == 1
         assert result["message"] == "Categorization complete"
 
     @pytest.mark.asyncio
@@ -1028,3 +1458,115 @@ class TestAnalyzeAndCategorize:
 
         # Only 1 valid item should be counted (blank description skipped)
         assert result["mapped"] == 1
+        assert result.get("transactions_updated") == 0
+
+
+# ---------------------------------------------------------------------------
+# POST /categories/apply-mappings
+# ---------------------------------------------------------------------------
+
+
+_apply_app = FastAPI()
+_apply_app.include_router(categories_router)
+
+
+def _apply_client(db: MagicMock, user: MagicMock) -> TestClient:
+    """TestClient with DB and user overrides for apply-mappings tests."""
+    from backend.database import get_db
+    from backend.middleware.auth import get_current_user
+
+    _apply_app.dependency_overrides[get_db] = lambda: db
+    _apply_app.dependency_overrides[get_current_user] = lambda: user
+    return TestClient(_apply_app, raise_server_exceptions=True)
+
+
+def _reset_apply_overrides() -> None:
+    """Clear dependency overrides on the apply-mappings test app."""
+    _apply_app.dependency_overrides.clear()
+
+
+class TestApplyMappingsEndpoint:
+    """POST /categories/apply-mappings — applies category_rules via resolver."""
+
+    def teardown_method(self) -> None:
+        """Ensure overrides do not leak between tests."""
+        _reset_apply_overrides()
+
+    def test_document_not_found_returns_404(self) -> None:
+        """Unknown document_id should yield 404 before any UPDATE."""
+        db = MagicMock()
+        doc_result = MagicMock()
+        doc_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = doc_result
+        user = MagicMock()
+        user.id = "user-1"
+
+        with patch("backend.routers.categories.set_rls_user"):
+            client = _apply_client(db, user)
+            try:
+                r = client.post(
+                    "/categories/apply-mappings",
+                    json={"document_id": "missing-doc"},
+                )
+            finally:
+                _reset_apply_overrides()
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "Document not found."
+        assert db.execute.call_count == 1
+
+    def test_scoped_update_returns_rowcount(self) -> None:
+        """Happy path with document_id validates document then applies rules."""
+        db = MagicMock()
+        doc_result = MagicMock()
+        doc_result.scalar_one_or_none.return_value = "doc-1"
+        db.execute.side_effect = [doc_result]
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            patch("backend.routers.categories.set_rls_user"),
+            patch(
+                "backend.routers.categories.apply_category_rules_to_transactions",
+                return_value=4,
+            ) as mock_apply,
+        ):
+            client = _apply_client(db, user)
+            try:
+                r = client.post(
+                    "/categories/apply-mappings",
+                    json={"document_id": "doc-1"},
+                )
+            finally:
+                _reset_apply_overrides()
+
+        assert r.status_code == 200
+        assert r.json() == {"message": "Mappings applied", "updated": 4}
+        assert db.execute.call_count == 1
+        mock_apply.assert_called_once_with(db, "user-1", document_id="doc-1")
+        db.commit.assert_called_once()
+
+    def test_global_update_single_execute(self) -> None:
+        """Without document_id only resolver apply runs (no document lookup)."""
+        db = MagicMock()
+        user = MagicMock()
+        user.id = "user-2"
+
+        with (
+            patch("backend.routers.categories.set_rls_user"),
+            patch(
+                "backend.routers.categories.apply_category_rules_to_transactions",
+                return_value=12,
+            ) as mock_apply,
+        ):
+            client = _apply_client(db, user)
+            try:
+                r = client.post("/categories/apply-mappings", json={})
+            finally:
+                _reset_apply_overrides()
+
+        assert r.status_code == 200
+        assert r.json()["updated"] == 12
+        assert db.execute.call_count == 0
+        mock_apply.assert_called_once_with(db, "user-2", document_id=None)
+        db.commit.assert_called_once()

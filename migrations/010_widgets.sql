@@ -4,7 +4,7 @@
 -- RLS enabled on both tables
 -- ============================================================
 
-CREATE TABLE user_widgets (
+CREATE TABLE IF NOT EXISTS user_widgets (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title        VARCHAR(255) NOT NULL,
@@ -13,9 +13,9 @@ CREATE TABLE user_widgets (
     is_default   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_user_widgets_user_id ON user_widgets(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_widgets_user_id ON user_widgets(user_id);
 
-CREATE TABLE user_dashboards (
+CREATE TABLE IF NOT EXISTS user_dashboards (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     layout     JSONB NOT NULL DEFAULT '{"cols": 3, "grid": []}',

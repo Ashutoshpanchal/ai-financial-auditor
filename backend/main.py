@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import logging
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
 
 from backend.config import get_settings
 from backend.database import engine
+from backend.db_migrations import run_database_bootstrap
 from backend.models import (  # noqa: F401 — side-effect: registers models with Base
     audit_report,
     category_master,
+    category_rule,
     chat_session,
     dashboard,
-    description_category,
     document,
     transaction,
     user,
@@ -38,15 +40,42 @@ from backend.routers import (
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+
+def _configure_backend_logging() -> None:
+    """Ensure ``backend.*`` loggers emit (Docker root logger is often WARNING)."""
+    level_name = settings.log_level.upper()
+    numeric = getattr(logging, level_name, logging.INFO)
+    logging.getLogger("backend").setLevel(numeric)
+
+
+_configure_backend_logging()
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    """Run DB extensions, SQL migrations, ORM DDL, and seed repair before serving traffic."""
+    skip = os.environ.get("SKIP_DB_BOOTSTRAP", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if skip:
+        logger.info("SKIP_DB_BOOTSTRAP is set — skipping automatic database bootstrap.")
+    else:
+        run_database_bootstrap(engine, Base)
+    yield
+
+
 app = FastAPI(
     title="AI Financial Auditor",
     description="Personal finance auditor powered by LangChain + LangGraph + OpenRouter",
     version="0.1.0",
+    lifespan=_lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3002"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,63 +94,6 @@ app.include_router(admin.router)
 app.include_router(transactions.router)
 app.include_router(categories.router)
 app.include_router(dashboard_router.router)
-
-
-def _run_migrations() -> None:
-    """Apply any pending SQL migration files in order.
-
-    Migrations live in /migrations and are named NNN_<name>.sql.
-    Applied migrations are tracked in the schema_migrations table so each
-    script runs exactly once, even across container restarts.
-    """
-    migrations_dir = Path(__file__).parent.parent / "migrations"
-    if not migrations_dir.is_dir():
-        return
-
-    sql_files = sorted(migrations_dir.glob("*.sql"))
-    if not sql_files:
-        return
-
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    filename TEXT PRIMARY KEY,
-                    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                )
-                """
-            )
-        )
-        applied: set[str] = {
-            row[0]
-            for row in conn.execute(
-                text("SELECT filename FROM schema_migrations")
-            ).fetchall()
-        }
-
-        for sql_file in sql_files:
-            name = sql_file.name
-            if name in applied:
-                continue
-            logger.info("Applying migration: %s", name)
-            conn.execute(text(sql_file.read_text()))
-            conn.execute(
-                text("INSERT INTO schema_migrations (filename) VALUES (:n)"),
-                {"n": name},
-            )
-            logger.info("Migration applied: %s", name)
-
-
-@app.on_event("startup")
-def _init_db() -> None:
-    """Enable extensions, run pending migrations, then create any missing tables."""
-    with engine.begin() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
-    _run_migrations()
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database ready.")
 
 
 @app.get("/health")

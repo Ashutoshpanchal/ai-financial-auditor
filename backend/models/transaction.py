@@ -36,9 +36,15 @@ class Transaction(Base):
     bank_name: Mapped[str] = mapped_column(String, nullable=False)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
+    short_description: Mapped[str | None] = mapped_column(
+        String(512), nullable=True, index=True
+    )
     debit: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     credit: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     category: Mapped[str | None] = mapped_column(String, nullable=True)
+    parent_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sub_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    category_master_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     remarks: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # pgvector embedding — used for RAG similarity search
     embedding: Mapped[list | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)

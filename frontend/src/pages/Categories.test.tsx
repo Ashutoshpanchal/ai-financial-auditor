@@ -7,7 +7,7 @@
  *  - Add sub-category form (validation + success + duplicate error)
  *  - Delete sub-category button
  *  - Description Mappings table
- *  - Auto-Categorize button (loading state + success + failure)
+ *  - AI Sync button (loading state + success + failure)
  *  - Parent/sub/payment-method dropdowns in the mappings table
  *
  * Mocking strategy:
@@ -39,10 +39,26 @@ import Categories from "./Categories";
 
 const MASTER_DATA = {
   "Food & Dining": [
-    { id: "cm-1", sub_category: "Swiggy" },
-    { id: "cm-2", sub_category: "Zomato" },
+    { id: "cm-1", sub_category: "Swiggy", is_global: true },
+    { id: "cm-2", sub_category: "Zomato", is_global: true },
   ],
-  Transport: [{ id: "cm-3", sub_category: "Uber" }],
+  Transport: [{ id: "cm-3", sub_category: "Uber", is_global: true }],
+  "My Categories": [{ id: "cm-user-1", sub_category: "Custom A", is_global: false }],
+};
+
+const MASTER_BUILTIN = {
+  "Food & Dining": MASTER_DATA["Food & Dining"],
+  Transport: MASTER_DATA.Transport,
+};
+
+const MASTER_USER = {
+  "My Categories": MASTER_DATA["My Categories"],
+};
+
+const SPLIT_MASTER = {
+  merged: MASTER_DATA,
+  builtin: MASTER_BUILTIN,
+  user_defined: MASTER_USER,
 };
 
 const DESCRIPTION_MAPPINGS = [
@@ -85,10 +101,10 @@ const PAYMENT_METHODS = [
  */
 function mockAllGetCalls() {
   (api.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-    if (url === "/categories/master") {
-      return Promise.resolve({ data: MASTER_DATA });
+    if (url === "/categories/master/split") {
+      return Promise.resolve({ data: SPLIT_MASTER });
     }
-    if (url === "/categories/descriptions") {
+    if (url === "/categories/rules") {
       return Promise.resolve({ data: DESCRIPTION_MAPPINGS });
     }
     if (url === "/categories/payment-methods") {
@@ -100,6 +116,13 @@ function mockAllGetCalls() {
 
 function renderCategories() {
   return render(<Categories />);
+}
+
+async function switchToUserDefinedDictionary() {
+  await waitFor(() => {
+    expect(screen.getByRole("tab", { name: "User-defined" })).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByRole("tab", { name: "User-defined" }));
 }
 
 // ── Tests: Initial render & data loading ──────────────────────────────────────
@@ -120,28 +143,29 @@ describe("Categories page — initial render", () => {
   it("renders the Category Dictionary section heading", async () => {
     renderCategories();
     await waitFor(() => {
-      expect(screen.getByText("Category Dictionary")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Category Dictionary" })).toBeInTheDocument();
     });
   });
 
-  it("renders the Description Mappings section heading", async () => {
+  it("does not render the Category rules section (hidden from UI)", async () => {
     renderCategories();
     await waitFor(() => {
-      expect(screen.getByText("Description Mappings")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Category Dictionary" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: /Category rules/i })).not.toBeInTheDocument();
+  });
+
+  it("calls GET /categories/master/split on mount", async () => {
+    renderCategories();
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith("/categories/master/split");
     });
   });
 
-  it("calls GET /categories/master on mount", async () => {
+  it("calls GET /categories/rules on mount", async () => {
     renderCategories();
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith("/categories/master");
-    });
-  });
-
-  it("calls GET /categories/descriptions on mount", async () => {
-    renderCategories();
-    await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith("/categories/descriptions");
+      expect(api.get).toHaveBeenCalledWith("/categories/rules");
     });
   });
 
@@ -169,46 +193,55 @@ describe("Categories page — Category Dictionary", () => {
     });
   });
 
-  it("renders sub-category chips for each parent", async () => {
+  it("renders dictionary table rows for sub-categories on Built-in tab", async () => {
     renderCategories();
     await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Built-in" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("columnheader", { name: "Type" })).toBeInTheDocument();
       expect(screen.getAllByText("Swiggy").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Zomato").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Uber").length).toBeGreaterThan(0);
     });
   });
 
-  it("renders a delete (×) button for each sub-category", async () => {
+  it("Built-in tab shows no remove actions for seed rows", async () => {
     renderCategories();
     await waitFor(() => {
-      // 3 sub-categories → 3 × buttons
-      const deleteButtons = screen.getAllByTitle("Remove");
-      expect(deleteButtons).toHaveLength(3);
+      expect(screen.getByRole("tab", { name: "Built-in" })).toBeInTheDocument();
+    });
+    expect(screen.queryAllByTitle("Remove")).toHaveLength(0);
+  });
+
+  it("User-defined tab shows remove (×) for user-owned master entries", async () => {
+    renderCategories();
+    await switchToUserDefinedDictionary();
+    await waitFor(() => {
+      const deleteButtons = screen.queryAllByTitle("Remove");
+      expect(deleteButtons).toHaveLength(1);
     });
   });
 
-  it("renders the Add button for the add-sub-category form", async () => {
+  it("renders the Add button on the User-defined tab", async () => {
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
     });
   });
 
-  it("renders the Parent category input field", async () => {
+  it("renders the Parent category input field on User-defined tab", async () => {
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() => {
-      expect(
-        screen.getByPlaceholderText("Parent category (e.g. Food & Dining)"),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Parent category")).toBeInTheDocument();
     });
   });
 
-  it("renders the Sub-category input field", async () => {
+  it("renders the Sub-category input field on User-defined tab", async () => {
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() => {
-      expect(
-        screen.getByPlaceholderText("Sub-category (e.g. Blinkit)"),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Sub-category")).toBeInTheDocument();
     });
   });
 });
@@ -223,6 +256,7 @@ describe("Categories page — Add sub-category form validation", () => {
 
   it("shows validation error when both fields are empty and Add is clicked", async () => {
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument(),
     );
@@ -234,14 +268,14 @@ describe("Categories page — Add sub-category form validation", () => {
 
   it("shows validation error when only parent is filled", async () => {
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument(),
     );
 
-    fireEvent.change(
-      screen.getByPlaceholderText("Parent category (e.g. Food & Dining)"),
-      { target: { value: "Food & Dining" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Parent category"), {
+      target: { value: "Food & Dining" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(screen.getByText("Both fields are required.")).toBeInTheDocument();
@@ -249,14 +283,14 @@ describe("Categories page — Add sub-category form validation", () => {
 
   it("shows validation error when only sub-category is filled", async () => {
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument(),
     );
 
-    fireEvent.change(
-      screen.getByPlaceholderText("Sub-category (e.g. Blinkit)"),
-      { target: { value: "Blinkit" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Sub-category"), {
+      target: { value: "Blinkit" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(screen.getByText("Both fields are required.")).toBeInTheDocument();
@@ -266,18 +300,17 @@ describe("Categories page — Add sub-category form validation", () => {
     (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
 
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument(),
     );
 
-    fireEvent.change(
-      screen.getByPlaceholderText("Parent category (e.g. Food & Dining)"),
-      { target: { value: "Shopping" } },
-    );
-    fireEvent.change(
-      screen.getByPlaceholderText("Sub-category (e.g. Blinkit)"),
-      { target: { value: "Amazon" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Parent category"), {
+      target: { value: "Shopping" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Sub-category"), {
+      target: { value: "Amazon" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
@@ -292,14 +325,13 @@ describe("Categories page — Add sub-category form validation", () => {
     (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
 
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument(),
     );
 
-    const parentInput = screen.getByPlaceholderText(
-      "Parent category (e.g. Food & Dining)",
-    );
-    const subInput = screen.getByPlaceholderText("Sub-category (e.g. Blinkit)");
+    const parentInput = screen.getByPlaceholderText("Parent category");
+    const subInput = screen.getByPlaceholderText("Sub-category");
 
     fireEvent.change(parentInput, { target: { value: "Shopping" } });
     fireEvent.change(subInput, { target: { value: "Amazon" } });
@@ -314,28 +346,32 @@ describe("Categories page — Add sub-category form validation", () => {
   it("shows API error message when POST returns a 409 conflict", async () => {
     (api.post as ReturnType<typeof vi.fn>).mockRejectedValue({
       response: {
-        data: { detail: "Entry 'Food & Dining / Swiggy' already exists." },
+        data: {
+          detail:
+            "Entry 'Food & Dining / Swiggy' already exists for your account.",
+        },
       },
     });
 
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument(),
     );
 
-    fireEvent.change(
-      screen.getByPlaceholderText("Parent category (e.g. Food & Dining)"),
-      { target: { value: "Food & Dining" } },
-    );
-    fireEvent.change(
-      screen.getByPlaceholderText("Sub-category (e.g. Blinkit)"),
-      { target: { value: "Swiggy" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Parent category"), {
+      target: { value: "Food & Dining" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Sub-category"), {
+      target: { value: "Swiggy" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(
-        screen.getByText("Entry 'Food & Dining / Swiggy' already exists."),
+        screen.getByText(
+          "Entry 'Food & Dining / Swiggy' already exists for your account.",
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -344,22 +380,62 @@ describe("Categories page — Add sub-category form validation", () => {
     (api.post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Network Error"));
 
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument(),
     );
 
-    fireEvent.change(
-      screen.getByPlaceholderText("Parent category (e.g. Food & Dining)"),
-      { target: { value: "Food & Dining" } },
-    );
-    fireEvent.change(
-      screen.getByPlaceholderText("Sub-category (e.g. Blinkit)"),
-      { target: { value: "Blinkit" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Parent category"), {
+      target: { value: "Food & Dining" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Sub-category"), {
+      target: { value: "Blinkit" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(screen.getByText("Failed to add entry.")).toBeInTheDocument();
+    });
+  });
+});
+
+// ── Tests: Rename user-defined dictionary entry ───────────────────────────────
+
+describe("Categories page — Rename dictionary entry", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAllGetCalls();
+  });
+
+  it("calls PATCH /categories/master/{id} when Rename modal Save is clicked", async () => {
+    (api.patch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        id: "cm-user-1",
+        parent_category: "My Categories",
+        sub_category: "Custom B",
+      },
+    });
+
+    renderCategories();
+    await switchToUserDefinedDictionary();
+    await waitFor(() => expect(screen.getByText("Custom A")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "Rename category" })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Parent category"), {
+      target: { value: "My Categories" },
+    });
+    fireEvent.change(screen.getByLabelText("Sub-category"), {
+      target: { value: "Custom B" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith("/categories/master/cm-user-1", {
+        parent_category: "My Categories",
+        sub_category: "Custom B",
+      });
     });
   });
 });
@@ -372,47 +448,52 @@ describe("Categories page — Delete sub-category", () => {
     mockAllGetCalls();
   });
 
-  it("calls DELETE /categories/master/{id} when × is clicked", async () => {
+  it("calls DELETE /categories/master/{id} when × is clicked on a user-owned chip", async () => {
     (api.delete as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
-      expect(screen.getAllByTitle("Remove")).toHaveLength(3),
+      expect(screen.getAllByTitle("Remove")).toHaveLength(1),
     );
 
-    // Click the first × button (Swiggy — id = cm-1)
     const removeButtons = screen.getAllByTitle("Remove");
     fireEvent.click(removeButtons[0]);
 
     await waitFor(() => {
-      expect(api.delete).toHaveBeenCalledWith("/categories/master/cm-1");
+      expect(api.delete).toHaveBeenCalledWith("/categories/master/cm-user-1");
     });
   });
 
-  it("reloads master data after a successful delete", async () => {
+  it("reloads master and descriptions after a successful delete", async () => {
     (api.delete as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     renderCategories();
+    await switchToUserDefinedDictionary();
     await waitFor(() =>
-      expect(screen.getAllByTitle("Remove")).toHaveLength(3),
+      expect(screen.getAllByTitle("Remove")).toHaveLength(1),
     );
 
     const removeButtons = screen.getAllByTitle("Remove");
     fireEvent.click(removeButtons[0]);
 
     await waitFor(() => {
-      // GET /categories/master called once on mount + once after delete = 2
       const masterCalls = (api.get as ReturnType<typeof vi.fn>).mock.calls.filter(
-        ([url]) => url === "/categories/master",
+        ([url]) => url === "/categories/master/split",
+      );
+      const descCalls = (api.get as ReturnType<typeof vi.fn>).mock.calls.filter(
+        ([url]) => url === "/categories/rules",
       );
       expect(masterCalls.length).toBeGreaterThanOrEqual(2);
+      expect(descCalls.length).toBeGreaterThanOrEqual(2);
     });
   });
 });
 
 // ── Tests: Description Mappings table ────────────────────────────────────────
 
-describe("Categories page — Description Mappings table", () => {
+/** Category rules table is hidden from the Categories page UI — un-skip when restored. */
+describe.skip("Categories page — Description Mappings table", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAllGetCalls();
@@ -433,21 +514,41 @@ describe("Categories page — Description Mappings table", () => {
     });
   });
 
-  it("renders column headers: Description, Category, Sub-category, Payment Method, Last Updated", async () => {
+  it("renders column headers: Pattern, Category, Sub-category, Payment Method, Last Updated, Saved", async () => {
     renderCategories();
     await waitFor(() => {
-      expect(screen.getByText("Description")).toBeInTheDocument();
-      expect(screen.getByText("Category")).toBeInTheDocument();
-      expect(screen.getByText("Sub-category")).toBeInTheDocument();
-      expect(screen.getByText("Payment Method")).toBeInTheDocument();
-      expect(screen.getByText("Last Updated")).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Pattern" })).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Category" })).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Sub-category" })).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Payment Method" })).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Last Updated" })).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Saved" })).toBeInTheDocument();
+    });
+  });
+
+  it("filters description rows by search text across description, parent, and sub", async () => {
+    renderCategories();
+    await waitFor(() => {
+      expect(screen.getByText("SWIGGY ORDER")).toBeInTheDocument();
+      expect(screen.getByText("UBER TRIP")).toBeInTheDocument();
+    });
+
+    const search = screen.getByPlaceholderText(/Search description, parent, or sub/i);
+    fireEvent.change(search, { target: { value: "UBER" } });
+
+    await waitFor(() => {
+      expect(screen.queryByText("SWIGGY ORDER")).not.toBeInTheDocument();
+      expect(screen.getByText("UBER TRIP")).toBeInTheDocument();
     });
   });
 
   it("shows empty-state message when there are no description mappings", async () => {
     (api.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url === "/categories/master") return Promise.resolve({ data: {} });
-      if (url === "/categories/descriptions")
+      if (url === "/categories/master/split")
+        return Promise.resolve({
+          data: { merged: {}, builtin: {}, user_defined: {} },
+        });
+      if (url === "/categories/rules")
         return Promise.resolve({ data: [] });
       if (url === "/categories/payment-methods")
         return Promise.resolve({ data: PAYMENT_METHODS });
@@ -456,7 +557,7 @@ describe("Categories page — Description Mappings table", () => {
 
     renderCategories();
     await waitFor(() => {
-      expect(screen.getByText(/No mappings yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/No category data yet/i)).toBeInTheDocument();
     });
   });
 
@@ -480,24 +581,25 @@ describe("Categories page — Description Mappings table", () => {
   });
 });
 
-// ── Tests: Auto-Categorize button ─────────────────────────────────────────────
+// ── Tests: AI Sync button ─────────────────────────────────────────────────────
 
-describe("Categories page — Auto-Categorize button", () => {
+/** AI Sync controls are hidden from the Categories page UI — un-skip when restored. */
+describe.skip("Categories page — AI Sync button", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAllGetCalls();
   });
 
-  it("renders the Auto-Categorize button", async () => {
+  it("renders the AI Sync button in the compact strip when mappings exist", async () => {
     renderCategories();
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Auto-Categorize/i }),
+        screen.getByRole("button", { name: "AI Sync" }),
       ).toBeInTheDocument();
     });
   });
 
-  it("shows success message after successful analyze call", async () => {
+  it("shows success message after successful analyze (confirm when mappings exist)", async () => {
     (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { message: "Categorization complete", mapped: 5 },
     });
@@ -505,20 +607,26 @@ describe("Categories page — Auto-Categorize button", () => {
     renderCategories();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /Auto-Categorize/i }),
+        screen.getByRole("button", { name: "AI Sync" }),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Auto-Categorize/i }));
+    fireEvent.click(screen.getByRole("button", { name: "AI Sync" }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
       expect(
-        screen.getByText("Categorization complete — 5 descriptions mapped."),
+        screen.getByText(
+          "Categorization complete — 5 rules saved, 0 transactions categorized.",
+        ),
       ).toBeInTheDocument();
     });
   });
 
-  it("calls POST /categories/analyze when button is clicked", async () => {
+  it("calls POST /categories/analyze after confirming re-run when mappings exist", async () => {
     (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { message: "Categorization complete", mapped: 3 },
     });
@@ -526,15 +634,50 @@ describe("Categories page — Auto-Categorize button", () => {
     renderCategories();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /Auto-Categorize/i }),
+        screen.getByRole("button", { name: "AI Sync" }),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Auto-Categorize/i }));
+    fireEvent.click(screen.getByRole("button", { name: "AI Sync" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith("/categories/analyze");
+      expect(api.post).toHaveBeenCalledWith(
+        "/categories/analyze",
+        {},
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
     });
+  });
+
+  it("calls POST without dialog when there are no mappings yet", async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === "/categories/master/split") return Promise.resolve({ data: SPLIT_MASTER });
+      if (url === "/categories/rules") return Promise.resolve({ data: [] });
+      if (url === "/categories/payment-methods")
+        return Promise.resolve({ data: PAYMENT_METHODS });
+      return Promise.reject(new Error(`Unexpected GET: ${url}`));
+    });
+    (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { message: "Categorization complete", mapped: 1 },
+    });
+
+    renderCategories();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "AI Sync" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "AI Sync" }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        "/categories/analyze",
+        {},
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows failure message when analyze call fails", async () => {
@@ -545,11 +688,13 @@ describe("Categories page — Auto-Categorize button", () => {
     renderCategories();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /Auto-Categorize/i }),
+        screen.getByRole("button", { name: "AI Sync" }),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Auto-Categorize/i }));
+    fireEvent.click(screen.getByRole("button", { name: "AI Sync" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
       expect(
@@ -559,7 +704,6 @@ describe("Categories page — Auto-Categorize button", () => {
   });
 
   it("disables the button while analysis is in progress", async () => {
-    // Never resolves so we can test the loading state
     (api.post as ReturnType<typeof vi.fn>).mockImplementation(
       () => new Promise(() => {}),
     );
@@ -567,18 +711,20 @@ describe("Categories page — Auto-Categorize button", () => {
     renderCategories();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /Auto-Categorize/i }),
+        screen.getByRole("button", { name: "AI Sync" }),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Auto-Categorize/i }));
+    fireEvent.click(screen.getByRole("button", { name: "AI Sync" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Analyzing/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Syncing/i })).toBeDisabled();
     });
   });
 
-  it("reloads descriptions after successful analyze", async () => {
+  it("reloads descriptions and master after successful analyze", async () => {
     (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { message: "Categorization complete", mapped: 2 },
     });
@@ -586,31 +732,37 @@ describe("Categories page — Auto-Categorize button", () => {
     renderCategories();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /Auto-Categorize/i }),
+        screen.getByRole("button", { name: "AI Sync" }),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Auto-Categorize/i }));
+    fireEvent.click(screen.getByRole("button", { name: "AI Sync" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
       const descCalls = (api.get as ReturnType<typeof vi.fn>).mock.calls.filter(
-        ([url]) => url === "/categories/descriptions",
+        ([url]) => url === "/categories/rules",
       );
-      // Initial load + reload after analyze = at least 2
+      const masterCalls = (api.get as ReturnType<typeof vi.fn>).mock.calls.filter(
+        ([url]) => url === "/categories/master/split",
+      );
       expect(descCalls.length).toBeGreaterThanOrEqual(2);
+      expect(masterCalls.length).toBeGreaterThanOrEqual(2);
     });
   });
 });
 
 // ── Tests: Description mapping dropdowns ──────────────────────────────────────
 
-describe("Categories page — mapping dropdowns", () => {
+/** Category rules / mapping editors are hidden — un-skip when restored. */
+describe.skip("Categories page — mapping dropdowns", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAllGetCalls();
   });
 
-  it("calls PATCH /categories/descriptions/{id} when payment method changes", async () => {
+  it("calls PATCH /categories/rules/{id} when payment method changes", async () => {
     (api.patch as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
 
     renderCategories();
@@ -627,9 +779,12 @@ describe("Categories page — mapping dropdowns", () => {
 
     await waitFor(() => {
       expect(api.patch).toHaveBeenCalledWith(
-        "/categories/descriptions/dc-1",
+        "/categories/rules/dc-1",
         expect.objectContaining({ payment_method: "NEFT" }),
       );
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText("Saved").length).toBeGreaterThan(0);
     });
   });
 
@@ -649,7 +804,7 @@ describe("Categories page — mapping dropdowns", () => {
 
     await waitFor(() => {
       expect(api.patch).toHaveBeenCalledWith(
-        "/categories/descriptions/dc-1",
+        "/categories/rules/dc-1",
         expect.objectContaining({
           parent_category: "Transport",
           sub_category: null,
@@ -660,8 +815,8 @@ describe("Categories page — mapping dropdowns", () => {
 
   it("sub-category dropdown is disabled when parent_category is null", async () => {
     (api.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url === "/categories/master") return Promise.resolve({ data: MASTER_DATA });
-      if (url === "/categories/descriptions")
+      if (url === "/categories/master/split") return Promise.resolve({ data: SPLIT_MASTER });
+      if (url === "/categories/rules")
         return Promise.resolve({
           data: [
             {

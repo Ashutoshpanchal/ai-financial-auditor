@@ -16,6 +16,7 @@ import type { UnmappedEntry } from "../services/api";
 
 const DICT_PAGE_SIZE = 8;
 const MAPPINGS_PAGE_SIZE = 10;
+const UNMAPPED_PAGE_SIZE = 10;
 
 /** Same fixed width for Category Dictionary and Description Mappings search fields */
 const TABLE_SEARCH_INPUT_CLASS =
@@ -171,14 +172,10 @@ export default function Categories() {
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
 
   const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [analyzeInfo, setAnalyzeInfo] = useState<string | null>(null);
   const [mutateError, setMutateError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const [introRailCollapsed, setIntroRailCollapsed] = useState(false);
-  const [topStripExpanded, setTopStripExpanded] = useState(false);
   const [analyzeConfirmOpen, setAnalyzeConfirmOpen] = useState(false);
 
   const [dictionaryOpen, setDictionaryOpen] = useState(true);
@@ -210,6 +207,8 @@ export default function Categories() {
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"dictionary" | "unmapped">("dictionary");
+  const [unmappedSearch, setUnmappedSearch] = useState("");
+  const [unmappedPage, setUnmappedPage] = useState(1);
 
   const analyzeAbortRef = useRef<AbortController | null>(null);
 
@@ -248,18 +247,6 @@ export default function Categories() {
     }
   }, []);
 
-  const refreshAll = useCallback(async () => {
-    setRefreshing(true);
-    setMutateError(null);
-    try {
-      await Promise.all([loadMaster(), loadDescriptions(), loadPaymentMethods(), loadUnmapped()]);
-    } catch {
-      setMutateError("Failed to refresh data — please try again.");
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadMaster, loadDescriptions, loadPaymentMethods, loadUnmapped]);
-
   useEffect(() => {
     loadMaster();
     loadDescriptions();
@@ -281,6 +268,10 @@ export default function Categories() {
   useEffect(() => {
     setDescPage(1);
   }, [descriptionSearch]);
+
+  useEffect(() => {
+    setUnmappedPage(1);
+  }, [unmappedSearch]);
 
   const activeDictionaryMaster: MasterData = dictTab === "builtin" ? masterBuiltin : masterUser;
 
@@ -334,11 +325,24 @@ export default function Categories() {
     return filteredDescriptions.slice(start, start + MAPPINGS_PAGE_SIZE);
   }, [filteredDescriptions, descPage]);
 
-  const parentOptions = Object.keys(masterMerged).sort();
+  const filteredUnmappedEntries = useMemo(() => {
+    const q = unmappedSearch.trim().toLowerCase();
+    if (!q) return unmappedEntries;
+    return unmappedEntries.filter((e) => {
+      const short = (e.short_description ?? "").toLowerCase();
+      const rawBlob = (e.sample_raw_descriptions ?? [])
+        .map((s) => (s ?? "").toLowerCase())
+        .join("\n");
+      return short.includes(q) || rawBlob.includes(q);
+    });
+  }, [unmappedEntries, unmappedSearch]);
 
-  function cancelAnalyzeSync() {
-    analyzeAbortRef.current?.abort();
-  }
+  const unmappedPageRows = useMemo(() => {
+    const start = (unmappedPage - 1) * UNMAPPED_PAGE_SIZE;
+    return filteredUnmappedEntries.slice(start, start + UNMAPPED_PAGE_SIZE);
+  }, [filteredUnmappedEntries, unmappedPage]);
+
+  const parentOptions = Object.keys(masterMerged).sort();
 
   async function runAnalyze() {
     analyzeAbortRef.current?.abort();
@@ -346,7 +350,6 @@ export default function Categories() {
     analyzeAbortRef.current = ac;
     flushSync(() => {
       setAnalyzing(true);
-      setAnalyzeMsg(null);
       setAnalyzeError(null);
       setAnalyzeInfo(null);
     });
@@ -362,15 +365,13 @@ export default function Categories() {
       const mapped = res.data.mapped ?? 0;
       const message = res.data.message ?? "Done";
       const summary = `${message} — ${mapped} rules saved, ${tx} transactions categorized.`;
-      setAnalyzeMsg(summary);
       try {
         await Promise.all([loadDescriptions(ac.signal), loadMaster(ac.signal)]);
       } catch (reloadErr) {
         if (wasRequestAborted(reloadErr)) {
-          setAnalyzeMsg(null);
           setAnalyzeInfo("AI Sync was cancelled before the list finished refreshing.");
         } else {
-          setAnalyzeMsg(`${summary} (Could not reload the list — click Refresh.)`);
+          setAnalyzeInfo(`${summary} (Could not reload the list — try opening this page again.)`);
         }
       }
     } catch (err) {
@@ -385,16 +386,6 @@ export default function Categories() {
       }
       setAnalyzing(false);
     }
-  }
-
-  function onClickAutoCategorize() {
-    setAnalyzeError(null);
-    setAnalyzeInfo(null);
-    if (descriptions.length > 0) {
-      setAnalyzeConfirmOpen(true);
-      return;
-    }
-    void runAnalyze();
   }
 
   async function handleAddSub() {
@@ -524,8 +515,12 @@ export default function Categories() {
     }
   }
 
-  const autoCategorizeBlurb =
-    "AI Sync scans your transaction descriptions, creates category rules (exact match on each line), applies them to uncategorized transactions, and saves results you can edit anytime.";
+  useEffect(() => {
+    setUnmappedPage((p) => {
+      const totalPages = Math.max(1, Math.ceil(filteredUnmappedEntries.length / UNMAPPED_PAGE_SIZE));
+      return p > totalPages ? totalPages : p;
+    });
+  }, [filteredUnmappedEntries.length]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
@@ -549,168 +544,13 @@ export default function Categories() {
         </div>
       )}
 
-      {/* ── Populated: compact top strip ───────────────────────────────────── */}
-      {showFullCatalogUi && (
-        <div className="mb-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-            <button
-              type="button"
-              onClick={() => setTopStripExpanded((v) => !v)}
-              className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-              aria-expanded={topStripExpanded}
-              aria-label={topStripExpanded ? "Hide details" : "Show details"}
-              title={topStripExpanded ? "Hide details" : "Show details"}
-            >
-              <svg
-                className={`w-5 h-5 transition-transform ${topStripExpanded ? "rotate-90" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onClickAutoCategorize}
-                disabled={analyzing}
-                aria-busy={analyzing}
-                className="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2 shrink-0"
-              >
-                {analyzing && (
-                  <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                )}
-                {analyzing ? "Syncing…" : "AI Sync"}
-              </button>
-              {analyzing && (
-                <button
-                  type="button"
-                  onClick={cancelAnalyzeSync}
-                  className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 shrink-0"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={refreshAll}
-              disabled={refreshing || analyzing}
-              className="border border-gray-300 bg-white text-gray-800 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-            >
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </button>
-            {topStripExpanded && (
-              <p className="w-full sm:w-auto sm:flex-1 text-xs text-gray-600 sm:ml-2 mt-1 sm:mt-0">
-                {autoCategorizeBlurb}
-              </p>
-            )}
-            {analyzeMsg && (
-              <span className="text-xs text-green-700 font-medium w-full basis-full sm:basis-auto sm:max-w-xl sm:ml-auto block sm:inline">
-                {analyzeMsg}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Empty state: left hint + collapsible right rail ───────────────── */}
+      {/* ── Empty state ───────────────────────────────────────────────────── */}
       {!showFullCatalogUi && (
-        <div className="flex flex-col lg:flex-row gap-6 min-h-[50vh] mb-8">
-          <div className="flex-1 rounded-xl border border-dashed border-gray-200 bg-white/60 p-6 flex flex-col justify-center">
-            <p className="text-gray-700 font-medium mb-2">No category rules yet</p>
-            <p className="text-sm text-gray-600 max-w-xl">
-              Start with <strong>AI Sync</strong> on the right. After the first run you will see
-              your category dictionary and per-pattern rules with search and pagination.
-            </p>
-          </div>
-
-          <div
-            className={`shrink-0 transition-all duration-200 ${
-              introRailCollapsed ? "lg:w-14 w-full" : "w-full lg:w-[22rem]"
-            }`}
-          >
-            {introRailCollapsed ? (
-              <div className="flex lg:flex-col items-center justify-center gap-2 h-full min-h-[8rem] rounded-xl border border-gray-200 bg-white shadow-sm p-2">
-                <button
-                  type="button"
-                  onClick={() => setIntroRailCollapsed(false)}
-                  className="p-2 rounded-lg text-gray-600 hover:bg-gray-100"
-                  aria-label="Show AI Sync panel"
-                  title="Show panel"
-                >
-                  <svg className="w-6 h-6 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-5 flex flex-col gap-4 h-full">
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-lg font-semibold text-gray-900">AI Sync</h2>
-                  <button
-                    type="button"
-                    onClick={() => setIntroRailCollapsed(true)}
-                    className="p-1 rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                    aria-label="Hide panel"
-                    title="Hide panel"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-                <p className="text-sm text-gray-600 leading-relaxed">{autoCategorizeBlurb}</p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={onClickAutoCategorize}
-                    disabled={analyzing}
-                    aria-busy={analyzing}
-                    className="w-full bg-emerald-600 text-white text-sm py-2.5 rounded-lg hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2"
-                  >
-                    {analyzing && (
-                      <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                      </svg>
-                    )}
-                    {analyzing ? "Syncing…" : "Run AI Sync"}
-                  </button>
-                  {analyzing && (
-                    <button
-                      type="button"
-                      onClick={cancelAnalyzeSync}
-                      className="w-full text-sm py-2 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
-                    >
-                      Cancel sync
-                    </button>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={refreshAll}
-                  disabled={refreshing || analyzing}
-                  className="w-full border border-gray-300 text-gray-800 text-sm py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {refreshing ? "Refreshing…" : "Refresh data"}
-                </button>
-                {analyzeError && (
-                  <p className="text-xs text-red-600">{analyzeError}</p>
-                )}
-                {analyzeInfo && (
-                  <p className="text-xs text-slate-700">{analyzeInfo}</p>
-                )}
-                {analyzeMsg && (
-                  <p className="text-xs text-green-700">{analyzeMsg}</p>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="rounded-xl border border-dashed border-gray-200 bg-white/60 p-6 min-h-[40vh] mb-8 flex flex-col justify-center">
+          <p className="text-gray-700 font-medium mb-2">No category data yet</p>
+          <p className="text-sm text-gray-600 max-w-xl">
+            Upload a statement or add dictionary entries. Data loads automatically when you open this page.
+          </p>
         </div>
       )}
 
@@ -755,71 +595,104 @@ export default function Categories() {
           {/* ── Unmapped tab ─────────────────────────────────────────────── */}
           {activeTab === "unmapped" && (
             <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Unmapped Merchants
                   {unmappedEntries.length > 0 && (
                     <span className="ml-2 text-sm font-normal text-gray-500">
-                      ({unmappedEntries.length} unique · {unmappedEntries.reduce((s, e) => s + e.txn_count, 0)} transactions)
+                      ({unmappedEntries.length} unique ·{" "}
+                      {unmappedEntries.reduce((s, e) => s + e.txn_count, 0)} transactions)
                     </span>
                   )}
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => void loadUnmapped()}
-                  disabled={unmappedLoading || refreshing}
-                  className="border border-gray-300 bg-white text-gray-800 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {unmappedLoading ? "Loading…" : "Refresh"}
-                </button>
               </div>
 
-              {unmappedEntries.length === 0 && !unmappedLoading ? (
+              {unmappedEntries.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-end justify-end gap-3">
+                  <div className="w-full sm:w-80 sm:shrink-0">
+                    <label htmlFor="unmapped-search" className="sr-only">
+                      Search short or raw description
+                    </label>
+                    <input
+                      id="unmapped-search"
+                      type="search"
+                      placeholder="Search short description or raw sample…"
+                      value={unmappedSearch}
+                      onChange={(e) => setUnmappedSearch(e.target.value)}
+                      className={TABLE_SEARCH_INPUT_CLASS}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {unmappedLoading && unmappedEntries.length === 0 ? (
+                <p className="text-center py-12 text-gray-500 text-sm">Loading…</p>
+              ) : unmappedEntries.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-sm">All merchants are categorized 🎉</p>
                   <p className="text-gray-400 text-xs mt-1">
                     Upload a new statement to see unmapped merchants here.
                   </p>
                 </div>
+              ) : filteredUnmappedEntries.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-8">
+                  No unmapped rows match your search.
+                </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-base min-w-[48rem]">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
-                        <th className="pb-2 pr-4 font-medium">Short Description</th>
-                        <th className="pb-2 pr-4 font-medium w-20">Count</th>
-                        <th className="pb-2 pr-4 font-medium">Sample Raw Description</th>
-                        <th className="pb-2 font-medium text-right w-36">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {unmappedEntries.map((entry) => (
-                        <tr key={entry.short_description} className="hover:bg-gray-50">
-                          <td className="py-3 pr-4">
-                            <code className="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">
-                              {entry.short_description}
-                            </code>
-                          </td>
-                          <td className="py-3 pr-4 text-gray-700 font-medium">
-                            {entry.txn_count}
-                          </td>
-                          <td className="py-3 pr-4 text-sm text-gray-500 max-w-xs truncate">
-                            {entry.sample_raw_descriptions[0] ?? "—"}
-                          </td>
-                          <td className="py-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => openResolveModal(entry)}
-                              className="text-xs font-medium text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded border border-indigo-200 hover:bg-indigo-50"
-                            >
-                              Add Category
-                            </button>
-                          </td>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-base min-w-[48rem]">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
+                          <th className="pb-2 pr-4 font-medium">Short Description</th>
+                          <th className="pb-2 pr-4 font-medium w-20">Count</th>
+                          <th className="pb-2 pr-4 font-medium">Raw description samples</th>
+                          <th className="pb-2 font-medium text-right w-36">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {unmappedPageRows.map((entry) => {
+                          const rawJoined = (entry.sample_raw_descriptions ?? [])
+                            .filter((s) => (s ?? "").trim() !== "")
+                            .join(" · ");
+                          const rawDisplay = rawJoined.length > 0 ? rawJoined : "—";
+                          return (
+                            <tr key={entry.short_description} className="hover:bg-gray-50">
+                              <td className="py-3 pr-4">
+                                <code className="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">
+                                  {entry.short_description}
+                                </code>
+                              </td>
+                              <td className="py-3 pr-4 text-gray-700 font-medium">{entry.txn_count}</td>
+                              <td
+                                className="py-3 pr-4 text-sm text-gray-500 max-w-md align-top"
+                                title={rawDisplay !== "—" ? rawDisplay : undefined}
+                              >
+                                <span className="line-clamp-2 break-words">{rawDisplay}</span>
+                              </td>
+                              <td className="py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => openResolveModal(entry)}
+                                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded border border-indigo-200 hover:bg-indigo-50"
+                                >
+                                  Add Category
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <PaginationBar
+                    page={unmappedPage}
+                    totalItems={filteredUnmappedEntries.length}
+                    pageSize={UNMAPPED_PAGE_SIZE}
+                    onPageChange={setUnmappedPage}
+                    aria-label="Unmapped merchants pagination"
+                  />
+                </>
               )}
             </section>
           )}
@@ -1000,8 +873,8 @@ export default function Categories() {
           </section>
           )}
 
-          {/* ── Category rules (always visible when catalog UI shows) ─────── */}
-          {activeTab === "dictionary" && (
+          {/* ── Category rules — hidden from UI; change outer `false` to `true` to restore ─ */}
+          {false && activeTab === "dictionary" && (
           <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-gray-800">
@@ -1351,6 +1224,12 @@ export default function Categories() {
           </div>
         </div>
       )}
+
+      {analyzing ? (
+        <span className="sr-only" aria-live="polite">
+          Syncing categories
+        </span>
+      ) : null}
 
     </div>
   );

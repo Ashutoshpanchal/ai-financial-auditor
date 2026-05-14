@@ -267,3 +267,24 @@ class TestParseCsvErrors:
         )
         transactions = parse_csv(csv_bytes, bank_name="Test Bank")
         assert transactions[0]["category"] is None
+
+
+# ---------------------------------------------------------------------------
+# Tab-separated (.csv extension, tab delimiters)
+# ---------------------------------------------------------------------------
+
+
+class TestParseTabSeparated:
+    """Bank exports often use tabs; file may still be named .csv."""
+
+    def test_tab_separated_withdrawal_deposit_columns(self) -> None:
+        """TSV with Narration + Withdrawal/Deposit must parse to transactions."""
+        tsv = (
+            b"Date\tNarration\tWithdrawal (Dr)\tDeposit (Cr)\tBalance\n"
+            b"01-Apr-24\tUPI merchant\t100.00\t\t0\n"
+        )
+        rows = parse_csv(tsv, bank_name="Test")
+        assert len(rows) == 1
+        assert rows[0]["debit"] == 100.0
+        assert rows[0]["credit"] == 0.0
+        assert "UPI" in rows[0]["description"]

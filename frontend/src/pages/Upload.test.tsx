@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
@@ -128,6 +128,14 @@ describe("Upload page — transaction table column headers", () => {
 
     expect(screen.queryByText("Amount")).toBeNull();
   });
+
+  it("renders a Category column header", async () => {
+    renderUpload();
+
+    await waitFor(() => {
+      expect(screen.getByRole("columnheader", { name: "Category" })).toBeInTheDocument();
+    });
+  });
 });
 
 describe("Upload page — debit transaction row", () => {
@@ -168,6 +176,45 @@ describe("Upload page — debit transaction row", () => {
     // The dash for the Credit column should have the muted gray style
     const creditDash = dashes.find((el) => el.classList.contains("text-gray-300"));
     expect(creditDash).toBeDefined();
+  });
+});
+
+describe("Upload page — category column and sync button", () => {
+  it("shows None in the category cell and a Sync categories button when category is null", async () => {
+    mockApiWithTransactions([makeTransaction({ id: "txn-a", category: null })]);
+    renderUpload();
+
+    await waitFor(() => {
+      expect(screen.getByRole("columnheader", { name: "Category" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("None")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sync categories" })).toBeInTheDocument();
+  });
+
+  it("hides Sync categories when every row on the page has a category", async () => {
+    mockApiWithTransactions([
+      makeTransaction({ id: "txn-1", category: "Bills / Electricity" }),
+    ]);
+    renderUpload();
+
+    await waitFor(() => {
+      expect(screen.getByText("Bills / Electricity")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("button", { name: "Sync categories" })).toBeNull();
+  });
+
+  it("shows Sync categories if any row on the page lacks a category", async () => {
+    mockApiWithTransactions([
+      makeTransaction({ id: "txn-1", category: "Income / Salary" }),
+      makeTransaction({ id: "txn-2", category: null, description: "Coffee" }),
+    ]);
+    renderUpload();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Sync categories" })).toBeInTheDocument();
+    });
   });
 });
 
@@ -226,5 +273,47 @@ describe("Upload page — transaction row with both debit and credit zero", () =
     // Both debit and credit cells should render em-dashes
     const dashes = screen.getAllByText("—");
     expect(dashes.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Upload page — transaction dropdown filters", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApiWithTransactions([makeTransaction({ id: "txn-date-filter" })]);
+  });
+
+  it("sends date and amount filters after clicking Apply", async () => {
+    renderUpload();
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining("/documents/transactions/all?"));
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+
+    const fromInput = screen.getByLabelText("Transaction from date");
+    const toInput = screen.getByLabelText("Transaction to date");
+    fireEvent.change(fromInput, { target: { value: "2024-01-01" } });
+    fireEvent.change(toInput, { target: { value: "2024-01-31" } });
+    fireEvent.change(screen.getByLabelText("Transaction amount filter mode"), { target: { value: "between" } });
+    fireEvent.change(screen.getByLabelText("Transaction amount from"), { target: { value: "1000" } });
+    fireEvent.change(screen.getByLabelText("Transaction amount to"), { target: { value: "5000" } });
+    fireEvent.change(screen.getByLabelText("Transaction amount operator"), { target: { value: ">=" } });
+    fireEvent.change(screen.getByLabelText("Transaction amount compare value"), { target: { value: "2500" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      const transactionCalls = (api.get as ReturnType<typeof vi.fn>).mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.startsWith("/documents/transactions/all?"));
+      const latestCall = transactionCalls[transactionCalls.length - 1] ?? "";
+
+      expect(latestCall).toContain("from_date=2024-01-01");
+      expect(latestCall).toContain("to_date=2024-01-31");
+      expect(latestCall).toContain("min_amount=1000");
+      expect(latestCall).toContain("max_amount=5000");
+      expect(latestCall).toContain("amount_operator=%3E%3D");
+      expect(latestCall).toContain("amount_value=2500");
+    });
   });
 });

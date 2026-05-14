@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api";
 
@@ -34,6 +34,9 @@ interface TransactionRow {
   debit: number;
   credit: number;
   category: string | null;
+  parent_category?: string | null;
+  sub_category?: string | null;
+  category_master_id?: string | null;
   remarks: Record<string, string> | null;
 }
 
@@ -77,19 +80,180 @@ const STEP_LABELS: Record<string, string> = {
   completed: "Complete",
 };
 
+/** Must match ``ALLOWED_PDF_PARSE_STRATEGIES`` in ``backend/parsers/pdf_strategies.py``. */
+const PDF_PARSE_STRATEGY_OPTIONS: { value: string; label: string }[] = [
+  { value: "auto", label: "Auto — try tables, then text" },
+  { value: "tables_only", label: "Tables only (no text fallback)" },
+  { value: "text_only", label: "Text / regex only" },
+];
+
+/** How amount maps to API min_amount / max_amount (debit or credit column). */
+type TxnAmountMode = "any" | "between" | "at_least" | "at_most" | "exact";
+
+type TxnEditableField = "description" | "debit" | "credit";
+
+/**
+ * When true, the upload modal shows the auditing step, "Upload & Analyze", and
+ * "View Report" after processing. Keep audit-related code paths intact; toggle
+ * only visibility and branching.
+ */
+const SHOW_AUDIT_ON_UPLOAD = false;
+
+/** Stepper labels when audit is hidden (embedding + auditing share "Processing"). */
+const STEPS_AUDIT_OFF: { label: string; stateMatch: (s: UploadState) => boolean }[] = [
+  { label: "Uploading", stateMatch: (s) => s === "uploading" },
+  { label: "Parsing", stateMatch: (s) => s === "parsing" },
+  { label: "Processing", stateMatch: (s) => s === "embedding" || s === "auditing" },
+  { label: "Complete", stateMatch: (s) => s === "completed" },
+];
+
+function visibleStepIndexAuditOff(state: UploadState): number {
+  if (state === "failed") return 0;
+  for (let i = 0; i < STEPS_AUDIT_OFF.length; i++) {
+    if (STEPS_AUDIT_OFF[i].stateMatch(state)) return i;
+  }
+  return 0;
+}
+
+/** True when a transaction has no category label (null, empty, or whitespace). */
+function isUncategorizedCategory(category: string | null | undefined): boolean {
+  return category == null || String(category).trim() === "";
+}
+
+/** Copy plain text to the clipboard (best-effort). */
+async function copyToClipboard(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// ─── Category sync (post-upload) ─────────────────────────────────────────────
+
+function CategorySyncModal({
+  open,
+  documentId,
+  onClose,
+  onApplied,
+}: {
+  open: boolean;
+  /** When set, only transactions for this document are updated. When null, all of the user’s uncategorized matches are updated. */
+  documentId: string | null;
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  const [syncing, setSyncing] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [updated, setUpdated] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setErr(null);
+      setUpdated(null);
+      setSyncing(false);
+    }
+  }, [open, documentId]);
+
+  if (!open) return null;
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setErr(null);
+    try {
+      const body = documentId ? { document_id: documentId } : {};
+      const res = await api.post<{ updated: number }>("/categories/apply-mappings", body);
+      setUpdated(res.data.updated);
+      onApplied();
+    } catch (e: unknown) {
+      setErr((e as ApiErr)?.response?.data?.detail ?? "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Sync categories</h3>
+        <p className="text-sm text-gray-600">
+          {documentId ? (
+            <>Applies your saved description → category rules to transactions in this upload that still have no category.</>
+          ) : (
+            <>Applies your saved description → category rules to <span className="font-medium text-gray-800">all</span> of your transactions that still have no category.</>
+          )}{" "}
+          Run <span className="font-medium text-gray-800">Categories → Analyze</span> first if you need AI to build new rules.
+        </p>
+        {err && (
+          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</div>
+        )}
+        {updated !== null && (
+          <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+            Applied rules to {updated} transaction{updated === 1 ? "" : "s"}.
+          </p>
+        )}
+        <div className="flex gap-3 justify-end pt-2">
+          {updated === null ? (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={syncing}
+                className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSync()}
+                disabled={syncing}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {syncing ? "Syncing…" : "Sync now"}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+            >
+              Done
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Upload Modal ─────────────────────────────────────────────────────────────
 
 function UploadModal({
   open,
   onClose,
   onUploaded,
+  onStatementProcessed,
 }: {
   open: boolean;
   onClose: () => void;
   onUploaded: () => void;
+  onStatementProcessed?: (documentId: string) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [bankName, setBankName] = useState("");
+  const [pdfParseStrategy, setPdfParseStrategy] = useState("auto");
   const [pdfPassword, setPdfPassword] = useState("");
   const [dragging, setDragging] = useState(false);
   const [upload, setUpload] = useState<UploadStatus>({
@@ -107,14 +271,15 @@ function UploadModal({
     upload.state !== "completed" &&
     upload.state !== "failed";
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setFile(null);
     setBankName("");
+    setPdfParseStrategy("auto");
     setPdfPassword("");
     setUpload({ state: "idle", documentId: null, auditId: null, errorMsg: null });
     if (pollRef.current) clearInterval(pollRef.current);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  };
+  }, []);
 
   const handleClose = () => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -152,6 +317,7 @@ function UploadModal({
     const formData = new FormData();
     formData.append("file", file);
     formData.append("bank_name", bankName.trim());
+    if (isPdf) formData.append("pdf_parse_strategy", pdfParseStrategy);
     if (isPdf && pdfPassword) formData.append("pdf_password", pdfPassword);
 
     try {
@@ -181,6 +347,12 @@ function UploadModal({
   };
 
   useEffect(() => {
+    if (!open) {
+      reset();
+    }
+  }, [open, reset]);
+
+  useEffect(() => {
     if (!upload.documentId || upload.state === "completed" || upload.state === "failed") return;
 
     pollRef.current = setInterval(async () => {
@@ -192,17 +364,28 @@ function UploadModal({
         const s = rawStatus as UploadState;
 
         if (s === "completed") {
+          const docId = upload.documentId;
           setUpload((prev) => ({ ...prev, state: "completed" }));
           clearInterval(pollRef.current!);
-          onUploaded();
-          try {
-            const auditRes = await api.get<{ id: string }[]>(
-              `/audit?document_id=${upload.documentId}`
-            );
-            if (auditRes.data.length > 0) {
-              setUpload((prev) => ({ ...prev, auditId: auditRes.data[0].id }));
+          if (docId) {
+            if (SHOW_AUDIT_ON_UPLOAD) {
+              onUploaded();
+              try {
+                const auditRes = await api.get<{ id: string }[]>(
+                  `/audit?document_id=${docId}`
+                );
+                if (auditRes.data.length > 0) {
+                  setUpload((prev) => ({ ...prev, auditId: auditRes.data[0].id }));
+                }
+              } catch { /* audit not ready yet */ }
+            } else if (onStatementProcessed) {
+              onStatementProcessed(docId);
+            } else {
+              onUploaded();
             }
-          } catch { /* audit not ready yet */ }
+          } else {
+            onUploaded();
+          }
         } else if (s === "failed") {
           setUpload((prev) => ({
             ...prev,
@@ -227,11 +410,17 @@ function UploadModal({
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [upload.documentId, upload.state, onUploaded]);
+  }, [upload.documentId, upload.state, onUploaded, onStatementProcessed]);
 
   if (!open) return null;
 
-  const currentStepIdx = UPLOAD_STEPS.indexOf(upload.state);
+  const displaySteps = SHOW_AUDIT_ON_UPLOAD
+    ? UPLOAD_STEPS.map((step) => ({ key: step, label: STEP_LABELS[step] ?? step }))
+    : STEPS_AUDIT_OFF.map((s, i) => ({ key: `audit-off-${i}`, label: s.label }));
+
+  const currentStepIdx = SHOW_AUDIT_ON_UPLOAD
+    ? UPLOAD_STEPS.indexOf(upload.state)
+    : visibleStepIndexAuditOff(upload.state);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -280,7 +469,6 @@ function UploadModal({
           </div>
 
 
-          {/* PDF password */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Bank Name <span className="text-red-500">*</span>
@@ -294,6 +482,27 @@ function UploadModal({
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
             />
           </div>
+
+          {isPdf && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">PDF extraction</label>
+              <p className="text-xs text-gray-500 mb-1.5">
+                Banks use different PDF layouts. Use Auto first; switch mode if transaction counts look wrong.
+              </p>
+              <select
+                value={pdfParseStrategy}
+                onChange={(e) => setPdfParseStrategy(e.target.value)}
+                disabled={isProcessing}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+              >
+                {PDF_PARSE_STRATEGY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* PDF password */}
           {isPdf && (
@@ -315,12 +524,12 @@ function UploadModal({
           {/* Progress steps */}
           {upload.state !== "idle" && (
             <div className="flex items-center gap-0 w-full">
-              {UPLOAD_STEPS.map((step, idx) => {
+              {displaySteps.map((stepMeta, idx) => {
                 const done = currentStepIdx > idx;
                 const active = currentStepIdx === idx;
                 const isFailed = upload.state === "failed";
                 return (
-                  <div key={step} className="flex items-center flex-1 min-w-0">
+                  <div key={stepMeta.key} className="flex items-center flex-1 min-w-0">
                     <div className="flex flex-col items-center flex-shrink-0">
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors
                         ${done ? "bg-indigo-600 text-white" : ""}
@@ -337,10 +546,10 @@ function UploadModal({
                         )}
                       </div>
                       <span className={`mt-1 text-[10px] font-medium whitespace-nowrap ${done ? "text-indigo-600" : active ? "text-gray-800" : "text-gray-400"}`}>
-                        {STEP_LABELS[step]}
+                        {stepMeta.label}
                       </span>
                     </div>
-                    {idx < UPLOAD_STEPS.length - 1 && (
+                    {idx < displaySteps.length - 1 && (
                       <div className={`flex-1 h-0.5 mx-1 mb-4 rounded transition-colors ${done ? "bg-indigo-500" : "bg-gray-200"}`} />
                     )}
                   </div>
@@ -354,12 +563,12 @@ function UploadModal({
           )}
 
           {upload.state === "completed" && (
-            <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm flex items-center justify-between">
-              <span>✅ Audit complete!</span>
-              {upload.auditId ? (
-                <Link to={`/audit/${upload.auditId}`} className="font-semibold text-green-800 hover:underline" onClick={handleClose}>View Report →</Link>
+            <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm flex items-center justify-between gap-2">
+              <span>{SHOW_AUDIT_ON_UPLOAD ? "✅ Audit complete!" : "✅ Upload complete"}</span>
+              {SHOW_AUDIT_ON_UPLOAD && upload.auditId ? (
+                <Link to={`/audit/${upload.auditId}`} className="font-semibold text-green-800 hover:underline shrink-0" onClick={handleClose}>View Report →</Link>
               ) : (
-                <button onClick={handleClose} className="font-semibold text-green-800 hover:underline">Close</button>
+                <button type="button" onClick={handleClose} className="font-semibold text-green-800 hover:underline shrink-0">Close</button>
               )}
             </div>
           )}
@@ -379,7 +588,7 @@ function UploadModal({
                   </span>
                   Processing…
                 </span>
-              ) : "Upload & Analyze"}
+              ) : SHOW_AUDIT_ON_UPLOAD ? "Upload & Analyze" : "Upload"}
             </button>
             {(isProcessing || upload.state === "failed" || upload.state === "completed") && (
               <button onClick={reset} className="px-5 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">Reset</button>
@@ -504,17 +713,50 @@ export default function Upload() {
   const [allTransactions, setAllTransactions] = useState<TransactionRow[]>([]);
   const [txnLoading, setTxnLoading] = useState(false);
   const [txnSearch, setTxnSearch] = useState("");
-  const [txnBankFilter, setTxnBankFilter] = useState("");
+  const [txnFromDate, setTxnFromDate] = useState("");
+  const [txnToDate, setTxnToDate] = useState("");
+  const [txnMinAmount, setTxnMinAmount] = useState("");
+  const [txnMaxAmount, setTxnMaxAmount] = useState("");
+  const [txnAmountOperator, setTxnAmountOperator] = useState<"" | "<" | "<=" | "=" | ">=" | ">">("");
+  const [txnAmountValue, setTxnAmountValue] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftFromDate, setDraftFromDate] = useState("");
+  const [draftToDate, setDraftToDate] = useState("");
+  const [draftAmountMode, setDraftAmountMode] = useState<TxnAmountMode>("any");
+  const [draftAmountFrom, setDraftAmountFrom] = useState("");
+  const [draftAmountTo, setDraftAmountTo] = useState("");
+  const [draftAmountOperator, setDraftAmountOperator] = useState<"" | "<" | "<=" | "=" | ">=" | ">">("");
+  const [draftAmountValue, setDraftAmountValue] = useState("");
   const [txnPage, setTxnPage] = useState(1);
   const [txnTotal, setTxnTotal] = useState(0);
   const txnPageSize = 20;
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [categorySyncModal, setCategorySyncModal] = useState<{
+    open: boolean;
+    documentId: string | null;
+  }>({ open: false, documentId: null });
+  const [unmatchedSummary, setUnmatchedSummary] = useState<{
+    uncategorized_transaction_count: number;
+    distinct_uncategorized_descriptions: number;
+  } | null>(null);
   const [editDoc, setEditDoc] = useState<DocumentRow | null>(null);
   const [deleteDoc, setDeleteDoc] = useState<DocumentRow | null>(null);
-  const [editingTxn, setEditingTxn] = useState<TransactionRow | null>(null);
+  const [editingTxnField, setEditingTxnField] = useState<{ id: string; field: TxnEditableField } | null>(null);
   const [deletingTxnId, setDeletingTxnId] = useState<string | null>(null);
+
+  const fetchUnmatchedSummary = useCallback(async () => {
+    try {
+      const res = await api.get<{
+        uncategorized_transaction_count: number;
+        distinct_uncategorized_descriptions: number;
+      }>("/categories/unmatched-summary");
+      setUnmatchedSummary(res.data);
+    } catch {
+      setUnmatchedSummary(null);
+    }
+  }, []);
 
   // Fetch documents
   const fetchDocuments = useCallback(async () => {
@@ -539,7 +781,14 @@ export default function Upload() {
         page_size: String(txnPageSize),
       });
       if (txnSearch) params.set("search", txnSearch);
-      if (txnBankFilter) params.set("bank_name", txnBankFilter);
+      if (txnFromDate) params.set("from_date", txnFromDate);
+      if (txnToDate) params.set("to_date", txnToDate);
+      if (txnMinAmount) params.set("min_amount", txnMinAmount);
+      if (txnMaxAmount) params.set("max_amount", txnMaxAmount);
+      if (txnAmountOperator && txnAmountValue) {
+        params.set("amount_operator", txnAmountOperator);
+        params.set("amount_value", txnAmountValue);
+      }
 
       const res = await api.get<{ items: TransactionRow[]; total: number }>(
         `/documents/transactions/all?${params}`
@@ -552,20 +801,37 @@ export default function Upload() {
     } finally {
       setTxnLoading(false);
     }
-  }, [txnPage, txnSearch, txnBankFilter]);
+  }, [txnPage, txnSearch, txnFromDate, txnToDate, txnMinAmount, txnMaxAmount, txnAmountOperator, txnAmountValue]);
 
   useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+  useEffect(() => {
+    void fetchUnmatchedSummary();
+  }, [fetchUnmatchedSummary]);
 
   const handleUploaded = useCallback(() => {
-    fetchDocuments();
-    fetchTransactions();
+    void fetchDocuments();
+    void fetchTransactions();
+    void fetchUnmatchedSummary();
+  }, [fetchDocuments, fetchTransactions, fetchUnmatchedSummary]);
+
+  const handleStatementProcessed = useCallback((documentId: string) => {
+    void fetchDocuments();
+    void fetchTransactions();
+    setUploadModalOpen(false);
+    setCategorySyncModal({ open: true, documentId });
   }, [fetchDocuments, fetchTransactions]);
+
+  const pageHasUncategorized = useMemo(
+    () => allTransactions.some((t) => isUncategorizedCategory(t.category)),
+    [allTransactions]
+  );
 
   const handleRefreshAll = useCallback(() => {
     fetchDocuments();
     fetchTransactions();
-  }, [fetchDocuments, fetchTransactions]);
+    void fetchUnmatchedSummary();
+  }, [fetchDocuments, fetchTransactions, fetchUnmatchedSummary]);
 
   // Delete transaction
   const handleDeleteTxn = useCallback(async (txnId: string) => {
@@ -581,16 +847,33 @@ export default function Upload() {
     }
   }, [fetchTransactions, fetchDocuments]);
 
-  // Edit transaction
-  const handleEditTxn = useCallback(async (txn: TransactionRow, newDesc: string) => {
-    try {
-      await api.patch(`/transactions/${txn.id}`, { description: newDesc });
-      setAllTransactions((prev) => prev.map((t) => (t.id === txn.id ? { ...t, description: newDesc } : t)));
-      setEditingTxn(null);
-    } catch (err: unknown) {
-      alert((err as ApiErr)?.response?.data?.detail ?? "Failed to update transaction.");
-    }
-  }, []);
+  // Edit transaction (description and/or amounts)
+  const handlePatchTxn = useCallback(
+    async (
+      txn: TransactionRow,
+      patch: { description?: string; debit?: number; credit?: number }
+    ) => {
+      try {
+        await api.patch(`/transactions/${txn.id}`, patch);
+        setAllTransactions((prev) =>
+          prev.map((t) =>
+            t.id === txn.id
+              ? {
+                  ...t,
+                  ...(patch.description !== undefined ? { description: patch.description } : {}),
+                  ...(patch.debit !== undefined ? { debit: patch.debit } : {}),
+                  ...(patch.credit !== undefined ? { credit: patch.credit } : {}),
+                }
+              : t
+          )
+        );
+        setEditingTxnField(null);
+      } catch (err: unknown) {
+        alert((err as ApiErr)?.response?.data?.detail ?? "Failed to update transaction.");
+      }
+    },
+    []
+  );
 
   // Filtered documents
   const filteredDocs = documents.filter((doc) => {
@@ -601,6 +884,146 @@ export default function Upload() {
   });
 
   const txnTotalPages = Math.ceil(txnTotal / txnPageSize);
+  const openFilters = useCallback(() => {
+    setDraftFromDate(txnFromDate);
+    setDraftToDate(txnToDate);
+    if (!txnMinAmount && !txnMaxAmount) {
+      setDraftAmountMode("any");
+      setDraftAmountFrom("");
+      setDraftAmountTo("");
+    } else if (txnMinAmount && txnMaxAmount && txnMinAmount === txnMaxAmount) {
+      setDraftAmountMode("exact");
+      setDraftAmountFrom(txnMinAmount);
+      setDraftAmountTo("");
+    } else if (txnMinAmount && txnMaxAmount) {
+      setDraftAmountMode("between");
+      setDraftAmountFrom(txnMinAmount);
+      setDraftAmountTo(txnMaxAmount);
+    } else if (txnMinAmount) {
+      setDraftAmountMode("at_least");
+      setDraftAmountFrom(txnMinAmount);
+      setDraftAmountTo("");
+    } else {
+      setDraftAmountMode("at_most");
+      setDraftAmountFrom(txnMaxAmount);
+      setDraftAmountTo("");
+    }
+    setDraftAmountOperator(txnAmountOperator);
+    setDraftAmountValue(txnAmountValue);
+    setFilterOpen(true);
+  }, [txnFromDate, txnToDate, txnMinAmount, txnMaxAmount, txnAmountOperator, txnAmountValue]);
+  const applyFilters = useCallback(() => {
+    setTxnFromDate(draftFromDate);
+    setTxnToDate(draftToDate);
+    const from = draftAmountFrom.trim();
+    const to = draftAmountTo.trim();
+    switch (draftAmountMode) {
+      case "any":
+        setTxnMinAmount("");
+        setTxnMaxAmount("");
+        break;
+      case "between":
+        setTxnMinAmount(from);
+        setTxnMaxAmount(to);
+        break;
+      case "at_least":
+        setTxnMinAmount(from);
+        setTxnMaxAmount("");
+        break;
+      case "at_most":
+        setTxnMinAmount("");
+        setTxnMaxAmount(from);
+        break;
+      case "exact":
+        setTxnMinAmount(from);
+        setTxnMaxAmount(from);
+        break;
+      default:
+        setTxnMinAmount("");
+        setTxnMaxAmount("");
+    }
+    if (draftAmountOperator && draftAmountValue.trim()) {
+      setTxnAmountOperator(draftAmountOperator);
+      setTxnAmountValue(draftAmountValue.trim());
+    } else {
+      setTxnAmountOperator("");
+      setTxnAmountValue("");
+    }
+    setTxnPage(1);
+    setFilterOpen(false);
+  }, [
+    draftFromDate,
+    draftToDate,
+    draftAmountMode,
+    draftAmountFrom,
+    draftAmountTo,
+    draftAmountOperator,
+    draftAmountValue,
+  ]);
+  const clearAllFilters = useCallback(() => {
+    setTxnFromDate("");
+    setTxnToDate("");
+    setTxnMinAmount("");
+    setTxnMaxAmount("");
+    setTxnAmountOperator("");
+    setTxnAmountValue("");
+    setDraftFromDate("");
+    setDraftToDate("");
+    setDraftAmountMode("any");
+    setDraftAmountFrom("");
+    setDraftAmountTo("");
+    setDraftAmountOperator("");
+    setDraftAmountValue("");
+    setTxnPage(1);
+    setFilterOpen(false);
+  }, []);
+  const removeFilter = useCallback(
+    (filterKey: "from_date" | "to_date" | "min_amount" | "max_amount" | "amount_exact" | "amount_condition") => {
+    if (filterKey === "from_date") {
+      setTxnFromDate("");
+      setDraftFromDate("");
+    }
+    if (filterKey === "to_date") {
+      setTxnToDate("");
+      setDraftToDate("");
+    }
+    if (filterKey === "min_amount") {
+      setTxnMinAmount("");
+    }
+    if (filterKey === "max_amount") {
+      setTxnMaxAmount("");
+    }
+    if (filterKey === "amount_exact") {
+      setTxnMinAmount("");
+      setTxnMaxAmount("");
+    }
+    if (filterKey === "amount_condition") {
+      setTxnAmountOperator("");
+      setTxnAmountValue("");
+      setDraftAmountOperator("");
+      setDraftAmountValue("");
+    }
+    setTxnPage(1);
+  }, []);
+
+  const activeFilterChips: Array<{
+    key: "from_date" | "to_date" | "min_amount" | "max_amount" | "amount_exact" | "amount_condition";
+    label: string;
+  }> = [];
+  if (txnFromDate) activeFilterChips.push({ key: "from_date", label: `From: ${txnFromDate}` });
+  if (txnToDate) activeFilterChips.push({ key: "to_date", label: `To: ${txnToDate}` });
+  if (txnMinAmount && txnMaxAmount && txnMinAmount === txnMaxAmount) {
+    activeFilterChips.push({ key: "amount_exact", label: `Amount = ${txnMinAmount}` });
+  } else {
+    if (txnMinAmount) activeFilterChips.push({ key: "min_amount", label: `Debit/Credit ≥ ${txnMinAmount}` });
+    if (txnMaxAmount) activeFilterChips.push({ key: "max_amount", label: `Debit/Credit ≤ ${txnMaxAmount}` });
+  }
+  if (txnAmountOperator && txnAmountValue) {
+    activeFilterChips.push({
+      key: "amount_condition",
+      label: `Also: debit/credit ${txnAmountOperator} ${txnAmountValue}`,
+    });
+  }
 
   return (
     <>
@@ -620,6 +1043,24 @@ export default function Upload() {
             </button>
           </div>
           <p className="text-sm text-gray-500 mt-1">Manage your uploaded bank statements and transactions</p>
+          {unmatchedSummary !== null && unmatchedSummary.uncategorized_transaction_count > 0 && (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span>
+                {unmatchedSummary.uncategorized_transaction_count} transaction
+                {unmatchedSummary.uncategorized_transaction_count === 1 ? "" : "s"} still need categories
+                {unmatchedSummary.distinct_uncategorized_descriptions > 0
+                  ? ` (${unmatchedSummary.distinct_uncategorized_descriptions} distinct descriptions).`
+                  : "."}{" "}
+                Run <strong className="font-semibold">AI Sync</strong> on the Categories page to create rules and apply them.
+              </span>
+              <Link
+                to="/categories?from=upload"
+                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-amber-700 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800"
+              >
+                Go to Categories
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════
@@ -713,16 +1154,190 @@ export default function Upload() {
             TRANSACTIONS SECTION
         ═══════════════════════════════════════════════════════════════════════ */}
         <section>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-3">
             <h2 className="text-lg font-semibold text-gray-800 flex-1">All Transactions</h2>
+            {pageHasUncategorized && (
+              <button
+                type="button"
+                onClick={() => setCategorySyncModal({ open: true, documentId: null })}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shrink-0 whitespace-nowrap"
+              >
+                Sync categories
+              </button>
+            )}
             <div className="relative flex-1 max-w-sm">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <input type="text" value={txnSearch} onChange={(e) => { setTxnSearch(e.target.value); setTxnPage(1); }} placeholder="Search transactions…" className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <input
+                type="text"
+                value={txnSearch}
+                onChange={(e) => { setTxnSearch(e.target.value); setTxnPage(1); }}
+                placeholder="Search transaction or bank…"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
             </div>
-            <input type="text" value={txnBankFilter} onChange={(e) => { setTxnBankFilter(e.target.value); setTxnPage(1); }} placeholder="Filter by bank…" className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 w-40" />
+            <button
+              type="button"
+              onClick={() => { if (filterOpen) setFilterOpen(false); else openFilters(); }}
+              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 shrink-0"
+            >
+              Filters
+              <svg className={`w-4 h-4 transition-transform ${filterOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
           </div>
+          {filterOpen && (
+            <div className="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm p-4 space-y-4 max-w-3xl">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">Date</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={draftFromDate}
+                    onChange={(e) => setDraftFromDate(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    aria-label="Transaction from date"
+                  />
+                  <input
+                    type="date"
+                    value={draftToDate}
+                    onChange={(e) => setDraftToDate(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    aria-label="Transaction to date"
+                  />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">Amount (debit or credit)</p>
+                <select
+                  value={draftAmountMode}
+                  onChange={(e) => setDraftAmountMode(e.target.value as TxnAmountMode)}
+                  className="w-full sm:w-72 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer mb-2"
+                  aria-label="Transaction amount filter mode"
+                >
+                  <option value="any">Any amount</option>
+                  <option value="between">Between…</option>
+                  <option value="at_least">At least…</option>
+                  <option value="at_most">At most…</option>
+                  <option value="exact">Exactly…</option>
+                </select>
+                {draftAmountMode === "between" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draftAmountFrom}
+                      onChange={(e) => setDraftAmountFrom(e.target.value)}
+                      placeholder="From"
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      aria-label="Transaction amount from"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draftAmountTo}
+                      onChange={(e) => setDraftAmountTo(e.target.value)}
+                      placeholder="To"
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      aria-label="Transaction amount to"
+                    />
+                  </div>
+                )}
+                {(draftAmountMode === "at_least" || draftAmountMode === "at_most" || draftAmountMode === "exact") && (
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={draftAmountFrom}
+                    onChange={(e) => setDraftAmountFrom(e.target.value)}
+                    placeholder="Amount"
+                    className="w-full sm:max-w-xs px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    aria-label="Transaction amount value"
+                  />
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Uses the non-zero value in the Debit or Credit column for each row. Amount band (mode above) and optional extra rule below are combined with <strong>AND</strong>.
+                </p>
+                <div className="pt-3 mt-3 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Optional extra amount rule (AND with band)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select
+                      value={draftAmountOperator}
+                      onChange={(e) =>
+                        setDraftAmountOperator(e.target.value as "" | "<" | "<=" | "=" | ">=" | ">")
+                      }
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+                      aria-label="Transaction amount operator"
+                    >
+                      <option value="">No extra rule</option>
+                      <option value="<">{"<"}</option>
+                      <option value="<=">{"<="}</option>
+                      <option value="=">{"="}</option>
+                      <option value=">=">{">="}</option>
+                      <option value=">">{">"}</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draftAmountValue}
+                      onChange={(e) => setDraftAmountValue(e.target.value)}
+                      placeholder="Compare value"
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      aria-label="Transaction amount compare value"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Leave operator empty unless you also enter a value. Both are sent together.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={applyFilters}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
+          {activeFilterChips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              {activeFilterChips.map((chip, chipIdx) => (
+                <span key={`${chip.key}-${chipIdx}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-700">
+                  {chip.label}
+                  <button
+                    type="button"
+                    onClick={() => removeFilter(chip.key)}
+                    className="text-gray-500 hover:text-gray-700"
+                    aria-label={`Remove ${chip.label} filter`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <button
+                onClick={clearAllFilters}
+                className="px-2.5 py-1 rounded-full border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:bg-gray-50"
+                type="button"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
 
           {txnLoading ? (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden animate-pulse">
@@ -753,46 +1368,177 @@ export default function Upload() {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Bank Name</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-red-400 uppercase tracking-wider">Debit</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-green-500 uppercase tracking-wider">Credit</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {allTransactions.map((txn) => (
+                    {allTransactions.map((txn) => {
+                      const isEditDesc = editingTxnField?.id === txn.id && editingTxnField.field === "description";
+                      const isEditDebit = editingTxnField?.id === txn.id && editingTxnField.field === "debit";
+                      const isEditCredit = editingTxnField?.id === txn.id && editingTxnField.field === "credit";
+                      return (
                       <tr key={txn.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{new Date(txn.transaction_date).toLocaleDateString()}</td>
                         <td className="px-4 py-2.5 text-gray-800 max-w-xs">
-                          {editingTxn?.id === txn.id ? (
-                            <input
-                              type="text"
-                              defaultValue={txn.description}
-                              autoFocus
-                              className="w-full rounded border border-indigo-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                              onBlur={(e) => { if (e.target.value !== txn.description) handleEditTxn(txn, e.target.value); else setEditingTxn(null); }}
-                              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditingTxn(null); }}
-                            />
-                          ) : (
-                            <span className="cursor-pointer hover:text-indigo-600 block truncate" onClick={() => setEditingTxn(txn)} title="Click to edit">{txn.description}</span>
-                          )}
+                          <div className="flex items-start gap-1.5 min-w-0">
+                            <div className="min-w-0 flex-1">
+                              {isEditDesc ? (
+                                <input
+                                  type="text"
+                                  defaultValue={txn.description}
+                                  autoFocus
+                                  className="w-full rounded border border-indigo-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                  onBlur={(e) => {
+                                    if (e.target.value !== txn.description) void handlePatchTxn(txn, { description: e.target.value });
+                                    else setEditingTxnField(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                    if (e.key === "Escape") setEditingTxnField(null);
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  className="cursor-pointer hover:text-indigo-600 block truncate"
+                                  onClick={() => setEditingTxnField({ id: txn.id, field: "description" })}
+                                  title="Click to edit"
+                                >
+                                  {txn.description}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void copyToClipboard(txn.description)}
+                              className="shrink-0 p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+                              title="Copy description"
+                              aria-label="Copy description"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                         <td className="px-4 py-2.5 text-gray-600 text-xs">{txn.bank_name}</td>
-                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          {txn.debit > 0 ? (
-                            <span className="font-semibold text-red-600">
-                              ₹{txn.debit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                            </span>
-                          ) : <span className="text-gray-300">—</span>}
+                        <td className="px-4 py-2.5 text-right whitespace-nowrap align-top">
+                          <div className="inline-flex flex-col items-end gap-1">
+                            <div className="flex items-center justify-end gap-1">
+                              {isEditDebit ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  defaultValue={txn.debit}
+                                  autoFocus
+                                  className="w-28 rounded border border-indigo-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                  onBlur={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    if (Number.isNaN(v) || v < 0) {
+                                      setEditingTxnField(null);
+                                      return;
+                                    }
+                                    const rounded = Math.round(v * 100) / 100;
+                                    if (rounded !== txn.debit) void handlePatchTxn(txn, { debit: rounded });
+                                    else setEditingTxnField(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                    if (e.key === "Escape") setEditingTxnField(null);
+                                  }}
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTxnField({ id: txn.id, field: "debit" })}
+                                  className="text-left font-semibold text-red-600 hover:underline"
+                                  title="Click to edit debit"
+                                >
+                                  {txn.debit > 0
+                                    ? `₹${txn.debit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                                    : <span className="text-gray-300 font-normal">—</span>}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => void copyToClipboard(String(txn.debit))}
+                                className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                                title="Copy debit amount"
+                                aria-label="Copy debit amount"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          {txn.credit > 0 ? (
-                            <span className="font-semibold text-green-600">
-                              ₹{txn.credit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        <td className="px-4 py-2.5 text-right whitespace-nowrap align-top">
+                          <div className="inline-flex flex-col items-end gap-1">
+                            <div className="flex items-center justify-end gap-1">
+                              {isEditCredit ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  defaultValue={txn.credit}
+                                  autoFocus
+                                  className="w-28 rounded border border-indigo-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                  onBlur={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    if (Number.isNaN(v) || v < 0) {
+                                      setEditingTxnField(null);
+                                      return;
+                                    }
+                                    const rounded = Math.round(v * 100) / 100;
+                                    if (rounded !== txn.credit) void handlePatchTxn(txn, { credit: rounded });
+                                    else setEditingTxnField(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                    if (e.key === "Escape") setEditingTxnField(null);
+                                  }}
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTxnField({ id: txn.id, field: "credit" })}
+                                  className="text-left font-semibold text-green-600 hover:underline"
+                                  title="Click to edit credit"
+                                >
+                                  {txn.credit > 0
+                                    ? `₹${txn.credit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                                    : <span className="text-gray-300 font-normal">—</span>}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => void copyToClipboard(String(txn.credit))}
+                                className="p-1 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 shrink-0"
+                                title="Copy credit amount"
+                                aria-label="Copy credit amount"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-left max-w-[10rem]">
+                          {isUncategorizedCategory(txn.category) ? (
+                            <span className="text-gray-400 font-medium">None</span>
+                          ) : (
+                            <span className="text-gray-800 truncate block" title={txn.category ?? undefined}>
+                              {txn.category}
                             </span>
-                          ) : <span className="text-gray-300">—</span>}
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={() => setEditingTxn(txn)}
+                              onClick={() => setEditingTxnField({ id: txn.id, field: "description" })}
                               className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                               title="Edit description"
                             >
@@ -806,7 +1552,8 @@ export default function Upload() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -827,7 +1574,18 @@ export default function Upload() {
       </main>
 
       {/* Modals */}
-      <UploadModal open={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onUploaded={handleUploaded} />
+      <UploadModal
+        open={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onUploaded={handleUploaded}
+        onStatementProcessed={SHOW_AUDIT_ON_UPLOAD ? undefined : handleStatementProcessed}
+      />
+      <CategorySyncModal
+        open={categorySyncModal.open}
+        documentId={categorySyncModal.open ? categorySyncModal.documentId : null}
+        onClose={() => setCategorySyncModal({ open: false, documentId: null })}
+        onApplied={handleUploaded}
+      />
       <EditDocumentModal doc={editDoc} open={!!editDoc} onClose={() => setEditDoc(null)} onSaved={fetchDocuments} />
       <ConfirmDeleteModal doc={deleteDoc} open={!!deleteDoc} onClose={() => setDeleteDoc(null)} onConfirm={fetchDocuments} />
     </>

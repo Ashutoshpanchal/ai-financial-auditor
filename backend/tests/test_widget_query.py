@@ -7,7 +7,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.services.widget_query import resolve_widget_data
+from backend.services.widget_query import (
+    describe_widget_query_human,
+    resolve_widget_data,
+    validate_widget_query_config,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -512,3 +516,99 @@ class TestGlobalFilterOverride:
             db=db,
         )
         assert result["value"] == 200.0
+
+
+# ---------------------------------------------------------------------------
+# validate_widget_query_config / describe_widget_query_human
+# ---------------------------------------------------------------------------
+
+
+class TestValidateWidgetQueryConfig:
+    """validate_widget_query_config enforces metric vs chart rules."""
+
+    def test_metric_valid(self) -> None:
+        """Metric with sum/credit and no group_by must pass."""
+        validate_widget_query_config(
+            "metric",
+            {"aggregation": "sum", "field": "credit"},
+        )
+
+    def test_metric_rejects_group_by(self) -> None:
+        """Metric with group_by must raise."""
+        with pytest.raises(ValueError, match="must not include"):
+            validate_widget_query_config(
+                "metric",
+                {"aggregation": "sum", "field": "credit", "group_by": "month"},
+            )
+
+    def test_chart_requires_group_by(self) -> None:
+        """Bar chart without group_by must raise."""
+        with pytest.raises(ValueError, match="requires"):
+            validate_widget_query_config(
+                "bar_chart",
+                {"aggregation": "sum", "field": "debit"},
+            )
+
+    def test_chart_valid(self) -> None:
+        """Pie chart with group_by must pass."""
+        validate_widget_query_config(
+            "pie_chart",
+            {"aggregation": "sum", "field": "debit", "group_by": "category"},
+        )
+
+    def test_invalid_transaction_type(self) -> None:
+        """Invalid transaction_type in filters must raise."""
+        with pytest.raises(ValueError, match="transaction_type"):
+            validate_widget_query_config(
+                "metric",
+                {
+                    "aggregation": "sum",
+                    "field": "credit",
+                    "filters": {"transaction_type": "bogus"},
+                },
+            )
+
+    def test_raw_metric_sql_valid(self) -> None:
+        """Metric with raw_metric_sql skips aggregation validation."""
+        validate_widget_query_config(
+            "metric",
+            {
+                "raw_metric_sql": "SELECT COALESCE(SUM(debit), 0) FROM transactions WHERE debit > 0",
+                "format": "currency",
+            },
+        )
+
+    def test_raw_metric_sql_with_group_by_rejected(self) -> None:
+        """raw_metric_sql combined with group_by must raise."""
+        with pytest.raises(ValueError, match="group_by"):
+            validate_widget_query_config(
+                "metric",
+                {
+                    "raw_metric_sql": "SELECT 1 FROM transactions",
+                    "group_by": "month",
+                },
+            )
+
+    def test_raw_metric_sql_only_on_metric(self) -> None:
+        """raw_metric_sql on chart type must raise."""
+        with pytest.raises(ValueError, match="raw_metric_sql"):
+            validate_widget_query_config(
+                "bar_chart",
+                {
+                    "raw_metric_sql": "SELECT 1 FROM transactions",
+                    "group_by": "month",
+                },
+            )
+
+
+class TestDescribeWidgetQueryHuman:
+    """describe_widget_query_human returns abstract-table pseudo-SQL."""
+
+    def test_includes_your_transactions(self) -> None:
+        """Output must mention your_transactions and WHERE."""
+        text = describe_widget_query_human(
+            {"aggregation": "sum", "field": "debit"},
+        )
+        assert "your_transactions" in text
+        assert "sum(debit)" in text
+        assert "WHERE" in text

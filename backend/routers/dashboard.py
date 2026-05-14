@@ -15,7 +15,11 @@ from backend.database import get_db, set_rls_user
 from backend.middleware.auth import get_current_user
 from backend.models.dashboard import UserDashboard
 from backend.models.widget import UserWidget
-from backend.services.widget_query import resolve_widget_data
+from backend.services.widget_query import (
+    describe_widget_query_human,
+    resolve_widget_data,
+    validate_widget_query_config,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -55,6 +59,17 @@ class LayoutUpdate(BaseModel):
     """Request body for replacing the user's dashboard layout."""
 
     layout: dict[str, Any]
+
+
+class WidgetPreviewRequest(BaseModel):
+    """Request body for previewing widget data without persisting."""
+
+    widget_type: str
+    query_config: dict[str, Any]
+    date_from: date | None = None
+    date_to: date | None = None
+    bank_name: str | None = None
+    category: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +115,91 @@ def list_widgets(
 
 
 # ---------------------------------------------------------------------------
+# POST /dashboard/widgets/preview
+# ---------------------------------------------------------------------------
+
+
+@router.post("/widgets/preview")
+def preview_widget(
+    body: WidgetPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Run resolve_widget_data for a provisional config without saving.
+
+    Returns data, a human-readable pseudo-query (abstract table name), and never
+    trusts client-supplied user identifiers for tenancy.
+    """
+    set_rls_user(db, current_user.id)
+
+    if body.widget_type not in _ALLOWED_WIDGET_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Invalid widget_type '{body.widget_type}'. "
+                f"Allowed values: {sorted(_ALLOWED_WIDGET_TYPES)}"
+            ),
+        )
+
+    try:
+        validate_widget_query_config(body.widget_type, body.query_config)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    try:
+        data = resolve_widget_data(
+            config=body.query_config,
+            user_id=current_user.id,
+            db=db,
+            date_from=body.date_from,
+            date_to=body.date_to,
+            bank_name=body.bank_name,
+            category=body.category,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    human = describe_widget_query_human(body.query_config)
+    return {"data": data, "human_query": human}
+
+
+# ---------------------------------------------------------------------------
+# GET /dashboard/widgets/{widget_id}
+# ---------------------------------------------------------------------------
+
+
+@router.get("/widgets/{widget_id}")
+def get_widget(
+    widget_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return a single widget by id for the current user.
+
+    Raises 404 if the widget does not exist.
+    """
+    set_rls_user(db, current_user.id)
+
+    widget = db.execute(
+        select(UserWidget).where(UserWidget.id == widget_id)
+    ).scalar_one_or_none()
+
+    if widget is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Widget '{widget_id}' not found.",
+        )
+
+    return _widget_to_dict(widget)
+
+
+# ---------------------------------------------------------------------------
 # POST /dashboard/widgets
 # ---------------------------------------------------------------------------
 
@@ -125,6 +225,14 @@ def create_widget(
                 f"Allowed values: {sorted(_ALLOWED_WIDGET_TYPES)}"
             ),
         )
+
+    try:
+        validate_widget_query_config(body.widget_type, body.query_config)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
     widget = UserWidget(
         id=str(uuid4()),
@@ -174,6 +282,13 @@ def update_widget(
     if body.title is not None:
         widget.title = body.title
     if body.query_config is not None:
+        try:
+            validate_widget_query_config(widget.widget_type, body.query_config)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
         widget.query_config = body.query_config
 
     db.commit()

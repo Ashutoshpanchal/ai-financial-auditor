@@ -64,10 +64,24 @@
       "Bash(git -C /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor add backend/routers/chat.py backend/agents/chat.py)",
       "Bash(git commit *)",
       "Bash(npm install *)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(graphify query *)",
+      "Bash(graphify explain *)",
+      "Bash(graphify path *)",
+      "Bash(cat /dev/null > /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/components/dashboard/ChatPanel.tsx)",
+      "Read(//dev/**)",
+      "Bash(python -m pytest backend/tests/test_widget_query.py backend/tests/test_dashboard_service.py backend/tests/test_dashboard_router.py -v)",
+      "Bash(python -m pytest backend/tests/test_widget_query.py backend/tests/test_dashboard_service.py backend/tests/test_dashboard_router.py -q)",
+      "Bash(npm uninstall *)",
+      "Bash(grep -rn \"currency\\\\|dollar\\\\|\\\\$\\\\|USD\\\\|INR\\\\|₹\\\\|toLocaleString\\\\|Intl\\\\|format\" /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/components/dashboard/ --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(grep -n \"\\\\$\\\\|USD\\\\|toLocaleString\\\\|currency\" /Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/components/dashboard/BarChartWidget.tsx)",
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\(JSON.stringify\\({vitest: pkg.devDependencies?.vitest, jsdom: pkg.devDependencies?.jsdom, 'happy-dom': pkg.devDependencies?.['happy-dom']}, null, 2\\)\\)\")",
+      "Read(//Users/ashutoshpanchal/Desktop/AI-Finanical-Advisor/backend/models/**)",
+      "Read(//Users/ashutoshpanchal/Desktop/AI-Finanical-Advisor/backend/services/**)"
     ],
     "additionalDirectories": [
-      "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/.claude"
+      "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/.claude",
+      "/Users/ashutashpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/pages"
     ]
   },
   "hooks": {

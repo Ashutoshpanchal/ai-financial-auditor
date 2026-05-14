@@ -10,6 +10,7 @@ from openai import OpenAI
 
 from backend.config import get_settings
 from backend.models.transaction import Transaction
+from backend.services.short_description import compute_short_description
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -111,6 +112,9 @@ def _upsert_transaction(
         existing.embedding = embedding
         existing.category = tx_data.get("category")
         existing.bank_name = tx_data["bank_name"]
+        existing.short_description = compute_short_description(
+            str(tx_data["description"])
+        )
     else:
         db.add(
             Transaction(
@@ -120,6 +124,9 @@ def _upsert_transaction(
                 bank_name=tx_data["bank_name"],
                 transaction_date=tx_data["date"],
                 description=tx_data["description"],
+                short_description=compute_short_description(
+                    str(tx_data["description"])
+                ),
                 debit=float(tx_data.get("debit", 0.0)),
                 credit=float(tx_data.get("credit", 0.0)),
                 category=tx_data.get("category"),

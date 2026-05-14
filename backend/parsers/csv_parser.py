@@ -72,7 +72,23 @@ def _read_csv_bytes(file_bytes: bytes) -> pd.DataFrame:
     """
     for encoding in ("utf-8", "latin-1"):
         try:
-            return pd.read_csv(io.BytesIO(file_bytes), encoding=encoding, dtype=str)
+            sample = (
+                file_bytes[:4000].decode(encoding, errors="replace")
+                if len(file_bytes) > 0
+                else ""
+            )
+            first_line = sample.split("\n", 1)[0] if sample else ""
+            tab_ct = first_line.count("\t")
+            comma_ct = first_line.count(",")
+
+            df0 = pd.read_csv(io.BytesIO(file_bytes), encoding=encoding, dtype=str)
+            # Bank exports are often tab-separated but saved as .csv — default comma
+            # yields a single wide column; retry with sep='\t' when that pattern fits.
+            if df0.shape[1] == 1 and tab_ct >= 2 and tab_ct > comma_ct:
+                df0 = pd.read_csv(
+                    io.BytesIO(file_bytes), encoding=encoding, dtype=str, sep="\t"
+                )
+            return df0
         except UnicodeDecodeError:
             continue
         except Exception as exc:

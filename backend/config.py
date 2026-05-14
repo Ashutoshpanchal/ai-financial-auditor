@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     secret_key: str
     super_admin_email: str
     environment: str = "development"
+    # Logging: DEBUG shows full LLM payloads in categories router; INFO previews only.
+    log_level: str = "INFO"
 
     # Google OAuth2
     google_client_id: str
@@ -49,6 +51,13 @@ class Settings(BaseSettings):
     # Local file storage fallback (used when Google Drive creds are absent)
     local_storage_path: str = "storage"
 
+    # Browser origins allowed for credentialed CORS (comma-separated). Include 127.0.0.1 if you open the UI that way.
+    cors_allow_origins: str = "http://localhost:3002,http://127.0.0.1:3002"
+
+    # Dev only: if true and ENVIRONMENT is not production, POST /categories/analyze may run without JWT
+    # (uses SUPER_ADMIN_EMAIL user, or first user). Never enable in production.
+    allow_analyze_without_auth: bool = False
+
     # Dev-only bypass login (ignored in production)
     dev_login_password: str | None = None
 
@@ -70,6 +79,11 @@ class Settings(BaseSettings):
             and bool(self.langfuse_public_key)
             and bool(self.langfuse_secret_key)
         )
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Origins for CORSMiddleware (trimmed, non-empty)."""
+        return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
 
 
 @lru_cache

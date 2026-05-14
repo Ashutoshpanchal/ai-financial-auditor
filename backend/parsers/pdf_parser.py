@@ -9,10 +9,34 @@ from datetime import datetime
 
 import pdfplumber
 
+from backend.parsers.pdf_strategies import normalize_pdf_parse_strategy
+
 logger = logging.getLogger(__name__)
 
+# Set PDF_PARSE_DEBUG=1 to print parse diagnostics to stdout (uvicorn terminal).
+_DEBUG_PDF = __import__("os").environ.get("PDF_PARSE_DEBUG", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+
+def _pdf_dbg(msg: str) -> None:
+    """Print one line of PDF parse diagnostics when PDF_PARSE_DEBUG is enabled."""
+    if _DEBUG_PDF:
+        print(f"[PDF_PARSE_DEBUG] {msg}", flush=True)
+
+
 # Date formats tried in order during table-row parsing.
-_DATE_FORMATS = ["%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"]
+# Include DD-Mon-YY (e.g. 01-Apr-24) used by Kotak and many Indian bank PDFs.
+_DATE_FORMATS = [
+    "%d-%b-%y",
+    "%d-%b-%Y",
+    "%d/%m/%Y",
+    "%Y-%m-%d",
+    "%m/%d/%Y",
+    "%d-%m-%Y",
+]
 
 # Regex for fallback text extraction.
 _TRANSACTION_RE = re.compile(
@@ -288,8 +312,36 @@ def _extract_bank_name(pdf: pdfplumber.PDF) -> str | None:
     return None
 
 
-_DEBIT_HEADER_KEYWORDS = ["debit", "withdrawal", "withdraw", "dr"]
-_CREDIT_HEADER_KEYWORDS = ["credit", "deposit", "cr"]
+_DEBIT_HEADER_KEYWORDS = ["debit", "withdrawal", "withdraw"]
+_DEBIT_HEADER_TOKEN_DR = re.compile(r"\bdr\b", re.IGNORECASE)
+_CREDIT_HEADER_KEYWORDS = ["credit", "deposit"]
+_CREDIT_HEADER_TOKEN_CR = re.compile(r"\bcr\b", re.IGNORECASE)
+# Trailing balance markers after a numeric amount, e.g. ``19,563.86(Cr)``.
+_TRAILING_DR_CR_PARENS = re.compile(r"\(\s*[cCdDrR]{2}\s*\)\s*$")
+
+
+def _cell_looks_like_amount_value(cell: str | None) -> bool:
+    """Return True when *cell* is almost certainly a numeric amount, not a header label.
+
+    Balance cells such as ``19,563.86(Cr)`` contain the substring ``cr``; without
+    this guard they are mistaken for a *Credit* column header and shift column
+    indices onto the wrong columns.
+
+    Args:
+        cell: Raw table cell from pdfplumber.
+
+    Returns:
+        ``True`` when the cell parses as a monetary amount (optionally with Dr/Cr).
+    """
+    raw = str(cell or "").strip()
+    if not raw:
+        return False
+    if _parse_amount(raw) is not None:
+        return True
+    # ``_parse_amount`` can fail on ``1,234.56(Cr)`` after stripping ``Cr`` (empty
+    # parentheses remain). Balance columns must not match header keyword ``cr``.
+    without_suffix = _TRAILING_DR_CR_PARENS.sub("", raw).strip()
+    return _parse_amount(without_suffix) is not None
 
 
 def _detect_debit_credit_cols(
@@ -306,10 +358,18 @@ def _detect_debit_credit_cols(
     debit_idx: int | None = None
     credit_idx: int | None = None
     for i, cell in enumerate(header_row):
+        if _cell_looks_like_amount_value(cell):
+            continue
         text = str(cell or "").lower()
-        if debit_idx is None and any(k in text for k in _DEBIT_HEADER_KEYWORDS):
+        if debit_idx is None and (
+            any(k in text for k in _DEBIT_HEADER_KEYWORDS)
+            or _DEBIT_HEADER_TOKEN_DR.search(text)
+        ):
             debit_idx = i
-        elif credit_idx is None and any(k in text for k in _CREDIT_HEADER_KEYWORDS):
+        elif credit_idx is None and (
+            any(k in text for k in _CREDIT_HEADER_KEYWORDS)
+            or _CREDIT_HEADER_TOKEN_CR.search(text)
+        ):
             credit_idx = i
     return debit_idx, credit_idx
 
@@ -320,6 +380,39 @@ def _detect_date_col(row: list[str | None]) -> int | None:
         raw = str(cell or "").strip()
         if raw and _try_parse_date(raw) is not None:
             return idx
+    return None
+
+
+def _infer_six_col_debit_credit_start(
+    table: list[list[str | None]],
+) -> tuple[int, int, int] | None:
+    """Detect headerless Date|Narration|Ref|Dr|Cr|Balance tables (common on p2+).
+
+    Kotak-style PDFs repeat the transaction block on continuation pages without
+    a header row. In that layout, withdrawal is column index 3 and deposit is 4.
+
+    Args:
+        table: One extracted pdfplumber table (list of rows).
+
+    Returns:
+        ``(debit_col, credit_col, data_start_row_index)`` when a consistent
+        six-column transaction block is found, else ``None``.
+    """
+    scan = min(len(table), 25)
+    for i in range(scan):
+        row = table[i]
+        if not row or len(row) != 6:
+            continue
+        raw_date = str(row[0] or "").strip()
+        if _try_parse_date(raw_date) is None:
+            continue
+        raw_dr = str(row[3] or "").strip()
+        raw_cr = str(row[4] or "").strip()
+        dr_amt = _parse_amount(raw_dr) if raw_dr else None
+        cr_amt = _parse_amount(raw_cr) if raw_cr else None
+        if dr_amt is None and cr_amt is None:
+            continue
+        return (3, 4, i)
     return None
 
 
@@ -357,12 +450,18 @@ def _extract_from_tables(pdf: pdfplumber.PDF, bank_name: str) -> list[dict]:
                 row_debit_col, row_credit_col = _detect_debit_credit_cols(row)
                 if row_debit_col is None and row_credit_col is None:
                     continue
-                if row_debit_col is None and row_credit_col is not None:
-                    if row_credit_col > 0:
-                        row_debit_col = row_credit_col - 1
-                if row_credit_col is None and row_debit_col is not None:
-                    if row_debit_col + 1 < len(row):
-                        row_credit_col = row_debit_col + 1
+                if (
+                    row_debit_col is None
+                    and row_credit_col is not None
+                    and row_credit_col > 0
+                ):
+                    row_debit_col = row_credit_col - 1
+                if (
+                    row_credit_col is None
+                    and row_debit_col is not None
+                    and row_debit_col + 1 < len(row)
+                ):
+                    row_credit_col = row_debit_col + 1
                 if row_debit_col is not None and row_credit_col is not None:
                     debit_col = row_debit_col
                     credit_col = row_credit_col
@@ -370,6 +469,11 @@ def _extract_from_tables(pdf: pdfplumber.PDF, bank_name: str) -> list[dict]:
                     break
 
             has_split_cols = debit_col is not None and credit_col is not None
+            if not has_split_cols:
+                inferred = _infer_six_col_debit_credit_start(table)
+                if inferred is not None:
+                    debit_col, credit_col, data_start_idx = inferred
+                    has_split_cols = True
 
             for row in table[data_start_idx:]:
                 if not row or len(row) < 3:
@@ -484,12 +588,13 @@ def parse_pdf(
     file_bytes: bytes,
     bank_name: str | None = None,
     password: str | None = None,
+    strategy: str | None = None,
 ) -> list[dict]:
     """Parse a bank PDF statement into a list of transaction dicts.
 
-    First attempts structured table extraction via pdfplumber. If no tables
-    are found the function falls back to full-page text extraction with a
-    regex pattern to identify transaction lines.
+    *strategy* controls extraction (see ``backend.parsers.pdf_strategies``):
+    ``auto`` runs table extraction first, then text regex; ``tables_only`` and
+    ``text_only`` force a single path for PDFs where the wrong path misfires.
 
     If *bank_name* is ``None`` or empty the function auto-detects the bank
     from the PDF content using known bank name patterns.
@@ -499,6 +604,8 @@ def parse_pdf(
         bank_name:  Human-readable bank identifier stored on every transaction.
                     If ``None`` or empty, auto-detected from PDF content.
         password:   Optional decryption password for password-protected PDFs.
+        strategy:   Parse mode: ``auto``, ``tables_only``, or ``text_only``.
+                    Invalid values are treated as ``auto``.
 
     Returns:
         A list of dicts with keys ``date``, ``description``, ``amount``,
@@ -508,6 +615,7 @@ def parse_pdf(
         ValueError: If the PDF cannot be opened, is encrypted without a valid
                     password, or no transactions are found.
     """
+    strat = normalize_pdf_parse_strategy(strategy)
 
     try:
         pdf_file = io.BytesIO(file_bytes)
@@ -536,14 +644,18 @@ def parse_pdf(
                     "Could not auto-detect bank name from PDF; using 'Unknown Bank'."
                 )
 
-        transactions = _extract_from_tables(pdf, bank_name)
-
-        if not transactions:
-            logger.info(
-                "No tables found in PDF for bank '%s'; falling back to text extraction.",
-                bank_name,
-            )
+        if strat == "text_only":
             transactions = _extract_from_text(pdf, bank_name)
+        elif strat == "tables_only":
+            transactions = _extract_from_tables(pdf, bank_name)
+        else:
+            transactions = _extract_from_tables(pdf, bank_name)
+            if not transactions:
+                logger.info(
+                    "No table rows parsed for bank '%s'; falling back to text extraction.",
+                    bank_name,
+                )
+                transactions = _extract_from_text(pdf, bank_name)
 
     if not transactions:
         raise ValueError(

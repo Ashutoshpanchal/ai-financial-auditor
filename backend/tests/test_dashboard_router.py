@@ -187,7 +187,11 @@ class TestCreateWidget:
                 json={
                     "title": "New Widget",
                     "widget_type": "bar_chart",
-                    "query_config": {"aggregation": "sum", "field": "debit"},
+                    "query_config": {
+                        "aggregation": "sum",
+                        "field": "debit",
+                        "group_by": "month",
+                    },
                 },
             )
 
@@ -222,6 +226,15 @@ class TestCreateWidget:
             db.refresh = MagicMock()
             user = _make_user()
 
+            if wt == "metric":
+                qcfg = {"aggregation": "sum", "field": "credit"}
+            else:
+                qcfg = {
+                    "aggregation": "sum",
+                    "field": "credit",
+                    "group_by": "month",
+                }
+
             with patch("backend.routers.dashboard.set_rls_user"):
                 client = _client_with_overrides(db, user)
                 response = client.post(
@@ -229,11 +242,51 @@ class TestCreateWidget:
                     json={
                         "title": f"Widget {wt}",
                         "widget_type": wt,
-                        "query_config": {"aggregation": "sum", "field": "credit"},
+                        "query_config": qcfg,
                     },
                 )
 
             assert response.status_code == 201, f"Expected 201 for widget_type={wt}"
+
+    def test_metric_with_group_by_returns_422(self) -> None:
+        """POST metric widget with group_by must fail validation."""
+        db = _make_db()
+        user = _make_user()
+
+        with patch("backend.routers.dashboard.set_rls_user"):
+            client = _client_with_overrides(db, user)
+            response = client.post(
+                "/dashboard/widgets",
+                json={
+                    "title": "Bad metric",
+                    "widget_type": "metric",
+                    "query_config": {
+                        "aggregation": "sum",
+                        "field": "credit",
+                        "group_by": "month",
+                    },
+                },
+            )
+
+        assert response.status_code == 422
+
+    def test_chart_without_group_by_returns_422(self) -> None:
+        """POST chart widget without group_by must fail validation."""
+        db = _make_db()
+        user = _make_user()
+
+        with patch("backend.routers.dashboard.set_rls_user"):
+            client = _client_with_overrides(db, user)
+            response = client.post(
+                "/dashboard/widgets",
+                json={
+                    "title": "Bad chart",
+                    "widget_type": "bar_chart",
+                    "query_config": {"aggregation": "sum", "field": "credit"},
+                },
+            )
+
+        assert response.status_code == 422
 
     def test_missing_title_returns_422(self) -> None:
         """POST without 'title' must return 422 (Pydantic validation)."""
@@ -320,6 +373,27 @@ class TestUpdateWidget:
             )
 
         assert widget.query_config == new_config
+
+    def test_invalid_query_config_returns_422(self) -> None:
+        """PATCH with invalid query_config for widget_type must return 422."""
+        widget = _make_widget(widget_type="metric")
+        db = self._make_update_db(widget)
+        user = _make_user()
+
+        with patch("backend.routers.dashboard.set_rls_user"):
+            client = _client_with_overrides(db, user)
+            response = client.patch(
+                f"/dashboard/widgets/{WIDGET_ID}",
+                json={
+                    "query_config": {
+                        "aggregation": "sum",
+                        "field": "debit",
+                        "group_by": "month",
+                    },
+                },
+            )
+
+        assert response.status_code == 422
 
     def test_missing_widget_returns_404(self) -> None:
         """PATCH on a non-existent widget must return 404."""
@@ -449,6 +523,115 @@ class TestDeleteWidget:
         widget_ids = [e["widget_id"] for e in updated_grid]
         assert WIDGET_ID not in widget_ids
         assert "other-widget" in widget_ids
+
+
+# ---------------------------------------------------------------------------
+# GET /dashboard/widgets/{widget_id}
+# ---------------------------------------------------------------------------
+
+
+class TestGetWidget:
+    """GET /dashboard/widgets/{id} — single widget, 404 on missing."""
+
+    def setup_method(self) -> None:
+        """Reset dependency overrides before each test."""
+        _reset_overrides()
+
+    def test_returns_200(self) -> None:
+        """GET must return one widget dict."""
+        widget = _make_widget()
+        db = _make_db()
+        execute_result = MagicMock()
+        execute_result.scalar_one_or_none.return_value = widget
+        db.execute.return_value = execute_result
+        user = _make_user()
+
+        with patch("backend.routers.dashboard.set_rls_user"):
+            client = _client_with_overrides(db, user)
+            response = client.get(f"/dashboard/widgets/{WIDGET_ID}")
+
+        assert response.status_code == 200
+        assert response.json()["id"] == WIDGET_ID
+
+    def test_missing_returns_404(self) -> None:
+        """GET for unknown id must return 404."""
+        db = _make_db()
+        execute_result = MagicMock()
+        execute_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = execute_result
+        user = _make_user()
+
+        with patch("backend.routers.dashboard.set_rls_user"):
+            client = _client_with_overrides(db, user)
+            response = client.get("/dashboard/widgets/ghost")
+
+        assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /dashboard/widgets/preview
+# ---------------------------------------------------------------------------
+
+
+class TestPreviewWidget:
+    """POST /dashboard/widgets/preview — returns data and human_query."""
+
+    def setup_method(self) -> None:
+        """Reset dependency overrides before each test."""
+        _reset_overrides()
+
+    def test_returns_200_with_mock_resolve(self) -> None:
+        """Preview must return data and human_query."""
+        db = _make_db()
+        user = _make_user()
+        mock_data = {"value": 42.0, "format": "currency"}
+
+        with (
+            patch("backend.routers.dashboard.set_rls_user"),
+            patch(
+                "backend.routers.dashboard.resolve_widget_data",
+                return_value=mock_data,
+            ),
+        ):
+            client = _client_with_overrides(db, user)
+            response = client.post(
+                "/dashboard/widgets/preview",
+                json={
+                    "widget_type": "metric",
+                    "query_config": {
+                        "aggregation": "sum",
+                        "field": "debit",
+                        "format": "currency",
+                    },
+                },
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["data"] == mock_data
+        assert "human_query" in body
+        assert "your_transactions" in body["human_query"]
+
+    def test_invalid_config_returns_422(self) -> None:
+        """Preview with metric + group_by must return 422."""
+        db = _make_db()
+        user = _make_user()
+
+        with patch("backend.routers.dashboard.set_rls_user"):
+            client = _client_with_overrides(db, user)
+            response = client.post(
+                "/dashboard/widgets/preview",
+                json={
+                    "widget_type": "metric",
+                    "query_config": {
+                        "aggregation": "sum",
+                        "field": "debit",
+                        "group_by": "month",
+                    },
+                },
+            )
+
+        assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------
