@@ -23,7 +23,7 @@ INSERT INTO category_master (id, parent_category, sub_category) VALUES
   (gen_random_uuid(), 'Utilities', 'Electricity'), (gen_random_uuid(), 'Utilities', 'Water'), (gen_random_uuid(), 'Utilities', 'Gas'),
   (gen_random_uuid(), 'Utilities', 'Internet'), (gen_random_uuid(), 'Utilities', 'Mobile Recharge'), (gen_random_uuid(), 'Utilities', 'Other'),
   (gen_random_uuid(), 'Healthcare', 'Pharmacy'), (gen_random_uuid(), 'Healthcare', 'Hospital'), (gen_random_uuid(), 'Healthcare', 'Doctor'), (gen_random_uuid(), 'Healthcare', 'Other'),
-  (gen_random_uuid(), 'Education', 'School Fees'), (gen_random_uuid(), 'Education', 'Online Course'), (gen_random_uuid(), 'Education', 'Books'), (gen_random_uuid(), 'Education', 'Other'),
+  (gen_random_uuid(), 'Education', 'Courses'), (gen_random_uuid(), 'Education', 'Books'), (gen_random_uuid(), 'Education', 'Tuition'),
   (gen_random_uuid(), 'Rent & EMI', 'House Rent'), (gen_random_uuid(), 'Rent & EMI', 'Loan EMI'), (gen_random_uuid(), 'Rent & EMI', 'Credit Card EMI'), (gen_random_uuid(), 'Rent & EMI', 'Other'),
   (gen_random_uuid(), 'Income', 'Salary'), (gen_random_uuid(), 'Income', 'Freelance'), (gen_random_uuid(), 'Income', 'Dividend'), (gen_random_uuid(), 'Income', 'Other'),
   (gen_random_uuid(), 'Transfers', 'Bank Transfer'), (gen_random_uuid(), 'Transfers', 'Wallet Transfer'), (gen_random_uuid(), 'Transfers', 'Other'),

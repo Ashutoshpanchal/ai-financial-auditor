@@ -131,7 +131,19 @@ class TestAutoCategorize:
         assert txn.category_master_id == "cm-u"
         assert txn.parent_category == "Savings"
 
-    def test_skips_already_categorized(self) -> None:
+    def test_substring_matches_embedded_merchant(self) -> None:
+        """CM sub_category 'Swiggy' matches short_description 'swiggyltd' via substring."""
+        cm = _make_cm_row("cm-1", "Food & Dining", "Swiggy", None)
+        txn = _make_txn("tx-1", "swiggyltd")
+
+        db = MagicMock()
+        db.execute.return_value.scalars.return_value.all.return_value = [cm]
+        db.query.return_value.filter.return_value.all.return_value = [txn]
+
+        result = auto_categorize_transactions(db, "u1")
+        assert result == 1
+        assert txn.sub_category == "Swiggy"
+        assert txn.category_master_id == "cm-1"
         """Transactions that already have category_master_id are not re-categorized."""
         cm = _make_cm_row("cm-1", "Food & Dining", "Zomato", None)
         txn = _make_txn("tx-1", "zomato")

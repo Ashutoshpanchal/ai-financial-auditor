@@ -7,6 +7,10 @@
     "mtime": 1777970244.2649105,
     "hash": "1ca0f88caafdb0d30f3820c422540741"
   },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/migrations/012_update_education_categories.sql": {
+    "mtime": 1778748202.3866363,
+    "hash": "fda7e22d01ad1d563da461d5c9e645ca"
+  },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/migrations/009_unique_description_categories.sql": {
     "mtime": 1778157632.058941,
     "hash": "c04d8db1f61cae17492107cda2476451"
@@ -16,8 +20,8 @@
     "hash": "697e9f281ce517c9fbb9fbb80e451d4f"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/migrations/007_categories.sql": {
-    "mtime": 1778744573.2559526,
-    "hash": "1ef1150d6b9e53f2a29a8983ed48d959"
+    "mtime": 1778748197.062878,
+    "hash": "bb9e9e5f353cec9e05594b3837576a3b"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/migrations/010_widgets.sql": {
     "mtime": 1778744573.256758,
@@ -34,6 +38,10 @@
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/migrations/004_file_hash.sql": {
     "mtime": 1778075262.6106517,
     "hash": "3c56fb0917c2ea7e5766df5ed9713956"
+  },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/migrations/011_category_rules.sql": {
+    "mtime": 1778747065.4106455,
+    "hash": "aff6b240e648143a2083f050c778e2e8"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/migrations/002_schema.sql": {
     "mtime": 1777970236.2696161,
@@ -60,8 +68,8 @@
     "hash": "c735540bb63936a123bc867d950c9f69"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/App.tsx": {
-    "mtime": 1778744573.2372475,
-    "hash": "cd1a73a2c5c4753f0f1f296a522f3542"
+    "mtime": 1778744828.537007,
+    "hash": "c55cee418c7edf46acd4b55528de991f"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/main.tsx": {
     "mtime": 1777970337.4369242,
@@ -160,8 +168,8 @@
     "hash": "0f20ca707902e3d396274885cd990dbb"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/pages/Upload.tsx": {
-    "mtime": 1778744573.2446175,
-    "hash": "76c7029b7f413cd192b353275751b8fc"
+    "mtime": 1778750773.3917193,
+    "hash": "c9e6ed1f8fc788f7ed735ac097fc6036"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/pages/Chat.tsx": {
     "mtime": 1777970385.7189515,
@@ -176,27 +184,31 @@
     "hash": "c3a8f0b20c3d7a3642eba5e42a397520"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/pages/Categories.tsx": {
-    "mtime": 1778744573.240508,
-    "hash": "c1bc9b5dab0f56534286a867cbe03518"
+    "mtime": 1778751490.419931,
+    "hash": "10f108e4b0cb6d77ee8d2574e979caf8"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/frontend/src/services/api.ts": {
-    "mtime": 1778657189.313114,
-    "hash": "9eb74775801fc9db63ae1e588907981a"
+    "mtime": 1778747350.4223745,
+    "hash": "b8a61970e8f29855c2172e50a73ac058"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/config.py": {
-    "mtime": 1778744573.2176516,
-    "hash": "ea3379bf9ef6b83b09dd927d67fc8411"
+    "mtime": 1778744936.254401,
+    "hash": "f8c6a0a0dc66f14f62d568a117348812"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/database.py": {
     "mtime": 1778155841.041176,
     "hash": "cafb21650be97ada4f6629f7af831c45"
+  },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/db_migrations.py": {
+    "mtime": 1778745023.3076541,
+    "hash": "6277084e6463dec638018009aca5577b"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/default_dashboard_config.py": {
     "mtime": 1778226179.5168462,
     "hash": "7940a9fc1cf8d9a5a7599bc33931653b"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/main.py": {
-    "mtime": 1778744573.2184596,
+    "mtime": 1778747099.080047,
     "hash": "55576023cabe1251f48688d76ab8202b"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/routers/auth.py": {
@@ -208,8 +220,8 @@
     "hash": "9f0384c4523c2d0c96bad78b6bdb87fd"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/routers/categories.py": {
-    "mtime": 1778688040.626047,
-    "hash": "57ecf3008baa509a28db3a91bd98321a"
+    "mtime": 1778751304.8059545,
+    "hash": "7895000dbdf0edc2133d014bc8455594"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/routers/transactions.py": {
     "mtime": 1778744573.2292664,
@@ -247,6 +259,10 @@
     "mtime": 1777984757.5584426,
     "hash": "b285fff589851f6413bc985aa52ecc98"
   },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/parsers/pdf_strategies.py": {
+    "mtime": 1778745391.0558882,
+    "hash": "3e22b98ee1b50b8ad956550a32a16d6e"
+  },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/conftest.py": {
     "mtime": 1778155841.0416918,
     "hash": "87c002c9dbcb022f5f162501ea9e2cd9"
@@ -268,8 +284,8 @@
     "hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/test_auto_categorize.py": {
-    "mtime": 1778685590.1017742,
-    "hash": "ba8c03de601f525ec8ba094a429dfa54"
+    "mtime": 1778747265.9616973,
+    "hash": "c5274e885b5d7143fa8cda6f4b921925"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/test_csv_parser.py": {
     "mtime": 1778744573.2336571,
@@ -283,6 +299,10 @@
     "mtime": 1778138330.8813303,
     "hash": "74f643805f74348dd3825c5bb988cc83"
   },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/test_db_migrations.py": {
+    "mtime": 1778745080.8116176,
+    "hash": "a9c38279c764a3b78bafc60c33b3ad5b"
+  },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/test_unmapped_endpoints.py": {
     "mtime": 1778659289.8337927,
     "hash": "3a2d8b91d22ff422e1643c0256bfd549"
@@ -295,6 +315,10 @@
     "mtime": 1778169824.2591825,
     "hash": "8fca7fc9f99c5745081cc842a7ff5167"
   },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/test_category_rules_apply.py": {
+    "mtime": 1778747293.0366404,
+    "hash": "27b3d543f1c86c08ff7e99bb0ea3325f"
+  },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/test_dashboard_service.py": {
     "mtime": 1778496151.3279812,
     "hash": "5611aeb579d991ce6e64278642ea922c"
@@ -304,8 +328,8 @@
     "hash": "75311e5959dab8cddfc10745171f5ccf"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/tests/test_categories_router.py": {
-    "mtime": 1778744573.230993,
-    "hash": "7e225364ed0e14c67d938ba2d5d4504f"
+    "mtime": 1778747493.4096622,
+    "hash": "ce710840331bb00f5a76677947473142"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/agents/tools.py": {
     "mtime": 1778155841.0434992,
@@ -335,12 +359,16 @@
     "mtime": 1778225426.9072967,
     "hash": "b6ae61998d1b8ec8c3e70da23bae1027"
   },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/models/category_rule.py": {
+    "mtime": 1778747068.6917617,
+    "hash": "a32cd82b9294a9f7536d4c681d606ac6"
+  },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/models/transaction.py": {
     "mtime": 1778744573.2226841,
     "hash": "bbd54e6cf9783a752c118574bfd06e56"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/models/__init__.py": {
-    "mtime": 1778744573.2202675,
+    "mtime": 1778747098.3030787,
     "hash": "53fbe40cd617300451b6f5f7d4c6673d"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/models/chat_session.py": {
@@ -388,8 +416,12 @@
     "hash": "0b0d7ab15012c5ae707da94171d59b00"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/services/widget_query.py": {
-    "mtime": 1778744573.2299318,
-    "hash": "6611c819eed80e3298126a307fe9e6fe"
+    "mtime": 1778745339.6850135,
+    "hash": "bf4f5c4e3afad8757093eba49fabf10c"
+  },
+  "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/services/category_rules_apply.py": {
+    "mtime": 1778747088.3098054,
+    "hash": "b372a5dd2da362cc767a5acd6a74908f"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/services/graphify_service.py": {
     "mtime": 1778155841.0071146,
@@ -404,8 +436,8 @@
     "hash": "d41e24177c365f9fd2f8a6e7d887e081"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/services/auto_categorize.py": {
-    "mtime": 1778656857.436735,
-    "hash": "32be2fe05a855c261dd495ec5d28e72c"
+    "mtime": 1778747576.0858593,
+    "hash": "ecb9cb4e9da6511dc3a5f94388cdbda1"
   },
   "/Users/ashutoshpanchal/Desktop/Project/AI-Finanical-Advisor/backend/services/drive.py": {
     "mtime": 1778083217.7675114,

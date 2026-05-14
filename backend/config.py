@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str
+    # Optional absolute path to numbered ``*.sql`` migrations (default: ``<repo>/migrations``).
+    migrations_dir: str | None = None
 
     # Observability — comma-separated: "langsmith", "langfuse", or "langsmith,langfuse"
     observability_backends: str = ""

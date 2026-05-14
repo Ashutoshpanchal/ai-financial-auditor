@@ -57,6 +57,12 @@ interface MasterFlatRow {
 
 type DictionaryTab = "builtin" | "user_defined";
 
+interface MappedCategory {
+  parent_category: string;
+  sub_category: string;
+  txn_count: number;
+}
+
 function formatAnalyzeApiError(err: unknown): string {
   const ax = err as { response?: { data?: { detail?: unknown } } };
   const d = ax.response?.data?.detail;
@@ -188,6 +194,8 @@ export default function Categories() {
   const [newParent, setNewParent] = useState("");
   const [newSub, setNewSub] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
 
   const [editEntry, setEditEntry] = useState<MasterFlatRow | null>(null);
   const [editParent, setEditParent] = useState("");
@@ -206,9 +214,17 @@ export default function Categories() {
   const [resolveSub, setResolveSub] = useState("");
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dictionary" | "unmapped">("dictionary");
+  const [activeTab, setActiveTab] = useState<"dictionary" | "unmapped" | "mapped">("dictionary");
   const [unmappedSearch, setUnmappedSearch] = useState("");
   const [unmappedPage, setUnmappedPage] = useState(1);
+  const [mappedCategories, setMappedCategories] = useState<MappedCategory[]>([]);
+  const [mappedSearch, setMappedSearch] = useState("");
+  const [selectedUnmapped, setSelectedUnmapped] = useState<Set<string>>(new Set());
+  const [bulkParent, setBulkParent] = useState("");
+  const [bulkSub, setBulkSub] = useState("");
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [showBulkControls, setShowBulkControls] = useState(false);
 
   const analyzeAbortRef = useRef<AbortController | null>(null);
 
@@ -247,12 +263,22 @@ export default function Categories() {
     }
   }, []);
 
+  const loadMapped = useCallback(async () => {
+    try {
+      const res = await api.get<MappedCategory[]>("/categories/mapped");
+      setMappedCategories(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      // non-fatal: mapped tab will just show empty
+    }
+  }, []);
+
   useEffect(() => {
     loadMaster();
     loadDescriptions();
     loadPaymentMethods();
     loadUnmapped();
-  }, [loadMaster, loadDescriptions, loadPaymentMethods, loadUnmapped]);
+    loadMapped();
+  }, [loadMaster, loadDescriptions, loadPaymentMethods, loadUnmapped, loadMapped]);
 
   useEffect(
     () => () => {
@@ -292,7 +318,7 @@ export default function Categories() {
   }, [activeDictionaryMaster]);
 
   /** Show dictionary + rules tables once master or rules data exists (not only when rules are non-empty). */
-  const showFullCatalogUi = descriptions.length > 0 || masterFlatRows.length > 0;
+  const showFullCatalogUi = descriptions.length > 0 || Object.keys(masterMerged).length > 0;
 
   const filteredDictionaryRows = useMemo(() => {
     const q = dictionarySearch.trim().toLowerCase();
@@ -396,14 +422,18 @@ export default function Categories() {
       setAddError("Both fields are required.");
       return;
     }
+    setAddSaving(true);
     try {
       await api.post("/categories/master", { parent_category: parent, sub_category: sub });
       setNewParent("");
       setNewSub("");
+      setAddModalOpen(false);
       await loadMaster();
     } catch (err) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setAddError(msg ?? "Failed to add entry.");
+    } finally {
+      setAddSaving(false);
     }
   }
 
@@ -485,7 +515,7 @@ export default function Categories() {
     }
     setResolveSaving(true);
     try {
-      await resolveUnmapped(resolveTarget.short_description, parent, sub);
+      await resolveUnmapped(resolveTarget.short_description, parent, capitalizeWords(sub));
       setResolveModalOpen(false);
       setResolveTarget(null);
       await Promise.all([loadUnmapped(), loadMaster(), loadDescriptions()]);
@@ -495,6 +525,38 @@ export default function Categories() {
     } finally {
       setResolveSaving(false);
     }
+  }
+
+  async function handleBulkApply() {
+    if (selectedUnmapped.size === 0 || !bulkParent || !bulkSub) {
+      setBulkError("Select entries and choose category.");
+      return;
+    }
+    setBulkApplying(true);
+    setBulkError(null);
+    try {
+      const capitalizedSub = capitalizeWords(bulkSub);
+      const tasks = Array.from(selectedUnmapped).map((shortDesc) =>
+        resolveUnmapped(shortDesc, bulkParent, capitalizedSub)
+      );
+      await Promise.all(tasks);
+      setSelectedUnmapped(new Set());
+      setBulkParent("");
+      setBulkSub("");
+      await Promise.all([loadUnmapped(), loadMaster(), loadDescriptions()]);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setBulkError(msg ?? "Failed to categorize.");
+    } finally {
+      setBulkApplying(false);
+    }
+  }
+
+  function capitalizeWords(str: string): string {
+    return str
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   }
 
   async function handleParentChange(row: DescriptionMapping, value: string) {
@@ -557,7 +619,7 @@ export default function Categories() {
       {/* ── Full-width dictionary (collapsible) + mappings ───────────────── */}
       {showFullCatalogUi && (
         <div className="flex flex-col gap-8">
-          {/* Tab bar: Dictionary | Unmapped */}
+          {/* Tab bar: Dictionary | Unmapped | Mapped */}
           <div className="flex items-center gap-1 border-b border-gray-200">
             <button
               type="button"
@@ -590,12 +652,30 @@ export default function Categories() {
                 </span>
               )}
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "mapped"}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                activeTab === "mapped"
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-gray-500 hover:text-gray-800"
+              }`}
+              onClick={() => setActiveTab("mapped")}
+            >
+              Mapped
+              {mappedCategories.length > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                  {mappedCategories.length}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* ── Unmapped tab ─────────────────────────────────────────────── */}
           {activeTab === "unmapped" && (
             <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Unmapped Merchants
                   {unmappedEntries.length > 0 && (
@@ -605,10 +685,22 @@ export default function Categories() {
                     </span>
                   )}
                 </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddError(null);
+                    setNewParent("");
+                    setNewSub("");
+                    setAddModalOpen(true);
+                  }}
+                  className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 shrink-0"
+                >
+                  Add Custom Categories
+                </button>
               </div>
 
               {unmappedEntries.length > 0 && (
-                <div className="mb-4 flex flex-wrap items-end justify-end gap-3">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div className="w-full sm:w-80 sm:shrink-0">
                     <label htmlFor="unmapped-search" className="sr-only">
                       Search short or raw description
@@ -622,6 +714,23 @@ export default function Categories() {
                       className={TABLE_SEARCH_INPUT_CLASS}
                     />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBulkControls(!showBulkControls);
+                      if (!showBulkControls) {
+                        setSelectedUnmapped(new Set());
+                        setBulkError(null);
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors shrink-0 ${
+                      showBulkControls
+                        ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
+                        : "border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    {showBulkControls ? "Hide Filter" : "Show Filter"}
+                  </button>
                 </div>
               )}
 
@@ -640,10 +749,86 @@ export default function Categories() {
                 </p>
               ) : (
                 <>
+                  {/* Bulk category controls */}
+                  {showBulkControls && (
+                  <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="flex-1 min-w-[10rem]">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Parent Category
+                        </label>
+                        <select
+                          value={bulkParent}
+                          onChange={(e) => {
+                            setBulkParent(e.target.value);
+                            setBulkSub("");
+                          }}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                          <option value="">— Select —</option>
+                          {parentOptions.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-[10rem]">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Sub-Category
+                        </label>
+                        <select
+                          value={bulkSub}
+                          onChange={(e) => setBulkSub(e.target.value)}
+                          disabled={!bulkParent}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-40"
+                        >
+                          <option value="">— Select —</option>
+                          {(masterMerged[bulkParent] ?? []).map((s) => (
+                            <option key={s.id} value={capitalizeWords(s.sub_category)}>
+                              {capitalizeWords(s.sub_category)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleBulkApply()}
+                        disabled={selectedUnmapped.size === 0 || !bulkParent || !bulkSub || bulkApplying}
+                        className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-40 shrink-0"
+                      >
+                        {bulkApplying ? "Applying…" : `Apply (${selectedUnmapped.size})`}
+                      </button>
+                    </div>
+                    {bulkError && <p className="text-red-600 text-xs mt-2">{bulkError}</p>}
+                    {selectedUnmapped.size > 0 && !bulkError && (
+                      <p className="text-indigo-700 text-xs mt-2">
+                        {selectedUnmapped.size} selected · Choose category to apply
+                      </p>
+                    )}
+                  </div>
+                  )}
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-base min-w-[48rem]">
                       <thead>
                         <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
+                          {showBulkControls && (
+                          <th className="pb-2 pr-4 font-medium w-8">
+                            <input
+                              type="checkbox"
+                              checked={selectedUnmapped.size === filteredUnmappedEntries.length && filteredUnmappedEntries.length > 0}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUnmapped(new Set(filteredUnmappedEntries.map((x) => x.short_description)));
+                                } else {
+                                  setSelectedUnmapped(new Set());
+                                }
+                              }}
+                              className="rounded"
+                            />
+                          </th>
+                          )}
                           <th className="pb-2 pr-4 font-medium">Short Description</th>
                           <th className="pb-2 pr-4 font-medium w-20">Count</th>
                           <th className="pb-2 pr-4 font-medium">Raw description samples</th>
@@ -656,8 +841,27 @@ export default function Categories() {
                             .filter((s) => (s ?? "").trim() !== "")
                             .join(" · ");
                           const rawDisplay = rawJoined.length > 0 ? rawJoined : "—";
+                          const isSelected = selectedUnmapped.has(entry.short_description);
                           return (
-                            <tr key={entry.short_description} className="hover:bg-gray-50">
+                            <tr key={entry.short_description} className={`hover:bg-gray-50 ${isSelected && showBulkControls ? "bg-indigo-50" : ""}`}>
+                              {showBulkControls && (
+                              <td className="py-3 pr-4">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const newSet = new Set(selectedUnmapped);
+                                    if (e.target.checked) {
+                                      newSet.add(entry.short_description);
+                                    } else {
+                                      newSet.delete(entry.short_description);
+                                    }
+                                    setSelectedUnmapped(newSet);
+                                  }}
+                                  className="rounded"
+                                />
+                              </td>
+                              )}
                               <td className="py-3 pr-4">
                                 <code className="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">
                                   {entry.short_description}
@@ -676,7 +880,7 @@ export default function Categories() {
                                   onClick={() => openResolveModal(entry)}
                                   className="text-xs font-medium text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded border border-indigo-200 hover:bg-indigo-50"
                                 >
-                                  Add Category
+                                  Add
                                 </button>
                               </td>
                             </tr>
@@ -693,6 +897,82 @@ export default function Categories() {
                     aria-label="Unmapped merchants pagination"
                   />
                 </>
+              )}
+            </section>
+          )}
+
+          {/* ── Mapped tab ──────────────────────────────────────────── */}
+          {activeTab === "mapped" && (
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  Mapped Categories
+                  {mappedCategories.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-gray-500">
+                      ({mappedCategories.length} categories)
+                    </span>
+                  )}
+                </h2>
+                <div className="w-full sm:w-80 sm:shrink-0">
+                  <label htmlFor="mapped-search" className="sr-only">
+                    Search mapped categories
+                  </label>
+                  <input
+                    id="mapped-search"
+                    type="search"
+                    placeholder="Search category…"
+                    value={mappedSearch}
+                    onChange={(e) => setMappedSearch(e.target.value)}
+                    className={TABLE_SEARCH_INPUT_CLASS}
+                  />
+                </div>
+              </div>
+
+              {mappedCategories.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-8">
+                  No mapped categories yet. Assign categories to transactions to see them here.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-base min-w-[40rem]">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
+                        <th className="pb-2 pr-4 font-medium">Parent Category</th>
+                        <th className="pb-2 pr-4 font-medium">Sub-Category</th>
+                        <th className="pb-2 pr-4 font-medium w-24">Transactions</th>
+                        <th className="pb-2 font-medium text-right w-20">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {mappedCategories
+                        .filter((cat) => {
+                          const q = mappedSearch.trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            cat.parent_category.toLowerCase().includes(q) ||
+                            cat.sub_category.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((cat) => (
+                          <tr key={`${cat.parent_category}-${cat.sub_category}`} className="hover:bg-gray-50">
+                            <td className="py-3 pr-4 align-top">
+                              <CategoryBadge value={cat.parent_category} />
+                            </td>
+                            <td className="py-3 pr-4 text-gray-800 align-top">{capitalizeWords(cat.sub_category)}</td>
+                            <td className="py-3 pr-4 text-gray-700 font-medium">{cat.txn_count}</td>
+                            <td className="py-3 text-right">
+                              <button
+                                type="button"
+                                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 px-3 py-1 rounded border border-indigo-200 hover:bg-indigo-50"
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </section>
           )}
@@ -772,102 +1052,99 @@ export default function Categories() {
                 </div>
 
                 {dictTab === "user_defined" && (
-                  <div className="flex flex-wrap items-end gap-2 mb-4">
-                    <input
-                      type="text"
-                      placeholder="Parent category"
-                      value={newParent}
-                      onChange={(e) => setNewParent(e.target.value)}
-                      list="parent-options-dict"
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    />
-                    <datalist id="parent-options-dict">
-                      {parentOptions.map((p) => (
-                        <option key={p} value={p} />
-                      ))}
-                    </datalist>
-                    <input
-                      type="text"
-                      placeholder="Sub-category"
-                      value={newSub}
-                      onChange={(e) => setNewSub(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    />
+                  <div className="mb-4 flex justify-end">
                     <button
                       type="button"
-                      onClick={handleAddSub}
-                      className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700 shrink-0"
+                      onClick={() => {
+                        setAddError(null);
+                        setNewParent("");
+                        setNewSub("");
+                        setAddModalOpen(true);
+                      }}
+                      className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700"
                     >
-                      Add
+                      Add Custom Categories
                     </button>
                   </div>
                 )}
-                {dictTab === "user_defined" && addError && (
-                  <p className="text-red-500 text-sm mb-2">{addError}</p>
-                )}
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-base min-w-[40rem]">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
-                        <th className="pb-2 pr-4 font-medium">Parent</th>
-                        <th className="pb-2 pr-4 font-medium">Sub</th>
-                        <th className="pb-2 pr-4 font-medium">Type</th>
-                        {dictTab === "user_defined" ? (
-                          <th className="pb-2 font-medium text-right w-32">Actions</th>
-                        ) : (
-                          <th className="pb-2 w-8" />
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {dictionaryPageRows.map((r) => (
-                        <tr key={r.id} className="hover:bg-gray-50">
-                          <td className="py-2.5 pr-4 align-top">
-                            <CategoryBadge value={r.parent_category} />
-                          </td>
-                          <td className="py-2.5 pr-4 text-gray-800 align-top">{r.sub_category}</td>
-                          <td className="py-2.5 pr-4 text-sm text-gray-600 align-top">
-                            {r.is_global ? "Built-in" : "User-defined"}
-                          </td>
-                          <td className="py-2.5 text-right align-top">
-                            {dictTab === "user_defined" && !r.is_global && (
-                              <div className="flex justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => openEditModal(r)}
-                                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded border border-indigo-200 hover:bg-indigo-50"
+                {dictTab === "builtin" ? (
+                  <div className="space-y-4">
+                    {Object.keys(masterBuiltin).length === 0 ? (
+                      <p className="text-gray-400 text-sm py-6 text-center">No categories available.</p>
+                    ) : (
+                      Object.keys(masterBuiltin)
+                        .sort()
+                        .filter((parent) => {
+                          const q = dictionarySearch.trim().toLowerCase();
+                          if (!q) return true;
+                          if (parent.toLowerCase().includes(q)) return true;
+                          const subs = masterBuiltin[parent] ?? [];
+                          return subs.some((s) => s.sub_category.toLowerCase().includes(q));
+                        })
+                        .map((parent) => (
+                          <div key={parent} className="border border-gray-200 rounded-lg p-4">
+                            <div className="mb-3">
+                              <CategoryBadge value={parent} />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(masterBuiltin[parent] ?? []).map((sub) => (
+                                <span
+                                  key={sub.id}
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
                                 >
-                                  Rename
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteSub(r.id)}
-                                  className="text-gray-400 hover:text-red-600 text-lg leading-none px-1"
-                                  title="Remove"
+                                  {capitalizeWords(sub.sub_category)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.keys(masterUser).length === 0 ? (
+                      <p className="text-gray-400 text-sm py-6 text-center">
+                        No user-defined categories yet. Click "Add Category" to create one.
+                      </p>
+                    ) : (
+                      Object.keys(masterUser)
+                        .sort()
+                        .filter((parent) => {
+                          const q = dictionarySearch.trim().toLowerCase();
+                          if (!q) return true;
+                          if (parent.toLowerCase().includes(q)) return true;
+                          const subs = masterUser[parent] ?? [];
+                          return subs.some((s) => s.sub_category.toLowerCase().includes(q));
+                        })
+                        .map((parent) => (
+                          <div key={parent} className="border border-gray-200 rounded-lg p-4">
+                            <div className="mb-3">
+                              <CategoryBadge value={parent} />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(masterUser[parent] ?? []).map((sub) => (
+                                <div
+                                  key={sub.id}
+                                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 group hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
                                 >
-                                  ×
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {filteredDictionaryRows.length === 0 && (
-                    <p className="text-gray-400 text-sm py-6 text-center">
-                      No dictionary rows match your search.
-                    </p>
-                  )}
-                </div>
-                <PaginationBar
-                  page={dictPage}
-                  totalItems={filteredDictionaryRows.length}
-                  pageSize={DICT_PAGE_SIZE}
-                  onPageChange={setDictPage}
-                  aria-label="Dictionary pagination"
-                />
+                                  <span>{capitalizeWords(sub.sub_category)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSub(sub.id)}
+                                    className="text-lg leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                    title="Remove"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -956,8 +1233,8 @@ export default function Categories() {
                             >
                               <option value="">—</option>
                               {subOptions.map((s) => (
-                                <option key={s.id} value={s.sub_category}>
-                                  {s.sub_category}
+                                <option key={s.id} value={capitalizeWords(s.sub_category)}>
+                                  {capitalizeWords(s.sub_category)}
                                 </option>
                               ))}
                             </select>
@@ -1006,6 +1283,80 @@ export default function Categories() {
             />
           </section>
           )}
+        </div>
+      )}
+
+      {/* Add Category modal */}
+      {addModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          role="presentation"
+          onClick={() => !addSaving && setAddModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-category-title"
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="add-category-title" className="text-lg font-semibold text-gray-900 mb-3">
+              Add Category
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="add-parent" className="block text-xs font-medium text-gray-600 mb-1">
+                  Parent category (PC)
+                </label>
+                <input
+                  id="add-parent"
+                  type="text"
+                  value={newParent}
+                  onChange={(e) => setNewParent(e.target.value)}
+                  list="parent-options-add"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  placeholder="e.g. Food & Dining"
+                />
+                <datalist id="parent-options-add">
+                  {parentOptions.map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label htmlFor="add-sub" className="block text-xs font-medium text-gray-600 mb-1">
+                  Sub-category (SC)
+                </label>
+                <input
+                  id="add-sub"
+                  type="text"
+                  value={newSub}
+                  onChange={(e) => setNewSub(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  placeholder="e.g. Zomato"
+                />
+              </div>
+            </div>
+            {addError && <p className="text-red-500 text-sm mt-3">{addError}</p>}
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                disabled={addSaving}
+                onClick={() => setAddModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                disabled={addSaving}
+                onClick={() => void handleAddSub()}
+              >
+                {addSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1168,38 +1519,59 @@ export default function Categories() {
                 <> Example: <span className="italic">{resolveTarget.sample_raw_descriptions[0]}</span></>
               )}
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setResolveModalOpen(false);
+                setAddError(null);
+                setNewParent("");
+                setNewSub("");
+                setAddModalOpen(true);
+              }}
+              className="text-indigo-600 hover:text-indigo-800 text-xs font-medium mb-4 block"
+            >
+              + Add custom category
+            </button>
             <div className="space-y-3">
               <div>
                 <label htmlFor="resolve-parent" className="block text-xs font-medium text-gray-600 mb-1">
                   Parent category
                 </label>
-                <input
+                <select
                   id="resolve-parent"
-                  type="text"
                   value={resolveParent}
-                  onChange={(e) => setResolveParent(e.target.value)}
-                  list="parent-options-resolve"
+                  onChange={(e) => {
+                    setResolveParent(e.target.value);
+                    setResolveSub("");
+                  }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  placeholder="e.g. Food & Dining"
-                />
-                <datalist id="parent-options-resolve">
+                >
+                  <option value="">— Select a category —</option>
                   {parentOptions.map((p) => (
-                    <option key={p} value={p} />
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </div>
               <div>
                 <label htmlFor="resolve-sub" className="block text-xs font-medium text-gray-600 mb-1">
                   Sub-category
                 </label>
-                <input
+                <select
                   id="resolve-sub"
-                  type="text"
                   value={resolveSub}
                   onChange={(e) => setResolveSub(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  placeholder="e.g. Zomato"
-                />
+                  disabled={!resolveParent}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-40"
+                >
+                  <option value="">— Select a sub-category —</option>
+                  {(masterMerged[resolveParent] ?? []).map((s) => (
+                    <option key={s.id} value={capitalizeWords(s.sub_category)}>
+                      {capitalizeWords(s.sub_category)}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             {resolveError && <p className="text-red-500 text-sm mt-3">{resolveError}</p>}

@@ -14,6 +14,37 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Minimum sub_category length for substring containment (avoids noisy single-token hits).
+_MIN_SUBSTRING_LEN = 3
+
+
+def _substring_match_cm(
+    short_lower: str,
+    cm_rows: list[CategoryMaster],
+    user_id: str,
+) -> CategoryMaster | None:
+    """Pick best CM row where ``sub_category.lower()`` is contained in *short_lower*."""
+    best: list[CategoryMaster] = []
+    best_len = 0
+    for cm in cm_rows:
+        sub_l = cm.sub_category.lower()
+        if len(sub_l) < _MIN_SUBSTRING_LEN:
+            continue
+        if sub_l not in short_lower:
+            continue
+        if len(sub_l) > best_len:
+            best = [cm]
+            best_len = len(sub_l)
+        elif len(sub_l) == best_len:
+            best.append(cm)
+    if not best:
+        return None
+    user_owned = [c for c in best if c.user_id == user_id]
+    if user_owned:
+        return user_owned[0]
+    global_only = [c for c in best if c.user_id is None]
+    return global_only[0] if global_only else best[0]
+
 
 def auto_categorize_transactions(
     db: Session,
@@ -22,13 +53,13 @@ def auto_categorize_transactions(
 ) -> int:
     """Match transaction short_descriptions against category_master and auto-categorize.
 
-    For each uncategorized transaction, splits the short_description on ``-`` into
-    tokens and checks if any token matches a ``category_master.sub_category``
-    (case-insensitive exact match).  If found, sets ``parent_category``,
-    ``sub_category``, ``category`` and ``category_master_id`` on the transaction.
+    First tries hyphen-separated tokens against ``sub_category`` (case-insensitive
+    exact token match). If none match, falls back to substring match: CM
+    ``sub_category`` (length ≥ ``_MIN_SUBSTRING_LEN``) contained in the full
+    ``short_description``; longest matching ``sub_category`` wins, with user-owned
+    CM preferred over global on ties.
 
-    When multiple CM rows match, the user-owned row is preferred over the global
-    seed, and the longer sub_category wins (more specific match).
+    Sets ``parent_category``, ``sub_category``, ``category`` and ``category_master_id``.
 
     Args:
         db:          SQLAlchemy session (RLS should already be set).
@@ -40,7 +71,6 @@ def auto_categorize_transactions(
     """
     from backend.models.transaction import Transaction
 
-    # Load all candidate category_master rows (global + user-owned)
     cm_rows = list(
         db.execute(
             select(CategoryMaster).where(
@@ -56,8 +86,6 @@ def auto_categorize_transactions(
     if not cm_rows:
         return 0
 
-    # Build a lookup: lower(sub_category) -> best CM row
-    # For duplicate sub_categories, prefer user-owned, then longer label.
     cm_by_sub: dict[str, CategoryMaster] = {}
     for row in cm_rows:
         key = row.sub_category.lower()
@@ -65,15 +93,13 @@ def auto_categorize_transactions(
         if existing is None:
             cm_by_sub[key] = row
         else:
-            # Prefer user-owned over global
-            if row.user_id is not None and existing.user_id is None:
+            if (row.user_id is not None and existing.user_id is None) or (
+                row.user_id is not None
+                and existing.user_id is not None
+                and len(row.sub_category) > len(existing.sub_category)
+            ):
                 cm_by_sub[key] = row
-            elif row.user_id is not None and existing.user_id is not None:
-                # Both user-owned: prefer longer (more specific) sub_category
-                if len(row.sub_category) > len(existing.sub_category):
-                    cm_by_sub[key] = row
 
-    # Fetch uncategorized transactions with a non-null short_description
     q = db.query(Transaction).filter(
         Transaction.user_id == user_id,
         Transaction.category_master_id.is_(None),
@@ -85,21 +111,28 @@ def auto_categorize_transactions(
 
     updated = 0
     for txn in txns:
-        tokens = (txn.short_description or "").lower().split("-")
+        short_lower = (txn.short_description or "").lower().strip()
+        if not short_lower:
+            continue
+
         best_cm: CategoryMaster | None = None
         best_token_len = 0
-        for token in tokens:
+        for token in short_lower.split("-"):
+            if not token:
+                continue
             cm = cm_by_sub.get(token)
-            if cm is not None:
-                # Pick the longest matching sub_category (most specific)
-                if len(token) > best_token_len:
-                    best_cm = cm
-                    best_token_len = len(token)
+            if cm is not None and len(token) > best_token_len:
+                best_cm = cm
+                best_token_len = len(token)
+
+        if best_cm is None:
+            best_cm = _substring_match_cm(short_lower, cm_rows, user_id)
+
         if best_cm is not None:
             txn.category = f"{best_cm.parent_category} / {best_cm.sub_category}"
             txn.parent_category = best_cm.parent_category
             txn.sub_category = best_cm.sub_category
-            txn.category_master_id = best_cm.id
+            txn.category_master_id = str(best_cm.id)
             updated += 1
 
     if updated:

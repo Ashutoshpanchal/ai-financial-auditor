@@ -14,10 +14,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.models.transaction import Transaction
-from backend.services.widget_metric_raw_sql import (
-    execute_raw_metric_sql,
-    validate_raw_metric_sql,
-)
 
 # --------------------------------------------------------------------------- #
 # Allowed enum values (domain constants — not config)
@@ -50,14 +46,15 @@ def validate_widget_query_config(widget_type: str, config: dict[str, Any]) -> No
             f"Allowed: metric, {', '.join(sorted(_CHART_WIDGET_TYPES))}"
         )
 
-    raw_sql = config.get("raw_metric_sql")
-    if isinstance(raw_sql, str) and raw_sql.strip():
-        if widget_type != "metric":
-            raise ValueError("raw_metric_sql is only supported for metric widgets.")
-        if config.get("group_by") is not None:
-            raise ValueError("Do not set group_by when using raw_metric_sql.")
-        validate_raw_metric_sql(raw_sql.strip())
-        return
+    # raw_metric_sql support disabled — widget_metric_raw_sql module not yet implemented
+    # raw_sql = config.get("raw_metric_sql")
+    # if isinstance(raw_sql, str) and raw_sql.strip():
+    #     if widget_type != "metric":
+    #         raise ValueError("raw_metric_sql is only supported for metric widgets.")
+    #     if config.get("group_by") is not None:
+    #         raise ValueError("Do not set group_by when using raw_metric_sql.")
+    #     validate_raw_metric_sql(raw_sql.strip())
+    #     return
 
     aggregation = config.get("aggregation", "")
     field = config.get("field", "")
@@ -107,9 +104,10 @@ def describe_widget_query_human(config: dict[str, Any]) -> str:
     Returns:
         A short multi-line human-readable description for UI display.
     """
-    raw_sql = config.get("raw_metric_sql")
-    if isinstance(raw_sql, str) and raw_sql.strip():
-        return raw_sql.strip()
+    # raw_metric_sql support disabled — widget_metric_raw_sql module not yet implemented
+    # raw_sql = config.get("raw_metric_sql")
+    # if isinstance(raw_sql, str) and raw_sql.strip():
+    #     return raw_sql.strip()
 
     aggregation = config.get("aggregation", "?")
     field = config.get("field", "?")
@@ -181,13 +179,14 @@ def resolve_widget_data(
                     respective allowed sets, or if ``group_by`` is present but not
                     in the allowed set.
     """
-    raw_sql = config.get("raw_metric_sql")
-    if isinstance(raw_sql, str) and raw_sql.strip():
-        group_by: str | None = config.get("group_by")
-        if group_by is not None:
-            raise ValueError("raw_metric_sql cannot be combined with group_by.")
-        value = execute_raw_metric_sql(raw_sql.strip(), user_id, db)
-        return {"value": value, "format": config.get("format", "number")}
+    # raw_metric_sql support disabled — widget_metric_raw_sql module not yet implemented
+    # raw_sql = config.get("raw_metric_sql")
+    # if isinstance(raw_sql, str) and raw_sql.strip():
+    #     group_by: str | None = config.get("group_by")
+    #     if group_by is not None:
+    #         raise ValueError("raw_metric_sql cannot be combined with group_by.")
+    #     value = execute_raw_metric_sql(raw_sql.strip(), user_id, db)
+    #     return {"value": value, "format": config.get("format", "number")}
 
     aggregation = config.get("aggregation", "")
     field = config.get("field", "")

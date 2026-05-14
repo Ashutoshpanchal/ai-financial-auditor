@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../services/api";
+import { api, postApplyCategoryMappings, postResetCategorySync } from "../services/api";
 
 type ApiErr = { response?: { status?: number; data?: { detail?: string } } };
 type DupDetail = { filename?: string; upload_date?: string; message?: string };
@@ -149,7 +149,7 @@ function CategorySyncModal({
   onApplied,
 }: {
   open: boolean;
-  /** When set, only transactions for this document are updated. When null, all of the user’s uncategorized matches are updated. */
+  /** When set, only transactions for this document are updated. When null, all of the user’s transactions in scope are updated. */
   documentId: string | null;
   onClose: () => void;
   onApplied: () => void;
@@ -157,11 +157,13 @@ function CategorySyncModal({
   const [syncing, setSyncing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [updated, setUpdated] = useState<number | null>(null);
+  const [breakdown, setBreakdown] = useState<{ auto: number; rules: number } | null>(null);
 
   useEffect(() => {
     if (open) {
       setErr(null);
       setUpdated(null);
+      setBreakdown(null);
       setSyncing(false);
     }
   }, [open, documentId]);
@@ -173,12 +175,43 @@ function CategorySyncModal({
     setErr(null);
     try {
       const body = documentId ? { document_id: documentId } : {};
-      const res = await api.post<{ updated: number }>("/categories/apply-mappings", body);
-      setUpdated(res.data.updated);
+      const data = await postApplyCategoryMappings(body);
+      setUpdated(data.updated);
+      setBreakdown({
+        auto: data.auto_categorized ?? 0,
+        rules: data.rules_applied ?? 0,
+      });
       onApplied();
     } catch (e: unknown) {
       setErr((e as ApiErr)?.response?.data?.detail ?? "Sync failed.");
     } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleReset = () => {
+    setResetConfirmOpen(true);
+    setResetError(null);
+  };
+
+  const handleConfirmReset = async () => {
+    setResettingInModal(true);
+    setResetError(null);
+    setSyncing(true);
+    setErr(null);
+    try {
+      const body = documentId ? { document_id: documentId } : {};
+      const data = await postResetCategorySync(body);
+      setUpdated(data.auto_categorized + data.rules_applied);
+      setBreakdown({ auto: data.auto_categorized, rules: data.rules_applied });
+      setResetConfirmOpen(false);
+      onApplied();
+    } catch (e: unknown) {
+      const errMsg = (e as ApiErr)?.response?.data?.detail ?? "Reset failed.";
+      setResetError(errMsg);
+      setErr(errMsg);
+    } finally {
+      setResettingInModal(false);
       setSyncing(false);
     }
   };
@@ -188,10 +221,13 @@ function CategorySyncModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Sync categories</h3>
         <p className="text-sm text-gray-600">
+          <span className="font-medium text-gray-800">Sync now</span> matches your{" "}
+          <span className="font-medium text-gray-800">short descriptions</span> to the category dictionary, then applies your{" "}
+          <span className="font-medium text-gray-800">description → category</span> rules to rows that are still unmatched.{" "}
           {documentId ? (
-            <>Applies your saved description → category rules to transactions in this upload that still have no category.</>
+            <>Only transactions from this upload are included.</>
           ) : (
-            <>Applies your saved description → category rules to <span className="font-medium text-gray-800">all</span> of your transactions that still have no category.</>
+            <>Every transaction you own is included.</>
           )}{" "}
           Run <span className="font-medium text-gray-800">Categories → Analyze</span> first if you need AI to build new rules.
         </p>
@@ -200,10 +236,11 @@ function CategorySyncModal({
         )}
         {updated !== null && (
           <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-            Applied rules to {updated} transaction{updated === 1 ? "" : "s"}.
+            Updated {updated} transaction{updated === 1 ? "" : "s"}
+            {breakdown ? ` (dictionary: ${breakdown.auto}, rules: ${breakdown.rules}).` : "."}
           </p>
         )}
-        <div className="flex gap-3 justify-end pt-2">
+        <div className="flex flex-col sm:flex-row gap-3 justify-end pt-2">
           {updated === null ? (
             <>
               <button
@@ -212,7 +249,15 @@ function CategorySyncModal({
                 disabled={syncing}
                 className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                Later
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleReset()}
+                disabled={syncing}
+                className="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-sm font-semibold hover:bg-amber-100 disabled:opacity-50"
+              >
+                {syncing ? "Working…" : "Reset & remap"}
               </button>
               <button
                 type="button"
@@ -234,6 +279,62 @@ function CategorySyncModal({
           )}
         </div>
       </div>
+
+      {/* Reset confirmation modal */}
+      {resetConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40"
+          role="presentation"
+          onClick={() => !resettingInModal && setResetConfirmOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              Reset and remap {documentId ? "this upload" : "all transactions"}?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This clears saved categories, recomputes short descriptions, then matches category rules again.
+            </p>
+
+            {/* Loading bar */}
+            {resettingInModal && (
+              <div className="mb-4">
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-600 animate-pulse w-full" />
+                </div>
+                <p className="text-xs text-gray-500 mt-2 text-center">Processing…</p>
+              </div>
+            )}
+
+            {resetError && (
+              <p className="text-red-500 text-sm mb-4">{resetError}</p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                disabled={resettingInModal}
+                onClick={() => setResetConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                disabled={resettingInModal}
+                onClick={() => void handleConfirmReset()}
+              >
+                {resettingInModal ? "Processing…" : "Reset & Remap"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -737,7 +838,7 @@ export default function Upload() {
     open: boolean;
     documentId: string | null;
   }>({ open: false, documentId: null });
-  const [unmatchedSummary, setUnmatchedSummary] = useState<{
+  const [, setUnmatchedSummary] = useState<{
     uncategorized_transaction_count: number;
     distinct_uncategorized_descriptions: number;
   } | null>(null);
@@ -745,6 +846,9 @@ export default function Upload() {
   const [deleteDoc, setDeleteDoc] = useState<DocumentRow | null>(null);
   const [editingTxnField, setEditingTxnField] = useState<{ id: string; field: TxnEditableField } | null>(null);
   const [deletingTxnId, setDeletingTxnId] = useState<string | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resettingInModal, setResettingInModal] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const fetchUnmatchedSummary = useCallback(async () => {
     try {
@@ -832,6 +936,7 @@ export default function Upload() {
     fetchTransactions();
     void fetchUnmatchedSummary();
   }, [fetchDocuments, fetchTransactions, fetchUnmatchedSummary]);
+
 
   // Delete transaction
   const handleDeleteTxn = useCallback(async (txnId: string) => {
@@ -1043,24 +1148,6 @@ export default function Upload() {
             </button>
           </div>
           <p className="text-sm text-gray-500 mt-1">Manage your uploaded bank statements and transactions</p>
-          {unmatchedSummary !== null && unmatchedSummary.uncategorized_transaction_count > 0 && (
-            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span>
-                {unmatchedSummary.uncategorized_transaction_count} transaction
-                {unmatchedSummary.uncategorized_transaction_count === 1 ? "" : "s"} still need categories
-                {unmatchedSummary.distinct_uncategorized_descriptions > 0
-                  ? ` (${unmatchedSummary.distinct_uncategorized_descriptions} distinct descriptions).`
-                  : "."}{" "}
-                Run <strong className="font-semibold">AI Sync</strong> on the Categories page to create rules and apply them.
-              </span>
-              <Link
-                to="/categories?from=upload"
-                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-amber-700 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800"
-              >
-                Go to Categories
-              </Link>
-            </div>
-          )}
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════
@@ -1157,13 +1244,15 @@ export default function Upload() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-3">
             <h2 className="text-lg font-semibold text-gray-800 flex-1">All Transactions</h2>
             {pageHasUncategorized && (
-              <button
-                type="button"
-                onClick={() => setCategorySyncModal({ open: true, documentId: null })}
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shrink-0 whitespace-nowrap"
-              >
-                Sync categories
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCategorySyncModal({ open: true, documentId: null })}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shrink-0 whitespace-nowrap"
+                >
+                  Sync categories
+                </button>
+              </>
             )}
             <div className="relative flex-1 max-w-sm">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

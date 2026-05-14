@@ -48,3 +48,33 @@ export async function resolveUnmapped(
   });
   return res.data;
 }
+
+/** Result of POST /categories/apply-mappings (CM match + description rules). */
+export interface CategoryApplyMappingsResult {
+  message: string;
+  updated: number;
+  auto_categorized?: number;
+  rules_applied?: number;
+}
+
+export async function postApplyCategoryMappings(
+  body: { document_id?: string } = {},
+): Promise<CategoryApplyMappingsResult> {
+  const res = await api.post<CategoryApplyMappingsResult>("/categories/apply-mappings", body);
+  return res.data;
+}
+
+/** Result of POST /categories/reset-sync (recompute short_description + full remap). */
+export interface CategoryResetSyncResult {
+  message: string;
+  transactions_touched: number;
+  auto_categorized: number;
+  rules_applied: number;
+}
+
+export async function postResetCategorySync(
+  body: { document_id?: string } = {},
+): Promise<CategoryResetSyncResult> {
+  const res = await api.post<CategoryResetSyncResult>("/categories/reset-sync", body);
+  return res.data;
+}

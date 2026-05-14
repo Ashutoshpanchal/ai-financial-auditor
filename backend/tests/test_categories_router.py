@@ -1174,9 +1174,15 @@ class TestAnalyzeAndCategorize:
     @pytest.fixture(autouse=True)
     def _patch_apply_zero(self) -> None:
         """Avoid ORM/query traffic on the mocked DB after upserts."""
-        with patch(
-            "backend.routers.categories.apply_category_rules_to_transactions",
-            return_value=0,
+        with (
+            patch(
+                "backend.routers.categories.apply_category_rules_to_transactions",
+                return_value=0,
+            ),
+            patch(
+                "backend.routers.categories.auto_categorize_transactions",
+                return_value=0,
+            ),
         ):
             yield
 
@@ -1527,8 +1533,12 @@ class TestApplyMappingsEndpoint:
         with (
             patch("backend.routers.categories.set_rls_user"),
             patch(
+                "backend.routers.categories.auto_categorize_transactions",
+                return_value=1,
+            ) as mock_auto,
+            patch(
                 "backend.routers.categories.apply_category_rules_to_transactions",
-                return_value=4,
+                return_value=3,
             ) as mock_apply,
         ):
             client = _apply_client(db, user)
@@ -1541,8 +1551,11 @@ class TestApplyMappingsEndpoint:
                 _reset_apply_overrides()
 
         assert r.status_code == 200
-        assert r.json() == {"message": "Mappings applied", "updated": 4}
+        body = r.json()
+        assert body["message"] == "Mappings applied"
+        assert body["updated"] == 4
         assert db.execute.call_count == 1
+        mock_auto.assert_called_once_with(db, "user-1", document_id="doc-1")
         mock_apply.assert_called_once_with(db, "user-1", document_id="doc-1")
         db.commit.assert_called_once()
 
@@ -1555,8 +1568,12 @@ class TestApplyMappingsEndpoint:
         with (
             patch("backend.routers.categories.set_rls_user"),
             patch(
+                "backend.routers.categories.auto_categorize_transactions",
+                return_value=5,
+            ) as mock_auto,
+            patch(
                 "backend.routers.categories.apply_category_rules_to_transactions",
-                return_value=12,
+                return_value=7,
             ) as mock_apply,
         ):
             client = _apply_client(db, user)
@@ -1568,5 +1585,107 @@ class TestApplyMappingsEndpoint:
         assert r.status_code == 200
         assert r.json()["updated"] == 12
         assert db.execute.call_count == 0
+        mock_auto.assert_called_once_with(db, "user-2", document_id=None)
         mock_apply.assert_called_once_with(db, "user-2", document_id=None)
+        db.commit.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# POST /categories/reset-sync
+# ---------------------------------------------------------------------------
+
+_reset_sync_app = FastAPI()
+_reset_sync_app.include_router(categories_router)
+
+
+def _reset_sync_client(db: MagicMock, user: MagicMock) -> TestClient:
+    """TestClient with DB and user overrides for reset-sync tests."""
+    from backend.database import get_db
+    from backend.middleware.auth import get_current_user
+
+    _reset_sync_app.dependency_overrides[get_db] = lambda: db
+    _reset_sync_app.dependency_overrides[get_current_user] = lambda: user
+    return TestClient(_reset_sync_app, raise_server_exceptions=True)
+
+
+def _clear_reset_sync_overrides() -> None:
+    _reset_sync_app.dependency_overrides.clear()
+
+
+class TestResetSyncEndpoint:
+    """POST /categories/reset-sync — recompute short_description + remap."""
+
+    def teardown_method(self) -> None:
+        _clear_reset_sync_overrides()
+
+    def test_document_not_found_returns_404(self) -> None:
+        """Unknown document_id yields 404."""
+        db = MagicMock()
+        doc_result = MagicMock()
+        doc_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = doc_result
+        user = MagicMock()
+        user.id = "user-1"
+
+        with patch("backend.routers.categories.set_rls_user"):
+            client = _reset_sync_client(db, user)
+            try:
+                r = client.post(
+                    "/categories/reset-sync",
+                    json={"document_id": "missing-doc"},
+                )
+            finally:
+                _clear_reset_sync_overrides()
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "Document not found."
+
+    def test_global_reset_runs_pipeline(self) -> None:
+        """Without document_id, touches all user rows then auto + rules."""
+        db = MagicMock()
+        txn = MagicMock()
+        txn.description = "UPI Swiggy"
+        txn.short_description = "old"
+        txn.category = "X"
+        txn.parent_category = "P"
+        txn.sub_category = "S"
+        txn.category_master_id = "cm-old"
+
+        tx_result = MagicMock()
+        tx_result.scalars.return_value.all.return_value = [txn]
+        db.execute.return_value = tx_result
+        user = MagicMock()
+        user.id = "user-1"
+
+        with (
+            patch("backend.routers.categories.set_rls_user"),
+            patch(
+                "backend.routers.categories.compute_short_description",
+                return_value="new-short",
+            ),
+            patch(
+                "backend.routers.categories.auto_categorize_transactions",
+                return_value=1,
+            ) as mock_auto,
+            patch(
+                "backend.routers.categories.apply_category_rules_to_transactions",
+                return_value=2,
+            ) as mock_apply,
+        ):
+            client = _reset_sync_client(db, user)
+            try:
+                r = client.post("/categories/reset-sync", json={})
+            finally:
+                _clear_reset_sync_overrides()
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["transactions_touched"] == 1
+        assert body["auto_categorized"] == 1
+        assert body["rules_applied"] == 2
+        assert txn.short_description == "new-short"
+        assert txn.category is None
+        assert txn.category_master_id is None
+        mock_auto.assert_called_once_with(db, "user-1", document_id=None)
+        mock_apply.assert_called_once_with(db, "user-1", document_id=None)
         db.commit.assert_called_once()

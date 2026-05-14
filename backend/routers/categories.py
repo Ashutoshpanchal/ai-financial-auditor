@@ -24,7 +24,9 @@ from backend.models.category_rule import CategoryRule
 from backend.models.document import Document
 from backend.models.transaction import Transaction
 from backend.prompts.category_prompt import category_prompt
+from backend.services.auto_categorize import auto_categorize_transactions
 from backend.services.category_rules_apply import apply_category_rules_to_transactions
+from backend.services.short_description import compute_short_description
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -537,12 +539,11 @@ def list_unmapped_short_descriptions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
-    """Return distinct short_descriptions that have no matching category_master entry.
+    """Return distinct short_descriptions with no ``category_master_id`` on the row.
 
-    A short_description is considered "mapped" when any category_master row
-    (global seed or user-owned) has a sub_category that equals one of the
-    hyphen-separated tokens in the short_description (case-insensitive exact
-    token match).
+    Rows appear here when auto-categorize and description rules did not assign CM.
+    Matching uses hyphen token equality and substring containment against CM
+    ``sub_category`` (see ``auto_categorize_transactions``).
 
     Returns a list of {short_description, txn_count, sample_raw_descriptions}.
     """
@@ -594,6 +595,51 @@ def list_unmapped_short_descriptions(
 
 
 # ---------------------------------------------------------------------------
+# GET /categories/mapped
+# ---------------------------------------------------------------------------
+
+
+@router.get("/mapped")
+def list_mapped_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    """Return all categories with mapped transactions (parent_category, sub_category, txn_count).
+
+    Shows categories that have been assigned to transactions for the current user.
+    """
+    set_rls_user(db, current_user.id)
+
+    # Get all distinct parent/sub categories with transaction counts
+    mapped_rows = db.execute(
+        select(
+            CategoryMaster.parent_category,
+            CategoryMaster.sub_category,
+            func.count(Transaction.id).label("txn_count"),
+        )
+        .join(Transaction, Transaction.category_master_id == CategoryMaster.id)
+        .where(
+            Transaction.user_id == current_user.id,
+            Transaction.category_master_id.isnot(None),
+        )
+        .group_by(CategoryMaster.parent_category, CategoryMaster.sub_category)
+        .order_by(func.count(Transaction.id).desc())
+    ).all()
+
+    result: list[dict] = []
+    for row in mapped_rows:
+        result.append(
+            {
+                "parent_category": row.parent_category,
+                "sub_category": row.sub_category,
+                "txn_count": row.txn_count,
+            }
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # POST /categories/resolve-unmapped
 # ---------------------------------------------------------------------------
 
@@ -627,6 +673,7 @@ def resolve_unmapped_short_description(
         )
 
     # Ensure category_master entry exists (user-owned)
+    # Check for exact match first
     existing_cm = db.execute(
         select(CategoryMaster).where(
             CategoryMaster.user_id == current_user.id,
@@ -635,6 +682,17 @@ def resolve_unmapped_short_description(
         )
     ).scalar_one_or_none()
 
+    # If not found, check for case-insensitive match
+    if existing_cm is None:
+        existing_cm = db.execute(
+            select(CategoryMaster).where(
+                CategoryMaster.user_id == current_user.id,
+                CategoryMaster.parent_category == parent_category,
+                func.lower(CategoryMaster.sub_category) == func.lower(sub_category),
+            )
+        ).scalar_one_or_none()
+
+    # Create new entry only if no match exists
     if existing_cm is None:
         existing_cm = CategoryMaster(
             id=str(uuid.uuid4()),
@@ -767,7 +825,11 @@ def apply_description_mappings_to_transactions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Apply enabled ``category_rules`` to transactions with NULL ``category``.
+    """Run CM auto-match then apply enabled ``category_rules`` to remaining rows.
+
+    First matches ``short_description`` to ``category_master`` (tokens + substring).
+    Then applies description ``category_rules`` to transactions still missing
+    ``category_master_id``.
 
     Optional ``document_id`` limits updates to transactions linked to that document
     (must belong to the caller).
@@ -795,11 +857,86 @@ def apply_description_mappings_to_transactions(
                 detail="Document not found.",
             )
 
-    updated = apply_category_rules_to_transactions(
+    auto_n = auto_categorize_transactions(db, current_user.id, document_id=document_id)
+    rules_n = apply_category_rules_to_transactions(
         db, current_user.id, document_id=document_id
     )
     db.commit()
-    return {"message": "Mappings applied", "updated": updated}
+    return {
+        "message": "Mappings applied",
+        "updated": auto_n + rules_n,
+        "auto_categorized": auto_n,
+        "rules_applied": rules_n,
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /categories/reset-sync
+# ---------------------------------------------------------------------------
+
+
+@router.post("/reset-sync")
+def reset_sync_transactions(
+    body: dict | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Recompute ``short_description``, clear CM fields, then auto + rules mapping.
+
+    Clears ``category``, ``parent_category``, ``sub_category``, and
+    ``category_master_id`` for each affected transaction, recomputes
+    ``short_description`` from ``description``, then runs the same pipeline as
+    ``POST /categories/apply-mappings``.
+
+    Optional ``document_id`` limits work to that document (must belong to caller).
+    """
+    set_rls_user(db, current_user.id)
+
+    payload = body or {}
+    raw_doc = payload.get("document_id")
+    document_id: str | None = None
+    if raw_doc is not None:
+        stripped = str(raw_doc).strip()
+        if stripped:
+            document_id = stripped
+
+    if document_id is not None:
+        exists = db.execute(
+            select(Document.id).where(
+                Document.id == document_id,
+                Document.user_id == current_user.id,
+            )
+        ).scalar_one_or_none()
+        if exists is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found.",
+            )
+
+    q = select(Transaction).where(Transaction.user_id == current_user.id)
+    if document_id is not None:
+        q = q.where(Transaction.document_id == document_id)
+
+    rows = list(db.execute(q).scalars().all())
+    for txn in rows:
+        txn.short_description = compute_short_description(str(txn.description))
+        txn.category = None
+        txn.parent_category = None
+        txn.sub_category = None
+        txn.category_master_id = None
+    db.flush()
+
+    auto_n = auto_categorize_transactions(db, current_user.id, document_id=document_id)
+    rules_n = apply_category_rules_to_transactions(
+        db, current_user.id, document_id=document_id
+    )
+    db.commit()
+    return {
+        "message": "Reset sync complete",
+        "transactions_touched": len(rows),
+        "auto_categorized": auto_n,
+        "rules_applied": rules_n,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -838,7 +975,6 @@ async def analyze_and_categorize(
         .scalars()
         .all()
     )
-    print(raw_desc, flush=True)
     # AI Sync builds rules from description text only; ignore blank / whitespace-only values.
     desc_rows: list[str] = sorted(
         {str(d).strip() for d in raw_desc if d is not None and str(d).strip()}
@@ -916,8 +1052,6 @@ async def analyze_and_categorize(
     )
 
     for chunk_index, chunk in enumerate(chunks, start=1):
-        print(chunk, flush=True)
-
         descriptions_text = "\n".join(
             f"{idx + 1}. {desc}" for idx, desc in enumerate(chunk)
         )
@@ -1049,9 +1183,13 @@ async def analyze_and_categorize(
             )
             total_mapped += 1
 
-    txn_updated = apply_category_rules_to_transactions(db, current_user.id, None)
+    auto_n = auto_categorize_transactions(db, user_id, None)
+    rules_n = apply_category_rules_to_transactions(db, user_id, None)
+    txn_updated = auto_n + rules_n
     logger.debug(
-        "AI Sync: apply rules to transactions updated=%s (%.2fs since start)",
+        "AI Sync: auto=%s rules=%s total=%s (%.2fs since start)",
+        auto_n,
+        rules_n,
         txn_updated,
         time.perf_counter() - t0,
     )
@@ -1067,6 +1205,8 @@ async def analyze_and_categorize(
         "message": "Categorization complete",
         "mapped": total_mapped,
         "transactions_updated": txn_updated,
+        "auto_categorized": auto_n,
+        "rules_applied": rules_n,
     }
 
 
