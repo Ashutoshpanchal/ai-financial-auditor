@@ -317,3 +317,43 @@ describe("Upload page — transaction dropdown filters", () => {
     });
   });
 });
+
+describe("Upload — Split-Pane Layout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApiWithTransactions([makeTransaction({ debit: 500, credit: 0 })]);
+  });
+
+  it("renders with split-pane container marked with data-upload-container", async () => {
+    renderUpload();
+
+    await waitFor(() => {
+      const container = document.querySelector("[data-upload-container]");
+      expect(container).toBeInTheDocument();
+      expect(container).toHaveClass("flex", "flex-col", "h-screen");
+    });
+  });
+
+  it("renders Documents and Transactions sections within panes", async () => {
+    renderUpload();
+
+    await waitFor(() => {
+      expect(screen.getByText("Documents")).toBeInTheDocument();
+      expect(screen.getByText("All Transactions")).toBeInTheDocument();
+    });
+  });
+
+  it("divider element has cursor col-resize and hover styling", async () => {
+    renderUpload();
+
+    await waitFor(() => {
+      // Find the divider by looking for the hover:bg-indigo-400 class
+      const divider = document.querySelector(
+        "[data-upload-container] > div:nth-child(2) > div:nth-child(2)"
+      ) as HTMLElement;
+      expect(divider).toBeInTheDocument();
+      expect(divider).toHaveClass("cursor-col-resize");
+      expect(divider).toHaveClass("hover:bg-indigo-400");
+    });
+  });
+});
