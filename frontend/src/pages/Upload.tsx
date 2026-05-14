@@ -850,6 +850,13 @@ export default function Upload() {
   const [resettingInModal, setResettingInModal] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
 
+  // Split-pane state
+  const [leftPaneWidth, setLeftPaneWidth] = useState(() => {
+    if (typeof window === "undefined") return 400; // default for SSR
+    return Math.max(window.innerWidth * 0.4, 300); // 40% of window, minimum 300px
+  });
+  const [isDragging, setIsDragging] = useState(false);
+
   const fetchUnmatchedSummary = useCallback(async () => {
     try {
       const res = await api.get<{
