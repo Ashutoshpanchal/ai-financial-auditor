@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import (
     APIRouter,
@@ -19,13 +19,16 @@ from fastapi import (
     UploadFile,
     status,
 )
+from sqlalchemy import and_, func, or_
 
 from backend.database import get_db, set_rls_user
 from backend.middleware.auth import get_current_user
 from backend.models.document import Document, DocumentStatus
 from backend.models.transaction import Transaction
 from backend.parsers.csv_parser import parse_csv
+from backend.parsers.pdf_strategies import ALLOWED_PDF_PARSE_STRATEGIES
 from backend.services.drive import upload_file as drive_upload_file
+from backend.services.short_description import compute_short_description
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -131,8 +134,9 @@ async def _run_audit_background(
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile,
-    bank_name: str = Form(...),
+    bank_name: Annotated[str | None, Form()] = None,
     pdf_password: str | None = Form(default=None),
+    pdf_parse_strategy: Annotated[str, Form()] = "auto",
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -140,7 +144,10 @@ async def upload_document(
 
     Accepts multipart/form-data with:
       - file:      The bank statement file (CSV or PDF).
-      - bank_name: Human-readable name of the bank (e.g. 'HDFC', 'SBI').
+      - bank_name: Human-readable name of the bank (e.g. 'HDFC', 'SBI'). When
+        omitted or blank, ``Unknown Bank`` is stored and passed to parsers.
+      - pdf_parse_strategy: For PDFs only — ``auto`` (default), ``tables_only``,
+        or ``text_only``. Ignored for CSV.
 
     The file is uploaded to Google Drive using the authenticated user's stored
     OAuth tokens, a Document record is created, transactions are parsed and
@@ -150,7 +157,7 @@ async def upload_document(
     Args:
         background_tasks: FastAPI BackgroundTasks for deferred audit execution.
         file:             The uploaded file (UploadFile).
-        bank_name:        Bank identifier provided as a form field.
+        bank_name:        Bank identifier from the form (optional; blank → Unknown Bank).
         current_user:     Authenticated user injected by the auth dependency.
         db:               SQLAlchemy session injected by the DB dependency.
 
@@ -174,10 +181,16 @@ async def upload_document(
             ),
         )
 
-    if not bank_name.strip():
+    safe_bank_name = (bank_name or "").strip() or "Unknown Bank"
+
+    pdf_strategy_raw = (pdf_parse_strategy or "auto").strip().lower()
+    if pdf_strategy_raw not in ALLOWED_PDF_PARSE_STRATEGIES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="bank_name is required and must not be empty.",
+            detail=(
+                f"Invalid pdf_parse_strategy '{pdf_parse_strategy}'. "
+                f"Allowed values: {', '.join(ALLOWED_PDF_PARSE_STRATEGIES)}."
+            ),
         )
 
     # --- Read file bytes ---
@@ -242,7 +255,7 @@ async def upload_document(
         id=document_id,
         user_id=current_user.id,
         filename=file.filename or f"statement_{today}.{file_type}",
-        bank_name=bank_name.strip(),
+        bank_name=safe_bank_name,
         file_type=file_type,
         drive_file_id=drive_result["drive_file_id"],
         drive_folder_id=drive_result["drive_folder_id"],
@@ -270,8 +283,6 @@ async def upload_document(
         db.rollback()
         logger.exception("Failed to update document status to parsing: %s", exc)
 
-    safe_bank_name = bank_name.strip()
-
     try:
         if file_type == "csv":
             raw_transactions = parse_csv(file_bytes, bank_name=safe_bank_name)
@@ -284,6 +295,7 @@ async def upload_document(
                     file_bytes,
                     bank_name=safe_bank_name,
                     password=pdf_password or None,
+                    strategy=pdf_strategy_raw,
                 )
             except ImportError as imp_exc:
                 raise ValueError(
@@ -335,6 +347,9 @@ async def upload_document(
                 "bank_name": txn_dict.get("bank_name") or safe_bank_name,
                 "transaction_date": raw_date,
                 "description": txn_dict["description"],
+                "short_description": compute_short_description(
+                    str(txn_dict["description"])
+                ),
                 "debit": float(txn_dict.get("debit", 0.0)),
                 "credit": float(txn_dict.get("credit", 0.0)),
                 "category": txn_dict.get("category"),
@@ -347,6 +362,22 @@ async def upload_document(
             db.add(Transaction(**txn_kwargs))
 
         db.commit()
+
+        # Auto-categorize transactions whose short_description matches a category_master entry
+        try:
+            categorized = auto_categorize_transactions(db, current_user.id, document_id)
+            if categorized:
+                db.commit()
+                logger.info(
+                    "Document %s: auto-categorized %d transactions on upload",
+                    document_id,
+                    categorized,
+                )
+        except Exception:
+            logger.exception(
+                "Auto-categorize failed for document %s (non-fatal)", document_id
+            )
+            db.rollback()
     except Exception as exc:
         db.rollback()
         document.status = DocumentStatus.failed
@@ -731,6 +762,9 @@ def list_document_transactions(
                 "debit": float(txn.debit),
                 "credit": float(txn.credit),
                 "category": txn.category,
+                "parent_category": txn.parent_category,
+                "sub_category": txn.sub_category,
+                "category_master_id": txn.category_master_id,
                 "remarks": txn.remarks,
             }
             for txn in rows
@@ -747,20 +781,32 @@ def list_all_transactions(
     page_size: int = 50,
     search: str = "",
     bank_name: str = "",
+    from_date: date | None = None,
+    to_date: date | None = None,
+    min_amount: float | None = None,
+    max_amount: float | None = None,
+    amount_operator: str = "",
+    amount_value: float | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Return paginated transactions across ALL documents for the current user.
 
-    Supports optional search (matches description, remarks) and bank_name filter.
+    Supports optional search, date filters, amount range on debit/credit, and an optional
+    extra comparison on debit/credit (combined with min/max using AND).
 
     Args:
         page:        Page number (1-indexed).
         page_size:   Rows per page (max 200).
         search:      Free-text search across description and remarks.
-        bank_name:   Filter by bank name.
-        current_user: Authenticated user.
-        db:           SQLAlchemy session.
+        from_date:     Optional inclusive lower bound for transaction date.
+        to_date:       Optional inclusive upper bound for transaction date.
+        min_amount:      Optional lower bound (non-zero debit or non-zero credit in range).
+        max_amount:      Optional upper bound (same). Set both equal for an exact band.
+        amount_operator: Optional extra filter ( <, <=, =, >=, > ) on debit or credit.
+        amount_value:    Value for amount_operator (required together with operator).
+        current_user:    Authenticated user.
+        db:            SQLAlchemy session.
 
     Returns:
         Dict with 'items' list, 'total' count, 'page', 'page_size'.
@@ -768,6 +814,19 @@ def list_all_transactions(
     set_rls_user(db, current_user.id)
     page_size = min(max(page_size, 1), 200)
     offset = (max(page, 1) - 1) * page_size
+    valid_amount_operators = {"<", "<=", "=", ">=", ">"}
+    if amount_operator and amount_operator not in valid_amount_operators:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid amount_operator. Use one of: <, <=, =, >=, >",
+        )
+    if (amount_operator and amount_value is None) or (
+        amount_value is not None and not amount_operator
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="amount_operator and amount_value must be provided together.",
+        )
 
     try:
         query = (
@@ -785,6 +844,40 @@ def list_all_transactions(
                 Transaction.description.ilike(search_lower)
                 | Transaction.bank_name.ilike(search_lower)
             )
+        if from_date is not None:
+            query = query.filter(func.date(Transaction.transaction_date) >= from_date)
+        if to_date is not None:
+            query = query.filter(func.date(Transaction.transaction_date) <= to_date)
+        if min_amount is not None or max_amount is not None:
+            debit_ok = [Transaction.debit > 0]
+            credit_ok = [Transaction.credit > 0]
+            if min_amount is not None:
+                debit_ok.append(Transaction.debit >= min_amount)
+                credit_ok.append(Transaction.credit >= min_amount)
+            if max_amount is not None:
+                debit_ok.append(Transaction.debit <= max_amount)
+                credit_ok.append(Transaction.credit <= max_amount)
+            query = query.filter(or_(and_(*debit_ok), and_(*credit_ok)))
+
+        if amount_operator and amount_value is not None:
+            debit_cmp = [Transaction.debit > 0]
+            credit_cmp = [Transaction.credit > 0]
+            if amount_operator == "<":
+                debit_cmp.append(Transaction.debit < amount_value)
+                credit_cmp.append(Transaction.credit < amount_value)
+            elif amount_operator == "<=":
+                debit_cmp.append(Transaction.debit <= amount_value)
+                credit_cmp.append(Transaction.credit <= amount_value)
+            elif amount_operator == "=":
+                debit_cmp.append(Transaction.debit == amount_value)
+                credit_cmp.append(Transaction.credit == amount_value)
+            elif amount_operator == ">=":
+                debit_cmp.append(Transaction.debit >= amount_value)
+                credit_cmp.append(Transaction.credit >= amount_value)
+            elif amount_operator == ">":
+                debit_cmp.append(Transaction.debit > amount_value)
+                credit_cmp.append(Transaction.credit > amount_value)
+            query = query.filter(or_(and_(*debit_cmp), and_(*credit_cmp)))
 
         total: int = query.count()
         rows = (
@@ -812,6 +905,9 @@ def list_all_transactions(
                 "debit": float(txn.debit),
                 "credit": float(txn.credit),
                 "category": txn.category,
+                "parent_category": txn.parent_category,
+                "sub_category": txn.sub_category,
+                "category_master_id": txn.category_master_id,
                 "remarks": txn.remarks,
             }
             for txn in rows
