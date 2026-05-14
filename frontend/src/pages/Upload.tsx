@@ -857,6 +857,8 @@ export default function Upload() {
   });
   const [isDragging, setIsDragging] = useState(false);
 
+  const MIN_PANE_WIDTH = 300; // pixels
+
   const fetchUnmatchedSummary = useCallback(async () => {
     try {
       const res = await api.get<{
@@ -1136,6 +1138,49 @@ export default function Upload() {
       label: `Also: debit/credit ${txnAmountOperator} ${txnAmountValue}`,
     });
   }
+
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const container = document.querySelector("[data-upload-container]");
+      if (!container) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const newLeftWidth = e.clientX - containerRect.left;
+
+      // Enforce minimum widths
+      const constrainedWidth = Math.max(
+        MIN_PANE_WIDTH,
+        Math.min(newLeftWidth, containerRect.width - MIN_PANE_WIDTH)
+      );
+
+      setLeftPaneWidth(constrainedWidth);
+    },
+    [isDragging, MIN_PANE_WIDTH]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Attach global mouse listeners when dragging
+  useEffect(() => {
+    if (!isDragging) return;
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   return (
     <>
