@@ -1130,7 +1130,595 @@ export default function Categories() {
             </div>
           </div>
         )}
+      </div>
     </div>
   );
 }
 
+/*---FOR REFERENCE - DISABLED SECTIONS BELOW ---*/
+
+{/* ───────────────────────────────────────────────────────────────────────
+          The following sections (Unmapped, Mapped) have been removed for the
+          split-pane dictionary view. They are disabled here for future reference.
+          ─────────────────────────────────────────────────────────────────────── */}
+
+{/* DISABLED: Unmapped tab ─────────────────────────────────────────────── */}
+{false && (
+                          ? "border-gray-200 bg-white text-indigo-700"
+                          : "border-transparent text-gray-500 hover:text-gray-800"
+                      }`}
+                      onClick={() => setDictTab("user_defined")}
+                    >
+                      User-defined
+                    </button>
+                  </div>
+                  <div className="w-full sm:w-80 sm:shrink-0">
+                    <label htmlFor="dictionary-search" className="sr-only">
+                      Search dictionary
+                    </label>
+                    <input
+                      id="dictionary-search"
+                      type="search"
+                      placeholder="Search parent or sub-category…"
+                      value={dictionarySearch}
+                      onChange={(e) => setDictionarySearch(e.target.value)}
+                      className={TABLE_SEARCH_INPUT_CLASS}
+                    />
+                  </div>
+                </div>
+
+                {dictTab === "user_defined" && (
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddError(null);
+                        setNewParent("");
+                        setNewSub("");
+                        setAddModalOpen(true);
+                      }}
+                      className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700"
+                    >
+                      Add Custom Categories
+                    </button>
+                  </div>
+                )}
+
+                {dictTab === "builtin" ? (
+                  <div className="space-y-4">
+                    {Object.keys(masterBuiltin).length === 0 ? (
+                      <p className="text-gray-400 text-sm py-6 text-center">No categories available.</p>
+                    ) : (
+                      Object.keys(masterBuiltin)
+                        .sort()
+                        .filter((parent) => {
+                          const q = dictionarySearch.trim().toLowerCase();
+                          if (!q) return true;
+                          if (parent.toLowerCase().includes(q)) return true;
+                          const subs = masterBuiltin[parent] ?? [];
+                          return subs.some((s) => s.sub_category.toLowerCase().includes(q));
+                        })
+                        .map((parent) => (
+                          <div key={parent} className="border border-gray-200 rounded-lg p-4">
+                            <div className="mb-3">
+                              <CategoryBadge value={parent} />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(masterBuiltin[parent] ?? []).map((sub) => (
+                                <span
+                                  key={sub.id}
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                >
+                                  {capitalizeWords(sub.sub_category)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.keys(masterUser).length === 0 ? (
+                      <p className="text-gray-400 text-sm py-6 text-center">
+                        No user-defined categories yet. Click "Add Category" to create one.
+                      </p>
+                    ) : (
+                      Object.keys(masterUser)
+                        .sort()
+                        .filter((parent) => {
+                          const q = dictionarySearch.trim().toLowerCase();
+                          if (!q) return true;
+                          if (parent.toLowerCase().includes(q)) return true;
+                          const subs = masterUser[parent] ?? [];
+                          return subs.some((s) => s.sub_category.toLowerCase().includes(q));
+                        })
+                        .map((parent) => (
+                          <div key={parent} className="border border-gray-200 rounded-lg p-4">
+                            <div className="mb-3">
+                              <CategoryBadge value={parent} />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(masterUser[parent] ?? []).map((sub) => (
+                                <div
+                                  key={sub.id}
+                                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 group hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
+                                >
+                                  <span>{capitalizeWords(sub.sub_category)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSub(sub.id)}
+                                    className="text-lg leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                    title="Remove"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+          )}
+
+          {/* ── Category rules — hidden from UI; change outer `false` to `true` to restore ─ */}
+          {false && activeTab === "dictionary" && (
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Category rules
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  ({descriptions.length} entries)
+                </span>
+              </h2>
+              <div className="w-full sm:w-80 sm:shrink-0">
+                <label htmlFor="mappings-search" className="sr-only">
+                  Search mappings
+                </label>
+                <input
+                  id="mappings-search"
+                  type="search"
+                  placeholder="Search description, parent, or sub…"
+                  value={descriptionSearch}
+                  onChange={(e) => setDescriptionSearch(e.target.value)}
+                  className={TABLE_SEARCH_INPUT_CLASS}
+                />
+              </div>
+            </div>
+
+            {filteredDescriptions.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-8">No rows match your search.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-base min-w-[56rem] table-fixed">
+                  <colgroup>
+                    <col className="w-[30%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[12%]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wide">
+                      <th className="pb-2 pr-3 font-medium">Pattern</th>
+                      <th className="pb-2 pr-3 font-medium">Category</th>
+                      <th className="pb-2 pr-3 font-medium">Sub-category</th>
+                      <th className="pb-2 pr-3 font-medium">Payment Method</th>
+                      <th className="pb-2 pr-3 font-medium">Last Updated</th>
+                      <th className="pb-2 pr-2 font-medium">Saved</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {descriptionsPageRows.map((row) => {
+                      const subOptions = row.parent_category
+                        ? (masterMerged[row.parent_category] ?? [])
+                        : [];
+                      return (
+                        <tr key={row.id} className="hover:bg-gray-50 align-top">
+                          <td className="py-3 pr-3 text-gray-800 whitespace-normal break-words leading-snug">
+                            {row.description}
+                          </td>
+                          <td className="py-3 pr-3">
+                            <select
+                              value={row.parent_category ?? ""}
+                              onChange={(e) => handleParentChange(row, e.target.value)}
+                              className="w-full min-w-0 border border-gray-200 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                            >
+                              <option value="">—</option>
+                              {parentOptions.map((p) => (
+                                <option key={p} value={p}>
+                                  {p}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 pr-3">
+                            <select
+                              value={row.sub_category ?? ""}
+                              onChange={(e) =>
+                                handleUpdateMapping(row.id, "sub_category", e.target.value)
+                              }
+                              disabled={!row.parent_category}
+                              className="w-full min-w-0 border border-gray-200 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white disabled:opacity-40"
+                            >
+                              <option value="">—</option>
+                              {subOptions.map((s) => (
+                                <option key={s.id} value={capitalizeWords(s.sub_category)}>
+                                  {capitalizeWords(s.sub_category)}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 pr-3">
+                            <select
+                              value={row.payment_method ?? ""}
+                              onChange={(e) =>
+                                handleUpdateMapping(row.id, "payment_method", e.target.value)
+                              }
+                              className="w-full min-w-0 border border-gray-200 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                            >
+                              <option value="">—</option>
+                              {paymentMethods.map((m) => (
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 pr-3 text-sm text-gray-500 whitespace-nowrap">
+                            {row.updated_at
+                              ? new Date(row.updated_at).toLocaleDateString()
+                              : "AI"}
+                          </td>
+                          <td className="py-3 pr-2 text-sm">
+                            {mappingSavedAt[row.id] ? (
+                              <span className="text-green-600 font-medium">Saved</span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <PaginationBar
+              page={descPage}
+              totalItems={filteredDescriptions.length}
+              pageSize={MAPPINGS_PAGE_SIZE}
+              onPageChange={setDescPage}
+              aria-label="Mappings pagination"
+            />
+          </section>
+          )}
+        </div>
+      )}
+
+      {/* Add Category modal */}
+      {addModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          role="presentation"
+          onClick={() => !addSaving && setAddModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-category-title"
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="add-category-title" className="text-lg font-semibold text-gray-900 mb-3">
+              Add Category
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="add-parent" className="block text-xs font-medium text-gray-600 mb-1">
+                  Parent category (PC)
+                </label>
+                <input
+                  id="add-parent"
+                  type="text"
+                  value={newParent}
+                  onChange={(e) => setNewParent(e.target.value)}
+                  list="parent-options-add"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  placeholder="e.g. Food & Dining"
+                />
+                <datalist id="parent-options-add">
+                  {parentOptions.map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label htmlFor="add-sub" className="block text-xs font-medium text-gray-600 mb-1">
+                  Sub-category (SC)
+                </label>
+                <input
+                  id="add-sub"
+                  type="text"
+                  value={newSub}
+                  onChange={(e) => setNewSub(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  placeholder="e.g. Zomato"
+                />
+              </div>
+            </div>
+            {addError && <p className="text-red-500 text-sm mt-3">{addError}</p>}
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                disabled={addSaving}
+                onClick={() => setAddModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                disabled={addSaving}
+                onClick={() => void handleAddSub()}
+              >
+                {addSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename modal */}
+      {editEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          role="presentation"
+          onClick={() => !editSaving && setEditEntry(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-dict-title"
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="rename-dict-title" className="text-lg font-semibold text-gray-900 mb-3">
+              Rename category
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Updates your dictionary entry and any category rules that used this parent and sub-category.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="edit-parent" className="block text-xs font-medium text-gray-600 mb-1">
+                  Parent category
+                </label>
+                <input
+                  id="edit-parent"
+                  type="text"
+                  value={editParent}
+                  onChange={(e) => setEditParent(e.target.value)}
+                  list="parent-options-edit"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <datalist id="parent-options-edit">
+                  {parentOptions.map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label htmlFor="edit-sub" className="block text-xs font-medium text-gray-600 mb-1">
+                  Sub-category
+                </label>
+                <input
+                  id="edit-sub"
+                  type="text"
+                  value={editSub}
+                  onChange={(e) => setEditSub(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </div>
+            </div>
+            {editError && <p className="text-red-500 text-sm mt-3">{editError}</p>}
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                disabled={editSaving}
+                onClick={() => setEditEntry(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                disabled={editSaving}
+                onClick={() => void handleSaveEdit()}
+              >
+                {editSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Re-run confirmation — portaled so no parent stacking context can hide it */}
+      {typeof document !== "undefined" &&
+        analyzeConfirmOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40"
+            role="presentation"
+            onClick={() => setAnalyzeConfirmOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="analyze-confirm-title"
+              className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 id="analyze-confirm-title" className="text-lg font-semibold text-gray-900 mb-2">
+                Re-run AI Sync?
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                The AI will process your transaction descriptions again,{" "}
+                <strong>update</strong> category rules and payment suggestions. It then applies rules to
+                uncategorized transactions. Your manual edits may be overwritten where the model returns a
+                new value for the same description pattern.
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                After you click Continue, the app sends{" "}
+                <code className="rounded bg-gray-100 px-1">POST /categories/analyze</code> (check the{" "}
+                <strong>browser</strong> Network tab — Docker container logs alone will not show this
+                request).
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50"
+                  onClick={() => setAnalyzeConfirmOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => {
+                    setAnalyzeConfirmOpen(false);
+                    void runAnalyze();
+                  }}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Resolve unmapped modal */}
+      {resolveModalOpen && resolveTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          role="presentation"
+          onClick={() => !resolveSaving && setResolveModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resolve-unmapped-title"
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="resolve-unmapped-title" className="text-lg font-semibold text-gray-900 mb-2">
+              Add Category
+            </h3>
+            <p className="text-sm text-gray-600 mb-1">
+              Assign a category to{" "}
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono">
+                {resolveTarget.short_description}
+              </code>
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              This will categorize {resolveTarget.txn_count} transaction{resolveTarget.txn_count !== 1 ? "s" : ""}.
+              {resolveTarget.sample_raw_descriptions[0] && (
+                <> Example: <span className="italic">{resolveTarget.sample_raw_descriptions[0]}</span></>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setResolveModalOpen(false);
+                setAddError(null);
+                setNewParent("");
+                setNewSub("");
+                setAddModalOpen(true);
+              }}
+              className="text-indigo-600 hover:text-indigo-800 text-xs font-medium mb-4 block"
+            >
+              + Add custom category
+            </button>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="resolve-parent" className="block text-xs font-medium text-gray-600 mb-1">
+                  Parent category
+                </label>
+                <select
+                  id="resolve-parent"
+                  value={resolveParent}
+                  onChange={(e) => {
+                    setResolveParent(e.target.value);
+                    setResolveSub("");
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                >
+                  <option value="">— Select a category —</option>
+                  {parentOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="resolve-sub" className="block text-xs font-medium text-gray-600 mb-1">
+                  Sub-category
+                </label>
+                <select
+                  id="resolve-sub"
+                  value={resolveSub}
+                  onChange={(e) => setResolveSub(e.target.value)}
+                  disabled={!resolveParent}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-40"
+                >
+                  <option value="">— Select a sub-category —</option>
+                  {(masterMerged[resolveParent] ?? []).map((s) => (
+                    <option key={s.id} value={capitalizeWords(s.sub_category)}>
+                      {capitalizeWords(s.sub_category)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {resolveError && <p className="text-red-500 text-sm mt-3">{resolveError}</p>}
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                disabled={resolveSaving}
+                onClick={() => setResolveModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                disabled={resolveSaving}
+                onClick={() => void handleResolveUnmapped()}
+              >
+                {resolveSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {analyzing ? (
+        <span className="sr-only" aria-live="polite">
+          Syncing categories
+        </span>
+      ) : null}
+
+    </div>
+  );
+}
