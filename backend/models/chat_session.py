@@ -20,8 +20,16 @@ class ChatSession(Base):
         String, ForeignKey("users.id"), nullable=False, index=True
     )
     title: Mapped[str | None] = mapped_column(String, nullable=True)
+    session_kind: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        server_default="general",
+        default="general",
+    )
     # Full message history as [{role, content, timestamp}]
     messages: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # Widget Studio: {status, intent_summary, pending_questions, last_suggestion}
+    draft_state: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

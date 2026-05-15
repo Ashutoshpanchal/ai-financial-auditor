@@ -27,6 +27,7 @@ from backend.models.document import Document, DocumentStatus
 from backend.models.transaction import Transaction
 from backend.parsers.csv_parser import parse_csv
 from backend.parsers.pdf_strategies import ALLOWED_PDF_PARSE_STRATEGIES
+from backend.services.auto_categorize import auto_categorize_transactions
 from backend.services.drive import upload_file as drive_upload_file
 from backend.services.short_description import compute_short_description
 

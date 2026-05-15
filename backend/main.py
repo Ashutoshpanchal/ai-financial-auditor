@@ -28,6 +28,7 @@ from backend.models import (  # noqa: F401 — side-effect: registers models wit
 from backend.models.base import Base
 from backend.routers import (
     admin,
+    analytics,
     audit,
     auth,
     categories,
@@ -93,6 +94,7 @@ app.include_router(chat.router)
 app.include_router(admin.router)
 app.include_router(transactions.router)
 app.include_router(categories.router)
+app.include_router(analytics.router)
 app.include_router(dashboard_router.router)
 
 

@@ -11,10 +11,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from backend.config import get_settings
 from backend.database import get_db, set_rls_user
 from backend.middleware.auth import get_current_user
 from backend.models.dashboard import UserDashboard
 from backend.models.widget import UserWidget
+from backend.services.preview_rate_limit import (
+    WidgetPreviewRateLimited,
+    check_widget_preview_rate_limit,
+)
 from backend.services.widget_query import (
     describe_widget_query_human,
     resolve_widget_data,
@@ -70,6 +75,8 @@ class WidgetPreviewRequest(BaseModel):
     date_to: date | None = None
     bank_name: str | None = None
     category: str | None = None
+    parent_category: str | None = None
+    sub_category: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +139,18 @@ def preview_widget(
     """
     set_rls_user(db, current_user.id)
 
+    settings = get_settings()
+    if settings.widget_preview_rate_limit_per_minute > 0:
+        try:
+            check_widget_preview_rate_limit(
+                current_user.id, settings.widget_preview_rate_limit_per_minute
+            )
+        except WidgetPreviewRateLimited as exc:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=exc.message,
+            ) from exc
+
     if body.widget_type not in _ALLOWED_WIDGET_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -158,6 +177,9 @@ def preview_widget(
             date_to=body.date_to,
             bank_name=body.bank_name,
             category=body.category,
+            parent_category=body.parent_category,
+            sub_category=body.sub_category,
+            default_month_for_preview=True,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -358,12 +380,14 @@ def get_widget_data(
     date_to: date | None = Query(default=None),
     bank_name: str | None = Query(default=None),
     category: str | None = Query(default=None),
+    parent_category: str | None = Query(default=None),
+    sub_category: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Execute the live data query for a widget and return the result.
 
-    Supports optional query-param filters: date_from, date_to, bank_name, category.
+    Supports optional query-param filters including parent/sub category.
     Global query params override config-level filters when both are supplied.
     Raises 404 if the widget does not exist.
     Raises 422 if the widget's query_config contains invalid aggregation parameters.
@@ -389,6 +413,8 @@ def get_widget_data(
             date_to=date_to,
             bank_name=bank_name,
             category=category,
+            parent_category=parent_category,
+            sub_category=sub_category,
         )
     except ValueError as exc:
         raise HTTPException(

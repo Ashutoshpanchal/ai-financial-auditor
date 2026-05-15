@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type MouseEvent as ReactMouseEvent,
   type SetStateAction,
 } from "react";
 import axios from "axios";
@@ -14,9 +15,10 @@ import type { UnmappedEntry } from "../services/api";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const DICT_PAGE_SIZE = 8;
 const MAPPINGS_PAGE_SIZE = 10;
 const UNMAPPED_PAGE_SIZE = 10;
+/** Parent groups per page in Category Dictionary split panes */
+const DICTIONARY_PARENT_PAGE_SIZE = 20;
 
 /** Same fixed width for Category Dictionary and Description Mappings search fields */
 const TABLE_SEARCH_INPUT_CLASS =
@@ -54,8 +56,6 @@ interface MasterFlatRow {
   sub_category: string;
   is_global: boolean;
 }
-
-type DictionaryTab = "builtin" | "user_defined";
 
 interface MappedCategory {
   parent_category: string;
@@ -102,9 +102,47 @@ function CategoryBadge({ value }: { value: string | null }) {
   if (!value) return <span className="text-gray-400 text-sm">—</span>;
   const cls = CATEGORY_COLORS[value] ?? "bg-slate-100 text-slate-700";
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-block max-w-full break-words [overflow-wrap:anywhere] px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}
+    >
       {value}
     </span>
+  );
+}
+
+function CatalogRefreshButton({
+  pending,
+  onRefresh,
+  "aria-label": ariaLabel = "Refresh category data",
+}: {
+  pending: boolean;
+  onRefresh: () => void | Promise<void>;
+  "aria-label"?: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      aria-label={ariaLabel}
+      onClick={() => void onRefresh()}
+      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+    >
+      <svg
+        className={`w-4 h-4 ${pending ? "animate-spin" : ""}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        viewBox="0 0 24 24"
+        aria-hidden
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M16.023 9.348h4.992V4.356m-1.636 13.645A9 9 0 1119.643 7.357l1.372 1.991"
+        />
+      </svg>
+      {pending ? "Refreshing…" : "Refresh"}
+    </button>
   );
 }
 
@@ -185,10 +223,10 @@ export default function Categories() {
   const [analyzeConfirmOpen, setAnalyzeConfirmOpen] = useState(false);
 
   const [dictionaryOpen, setDictionaryOpen] = useState(true);
-  const [dictTab, setDictTab] = useState<DictionaryTab>("builtin");
   const [dictionarySearch, setDictionarySearch] = useState("");
+  const [dictBuiltinPage, setDictBuiltinPage] = useState(1);
+  const [dictUserPage, setDictUserPage] = useState(1);
   const [descriptionSearch, setDescriptionSearch] = useState("");
-  const [dictPage, setDictPage] = useState(1);
   const [descPage, setDescPage] = useState(1);
 
   const [newParent, setNewParent] = useState("");
@@ -226,12 +264,15 @@ export default function Categories() {
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [showBulkControls, setShowBulkControls] = useState(false);
 
-  // Split-pane state for dictionary
-  const [leftPaneWidth, setLeftPaneWidth] = useState(() => {
-    if (typeof window === "undefined") return 400;
-    return Math.max(window.innerWidth * 0.4, 300);
+  /** Resizable split between built-in and user-defined dictionary (same pattern as Upload). */
+  const [dictLeftPaneWidth, setDictLeftPaneWidth] = useState(() => {
+    if (typeof window === "undefined") return 480;
+    return Math.min(Math.max(window.innerWidth * 0.46, 360), Math.floor(window.innerWidth * 0.62));
   });
-  const [isDragging, setIsDragging] = useState(false);
+  const [dictSplitDragging, setDictSplitDragging] = useState(false);
+  const DICT_MIN_PANE = 300;
+
+  const [catalogRefreshPending, setCatalogRefreshPending] = useState(false);
 
   const analyzeAbortRef = useRef<AbortController | null>(null);
 
@@ -279,6 +320,21 @@ export default function Categories() {
     }
   }, []);
 
+  const handleRefreshCatalog = useCallback(async () => {
+    setCatalogRefreshPending(true);
+    try {
+      await Promise.all([
+        loadMaster(),
+        loadDescriptions(),
+        loadPaymentMethods(),
+        loadUnmapped(),
+        loadMapped(),
+      ]);
+    } finally {
+      setCatalogRefreshPending(false);
+    }
+  }, [loadMaster, loadDescriptions, loadPaymentMethods, loadUnmapped, loadMapped]);
+
   useEffect(() => {
     loadMaster();
     loadDescriptions();
@@ -295,10 +351,6 @@ export default function Categories() {
   );
 
   useEffect(() => {
-    setDictPage(1);
-  }, [dictionarySearch, dictTab]);
-
-  useEffect(() => {
     setDescPage(1);
   }, [descriptionSearch]);
 
@@ -306,36 +358,13 @@ export default function Categories() {
     setUnmappedPage(1);
   }, [unmappedSearch]);
 
-  const activeDictionaryMaster: MasterData = dictTab === "builtin" ? masterBuiltin : masterUser;
-
-  const masterFlatRows: MasterFlatRow[] = useMemo(() => {
-    const rows: MasterFlatRow[] = [];
-    const parents = Object.keys(activeDictionaryMaster).sort((a, b) => a.localeCompare(b));
-    for (const parent of parents) {
-      for (const entry of activeDictionaryMaster[parent] ?? []) {
-        rows.push({
-          id: entry.id,
-          parent_category: parent,
-          sub_category: entry.sub_category,
-          is_global: entry.is_global !== false,
-        });
-      }
-    }
-    return rows;
-  }, [activeDictionaryMaster]);
+  useEffect(() => {
+    setDictBuiltinPage(1);
+    setDictUserPage(1);
+  }, [dictionarySearch]);
 
   /** Show dictionary + rules tables once master or rules data exists (not only when rules are non-empty). */
   const showFullCatalogUi = descriptions.length > 0 || Object.keys(masterMerged).length > 0;
-
-  const filteredDictionaryRows = useMemo(() => {
-    const q = dictionarySearch.trim().toLowerCase();
-    if (!q) return masterFlatRows;
-    return masterFlatRows.filter(
-      (r) =>
-        r.parent_category.toLowerCase().includes(q) ||
-        r.sub_category.toLowerCase().includes(q),
-    );
-  }, [masterFlatRows, dictionarySearch]);
 
   const filteredDescriptions = useMemo(() => {
     const q = descriptionSearch.trim().toLowerCase();
@@ -347,11 +376,6 @@ export default function Categories() {
       return d.includes(q) || p.includes(q) || s.includes(q);
     });
   }, [descriptions, descriptionSearch]);
-
-  const dictionaryPageRows = useMemo(() => {
-    const start = (dictPage - 1) * DICT_PAGE_SIZE;
-    return filteredDictionaryRows.slice(start, start + DICT_PAGE_SIZE);
-  }, [filteredDictionaryRows, dictPage]);
 
   const descriptionsPageRows = useMemo(() => {
     const start = (descPage - 1) * MAPPINGS_PAGE_SIZE;
@@ -374,6 +398,38 @@ export default function Categories() {
     const start = (unmappedPage - 1) * UNMAPPED_PAGE_SIZE;
     return filteredUnmappedEntries.slice(start, start + UNMAPPED_PAGE_SIZE);
   }, [filteredUnmappedEntries, unmappedPage]);
+
+  const filteredBuiltinParents = useMemo(() => {
+    const keys = Object.keys(masterBuiltin).sort();
+    const q = dictionarySearch.trim().toLowerCase();
+    if (!q) return keys;
+    return keys.filter((parent) => {
+      if (parent.toLowerCase().includes(q)) return true;
+      const subs = masterBuiltin[parent] ?? [];
+      return subs.some((s) => s.sub_category.toLowerCase().includes(q));
+    });
+  }, [masterBuiltin, dictionarySearch]);
+
+  const filteredUserParents = useMemo(() => {
+    const keys = Object.keys(masterUser).sort();
+    const q = dictionarySearch.trim().toLowerCase();
+    if (!q) return keys;
+    return keys.filter((parent) => {
+      if (parent.toLowerCase().includes(q)) return true;
+      const subs = masterUser[parent] ?? [];
+      return subs.some((s) => s.sub_category.toLowerCase().includes(q));
+    });
+  }, [masterUser, dictionarySearch]);
+
+  const paginatedBuiltinParents = useMemo(() => {
+    const start = (dictBuiltinPage - 1) * DICTIONARY_PARENT_PAGE_SIZE;
+    return filteredBuiltinParents.slice(start, start + DICTIONARY_PARENT_PAGE_SIZE);
+  }, [filteredBuiltinParents, dictBuiltinPage]);
+
+  const paginatedUserParents = useMemo(() => {
+    const start = (dictUserPage - 1) * DICTIONARY_PARENT_PAGE_SIZE;
+    return filteredUserParents.slice(start, start + DICTIONARY_PARENT_PAGE_SIZE);
+  }, [filteredUserParents, dictUserPage]);
 
   const parentOptions = Object.keys(masterMerged).sort();
 
@@ -452,13 +508,6 @@ export default function Categories() {
     } catch {
       setMutateError("Failed to delete entry — only categories you created can be removed.");
     }
-  }
-
-  function openEditModal(row: MasterFlatRow) {
-    setEditError(null);
-    setEditEntry(row);
-    setEditParent(row.parent_category);
-    setEditSub(row.sub_category);
   }
 
   async function handleSaveEdit() {
@@ -591,88 +640,150 @@ export default function Categories() {
     });
   }, [filteredUnmappedEntries.length]);
 
-  // Split-pane handlers
-  const MIN_PANE_WIDTH = 300;
+  useEffect(() => {
+    setDictBuiltinPage((p) => {
+      const totalPages = Math.max(
+        1,
+        Math.ceil(filteredBuiltinParents.length / DICTIONARY_PARENT_PAGE_SIZE),
+      );
+      return p > totalPages ? totalPages : p;
+    });
+  }, [filteredBuiltinParents.length]);
 
-  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+  useEffect(() => {
+    setDictUserPage((p) => {
+      const totalPages = Math.max(
+        1,
+        Math.ceil(filteredUserParents.length / DICTIONARY_PARENT_PAGE_SIZE),
+      );
+      return p > totalPages ? totalPages : p;
+    });
+  }, [filteredUserParents.length]);
+
+  const handleDictDividerMouseDown = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(true);
+    setDictSplitDragging(true);
   }, []);
 
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging) return;
-
-      const container = document.querySelector("[data-categories-container]");
+  const handleDictSplitMouseMove = useCallback(
+    (e: globalThis.MouseEvent) => {
+      if (!dictSplitDragging) return;
+      const container = document.querySelector("[data-categories-dict-split]");
       if (!container) return;
-
-      const containerRect = container.getBoundingClientRect();
-      const newLeftWidth = e.clientX - containerRect.left;
-
-      const constrainedWidth = Math.max(
-        MIN_PANE_WIDTH,
-        Math.min(newLeftWidth, containerRect.width - MIN_PANE_WIDTH)
-      );
-
-      setLeftPaneWidth(constrainedWidth);
+      const rect = container.getBoundingClientRect();
+      const next = e.clientX - rect.left;
+      const max = rect.width - DICT_MIN_PANE;
+      setDictLeftPaneWidth(Math.max(DICT_MIN_PANE, Math.min(next, max)));
     },
-    [isDragging]
+    [dictSplitDragging, DICT_MIN_PANE],
   );
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
+  const handleDictSplitMouseUp = useCallback(() => {
+    setDictSplitDragging(false);
   }, []);
 
   useEffect(() => {
-    if (!isDragging) return;
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
+    if (!dictSplitDragging) return;
+    document.addEventListener("mousemove", handleDictSplitMouseMove);
+    document.addEventListener("mouseup", handleDictSplitMouseUp);
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mousemove", handleDictSplitMouseMove);
+      document.removeEventListener("mouseup", handleDictSplitMouseUp);
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [dictSplitDragging, handleDictSplitMouseMove, handleDictSplitMouseUp]);
 
   return (
-    <div className="flex flex-col h-screen" data-categories-container>
-      {/* Header */}
-      <div className="px-4 sm:px-6 lg:px-8 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-        <h1 className="text-xl font-bold text-gray-900">Category Dictionary</h1>
-      </div>
-
-      {/* Error messages */}
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       {mutateError && (
-        <div className="mx-4 sm:mx-6 lg:mx-8 mt-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
           {mutateError}
         </div>
       )}
 
       {analyzeError && (
-        <div className="mx-4 sm:mx-6 lg:mx-8 mt-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
           {analyzeError}
         </div>
       )}
 
-      {/* Empty state */}
-      {!showFullCatalogUi && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white/60 p-6 flex flex-col justify-center text-center">
-            <p className="text-gray-700 font-medium mb-2">No category data yet</p>
-            <p className="text-sm text-gray-600 max-w-xl">
-              Upload a statement or add dictionary entries. Data loads automatically when you open this page.
-            </p>
-          </div>
+      {analyzeInfo && (
+        <div className="mb-4 bg-slate-100 border border-slate-200 text-slate-800 text-sm rounded-lg px-4 py-2">
+          {analyzeInfo}
         </div>
       )}
 
-      {/* Split-pane dictionary */}
+      {/* ── Empty state ───────────────────────────────────────────────────── */}
+      {!showFullCatalogUi && (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-white/60 p-6 min-h-[40vh] mb-8 flex flex-col justify-center">
+          <p className="text-gray-700 font-medium mb-2">No category data yet</p>
+          <p className="text-sm text-gray-600 max-w-xl mb-4">
+            Upload a statement or add dictionary entries. Data loads automatically when you open this page.
+          </p>
+          <CatalogRefreshButton
+            pending={catalogRefreshPending}
+            onRefresh={handleRefreshCatalog}
+            aria-label="Reload category data"
+          />
+        </div>
+      )}
+
+      {/* ── Full-width dictionary (collapsible) + mappings ───────────────── */}
       {showFullCatalogUi && (
-        <div className="flex-1 grid" style={{ gridTemplateColumns: `${leftPaneWidth}px 4px 1fr`, gap: 0 }}>
-          {/* LEFT PANE: Built-in */}
-          <div className="overflow-y-auto border-r border-gray-200 bg-white">
-            <div className="p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col gap-8">
+          {/* Tab bar: Dictionary | Unmapped | Mapped */}
+          <div className="flex flex-wrap items-end gap-1 border-b border-gray-200">
+            <div className="flex items-center gap-1 min-w-0">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "dictionary"}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  activeTab === "dictionary"
+                    ? "border-indigo-600 text-indigo-700"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+                onClick={() => setActiveTab("dictionary")}
+              >
+                Category Dictionary
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "unmapped"}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                  activeTab === "unmapped"
+                    ? "border-indigo-600 text-indigo-700"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+                onClick={() => setActiveTab("unmapped")}
+              >
+                Unmapped
+                {unmappedEntries.length > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                    {unmappedEntries.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "mapped"}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                  activeTab === "mapped"
+                    ? "border-indigo-600 text-indigo-700"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+                onClick={() => setActiveTab("mapped")}
+              >
+                Mapped
+                {mappedCategories.length > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                    {mappedCategories.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
 
           {/* ── Unmapped tab ─────────────────────────────────────────────── */}
           {activeTab === "unmapped" && (
@@ -687,18 +798,25 @@ export default function Categories() {
                     </span>
                   )}
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddError(null);
-                    setNewParent("");
-                    setNewSub("");
-                    setAddModalOpen(true);
-                  }}
-                  className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 shrink-0"
-                >
-                  Add Custom Categories
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CatalogRefreshButton
+                    pending={catalogRefreshPending}
+                    onRefresh={handleRefreshCatalog}
+                    aria-label="Refresh unmapped merchants"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddError(null);
+                      setNewParent("");
+                      setNewSub("");
+                      setAddModalOpen(true);
+                    }}
+                    className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 shrink-0"
+                  >
+                    Add Custom Categories
+                  </button>
+                </div>
               </div>
 
               {unmappedEntries.length > 0 && (
@@ -915,18 +1033,25 @@ export default function Categories() {
                     </span>
                   )}
                 </h2>
-                <div className="w-full sm:w-80 sm:shrink-0">
-                  <label htmlFor="mapped-search" className="sr-only">
-                    Search mapped categories
-                  </label>
-                  <input
-                    id="mapped-search"
-                    type="search"
-                    placeholder="Search category…"
-                    value={mappedSearch}
-                    onChange={(e) => setMappedSearch(e.target.value)}
-                    className={TABLE_SEARCH_INPUT_CLASS}
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+                  <CatalogRefreshButton
+                    pending={catalogRefreshPending}
+                    onRefresh={handleRefreshCatalog}
+                    aria-label="Refresh mapped categories"
                   />
+                  <div className="w-full sm:w-80 sm:shrink-0">
+                    <label htmlFor="mapped-search" className="sr-only">
+                      Search mapped categories
+                    </label>
+                    <input
+                      id="mapped-search"
+                      type="search"
+                      placeholder="Search category…"
+                      value={mappedSearch}
+                      onChange={(e) => setMappedSearch(e.target.value)}
+                      className={TABLE_SEARCH_INPUT_CLASS}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -980,178 +1105,36 @@ export default function Categories() {
           )}
 
           {/* ── Dictionary tab ──────────────────────────────────────────── */}
-              {/* Built-in Categories Header */}
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Built-in</h3>
-                <p className="text-xs text-gray-500 mt-1">System-provided categories</p>
+          {activeTab === "dictionary" && (
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 gap-y-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setDictionaryOpen((v) => !v)}
+                  className="shrink-0 rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                  aria-expanded={dictionaryOpen}
+                  aria-label={dictionaryOpen ? "Collapse category dictionary" : "Expand category dictionary"}
+                  title={dictionaryOpen ? "Collapse" : "Expand"}
+                >
+                  <svg
+                    className={`h-5 w-5 transition-transform ${dictionaryOpen ? "rotate-90" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <h2 className="text-lg font-semibold text-gray-800">Category Dictionary</h2>
               </div>
-
-              {/* Built-in Content */}
-              <div className="space-y-4">
-                {Object.keys(masterBuiltin).length === 0 ? (
-                  <p className="text-gray-400 text-sm py-6 text-center">No built-in categories available.</p>
-                ) : (
-                  Object.keys(masterBuiltin)
-                    .sort()
-                    .filter((parent) => {
-                      const q = dictionarySearch.trim().toLowerCase();
-                      if (!q) return true;
-                      if (parent.toLowerCase().includes(q)) return true;
-                      const subs = masterBuiltin[parent] ?? [];
-                      return subs.some((s) => s.sub_category.toLowerCase().includes(q));
-                    })
-                    .map((parent) => (
-                      <div key={parent} className="border border-gray-200 rounded-lg p-4">
-                        <div className="mb-3">
-                          <CategoryBadge value={parent} />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {(masterBuiltin[parent] ?? []).map((sub) => (
-                            <span
-                              key={sub.id}
-                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
-                            >
-                              {capitalizeWords(sub.sub_category)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                )}
-              </div>
-
-              {/* Search for Built-in (optional) */}
-              <div className="mt-4">
-                <input
-                  type="text"
-                  placeholder="Search built-in categories…"
-                  value={dictionarySearch}
-                  onChange={(e) => setDictionarySearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                />
-              </div>
-            </div>
-
-            {/* DIVIDER */}
-            <div
-              className={`bg-gray-200 cursor-col-resize hover:bg-indigo-400 transition-colors ${
-                isDragging ? "bg-indigo-500" : ""
-              }`}
-              onMouseDown={handleDividerMouseDown}
-              style={{ userSelect: "none" }}
-            />
-
-            {/* RIGHT PANE: User-defined */}
-            <div className="overflow-y-auto bg-white">
-              <div className="p-4 sm:p-6 space-y-4">
-                {/* User-defined Categories Header */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800">User-defined</h3>
-                      <p className="text-xs text-gray-500 mt-1">Your custom categories</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddError(null);
-                        setNewParent("");
-                        setNewSub("");
-                        setAddModalOpen(true);
-                      }}
-                      className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700 whitespace-nowrap"
-                    >
-                      Add Category
-                    </button>
-                  </div>
-                </div>
-
-                {/* User-defined Content */}
-                <div className="space-y-4">
-                  {Object.keys(masterUser).length === 0 ? (
-                    <p className="text-gray-400 text-sm py-6 text-center">
-                      No user-defined categories yet. Click "Add Category" to create one.
-                    </p>
-                  ) : (
-                    Object.keys(masterUser)
-                      .sort()
-                      .filter((parent) => {
-                        const q = dictionarySearch.trim().toLowerCase();
-                        if (!q) return true;
-                        if (parent.toLowerCase().includes(q)) return true;
-                        const subs = masterUser[parent] ?? [];
-                        return subs.some((s) => s.sub_category.toLowerCase().includes(q));
-                      })
-                      .map((parent) => (
-                        <div key={parent} className="border border-gray-200 rounded-lg p-4">
-                          <div className="mb-3 flex items-center justify-between">
-                            <CategoryBadge value={parent} />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const entry = masterUser[parent]?.find(s => s.id);
-                                if (entry) {
-                                  setEditEntry({ id: entry.id, parent_category: parent, sub_category: parent });
-                                  setEditParent(parent);
-                                  setEditSub(parent);
-                                }
-                              }}
-                              className="text-xs text-indigo-600 hover:text-indigo-800"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {(masterUser[parent] ?? []).map((sub) => (
-                              <span
-                                key={sub.id}
-                                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200"
-                              >
-                                {capitalizeWords(sub.sub_category)}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))
-                  )}
-                </div>
-
-                {/* Search for User-defined (optional) */}
-                <div className="mt-4">
-                  <input
-                    type="text"
-                    placeholder="Search user-defined categories…"
-                    value={dictionarySearch}
-                    onChange={(e) => setDictionarySearch(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              {dictionaryOpen && (
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end sm:ml-auto">
+                  <CatalogRefreshButton
+                    pending={catalogRefreshPending}
+                    onRefresh={handleRefreshCatalog}
+                    aria-label="Refresh category dictionary"
                   />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/*---FOR REFERENCE - DISABLED SECTIONS BELOW ---*/
-
-{/* ───────────────────────────────────────────────────────────────────────
-          The following sections (Unmapped, Mapped) have been removed for the
-          split-pane dictionary view. They are disabled here for future reference.
-          ─────────────────────────────────────────────────────────────────────── */}
-
-{/* DISABLED: Unmapped tab ─────────────────────────────────────────────── */}
-{false && (
-                          ? "border-gray-200 bg-white text-indigo-700"
-                          : "border-transparent text-gray-500 hover:text-gray-800"
-                      }`}
-                      onClick={() => setDictTab("user_defined")}
-                    >
-                      User-defined
-                    </button>
-                  </div>
                   <div className="w-full sm:w-80 sm:shrink-0">
                     <label htmlFor="dictionary-search" className="sr-only">
                       Search dictionary
@@ -1166,107 +1149,158 @@ export default function Categories() {
                     />
                   </div>
                 </div>
+              )}
+            </div>
 
-                {dictTab === "user_defined" && (
-                  <div className="mb-4 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddError(null);
-                        setNewParent("");
-                        setNewSub("");
-                        setAddModalOpen(true);
-                      }}
-                      className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700"
-                    >
-                      Add Custom Categories
-                    </button>
-                  </div>
-                )}
-
-                {dictTab === "builtin" ? (
-                  <div className="space-y-4">
-                    {Object.keys(masterBuiltin).length === 0 ? (
-                      <p className="text-gray-400 text-sm py-6 text-center">No categories available.</p>
-                    ) : (
-                      Object.keys(masterBuiltin)
-                        .sort()
-                        .filter((parent) => {
-                          const q = dictionarySearch.trim().toLowerCase();
-                          if (!q) return true;
-                          if (parent.toLowerCase().includes(q)) return true;
-                          const subs = masterBuiltin[parent] ?? [];
-                          return subs.some((s) => s.sub_category.toLowerCase().includes(q));
-                        })
-                        .map((parent) => (
-                          <div key={parent} className="border border-gray-200 rounded-lg p-4">
-                            <div className="mb-3">
-                              <CategoryBadge value={parent} />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {(masterBuiltin[parent] ?? []).map((sub) => (
-                                <span
-                                  key={sub.id}
-                                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                >
-                                  {capitalizeWords(sub.sub_category)}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ))
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {Object.keys(masterUser).length === 0 ? (
-                      <p className="text-gray-400 text-sm py-6 text-center">
-                        No user-defined categories yet. Click "Add Category" to create one.
-                      </p>
-                    ) : (
-                      Object.keys(masterUser)
-                        .sort()
-                        .filter((parent) => {
-                          const q = dictionarySearch.trim().toLowerCase();
-                          if (!q) return true;
-                          if (parent.toLowerCase().includes(q)) return true;
-                          const subs = masterUser[parent] ?? [];
-                          return subs.some((s) => s.sub_category.toLowerCase().includes(q));
-                        })
-                        .map((parent) => (
-                          <div key={parent} className="border border-gray-200 rounded-lg p-4">
-                            <div className="mb-3">
-                              <CategoryBadge value={parent} />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {(masterUser[parent] ?? []).map((sub) => (
-                                <div
-                                  key={sub.id}
-                                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 group hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
-                                >
-                                  <span>{capitalizeWords(sub.sub_category)}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteSub(sub.id)}
-                                    className="text-lg leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                    title="Remove"
+            {dictionaryOpen && (
+              <>
+                <div
+                  className="rounded-xl border border-gray-200 bg-gray-50/80 overflow-x-auto"
+                  data-categories-dict-split
+                >
+                  <div
+                    className="grid w-full min-h-[min(400px,50vh)] max-h-[min(1200px,calc(100vh-10rem))] items-stretch min-w-[min(100%,560px)]"
+                    style={{ gridTemplateColumns: `${dictLeftPaneWidth}px 4px 1fr`, gap: 0 }}
+                  >
+                    {/* Left: built-in */}
+                    <div className="flex flex-col min-h-0 min-w-0 bg-white border-r border-gray-200">
+                      <div className="shrink-0 p-4 border-b border-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-800">Built-in</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">System category dictionary (read-only)</p>
+                      </div>
+                      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto p-4 space-y-4">
+                        {Object.keys(masterBuiltin).length === 0 ? (
+                          <p className="text-gray-400 text-sm py-6 text-center">No categories available.</p>
+                        ) : filteredBuiltinParents.length === 0 ? (
+                          <p className="text-gray-400 text-sm py-6 text-center">No rows match your search.</p>
+                        ) : (
+                          paginatedBuiltinParents.map((parent) => (
+                            <div
+                              key={parent}
+                              className="border border-gray-200 rounded-lg p-4 bg-white min-w-0 max-w-full"
+                            >
+                              <div className="mb-3 min-w-0">
+                                <CategoryBadge value={parent} />
+                              </div>
+                              <div className="flex flex-wrap gap-2 min-w-0">
+                                {(masterBuiltin[parent] ?? []).map((sub) => (
+                                  <span
+                                    key={sub.id}
+                                    className="inline-flex items-center max-w-full px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 break-words [overflow-wrap:anywhere]"
                                   >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
+                                    {capitalizeWords(sub.sub_category)}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ))
-                    )}
+                          ))
+                        )}
+                      </div>
+                      {Object.keys(masterBuiltin).length > 0 && (
+                        <div className="shrink-0 px-2 pb-2 bg-white">
+                          <PaginationBar
+                            page={dictBuiltinPage}
+                            totalItems={filteredBuiltinParents.length}
+                            pageSize={DICTIONARY_PARENT_PAGE_SIZE}
+                            onPageChange={setDictBuiltinPage}
+                            aria-label="Built-in dictionary pagination"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize built-in and user-defined panes"
+                      className={`bg-gray-200 cursor-col-resize hover:bg-indigo-400 transition-colors shrink-0 ${
+                        dictSplitDragging ? "bg-indigo-500" : ""
+                      }`}
+                      onMouseDown={handleDictDividerMouseDown}
+                      style={{ userSelect: "none" }}
+                    />
+
+                    {/* Right: user-defined */}
+                    <div className="flex flex-col min-h-0 min-w-0 bg-white">
+                      <div className="shrink-0 p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-800">User-defined</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">Your custom dictionary entries</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddError(null);
+                            setNewParent("");
+                            setNewSub("");
+                            setAddModalOpen(true);
+                          }}
+                          className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700 shrink-0"
+                        >
+                          Add Custom Categories
+                        </button>
+                      </div>
+                      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto p-4 space-y-4">
+                        {Object.keys(masterUser).length === 0 ? (
+                          <p className="text-gray-400 text-sm py-6 text-center">
+                            {`No user-defined categories yet. Use "Add Custom Categories" above to create your first entry.`}
+                          </p>
+                        ) : filteredUserParents.length === 0 ? (
+                          <p className="text-gray-400 text-sm py-6 text-center">No rows match your search.</p>
+                        ) : (
+                          paginatedUserParents.map((parent) => (
+                            <div
+                              key={parent}
+                              className="border border-gray-200 rounded-lg p-4 bg-white min-w-0 max-w-full"
+                            >
+                              <div className="mb-3 min-w-0">
+                                <CategoryBadge value={parent} />
+                              </div>
+                              <div className="flex flex-wrap gap-2 min-w-0">
+                                {(masterUser[parent] ?? []).map((sub) => (
+                                  <div
+                                    key={sub.id}
+                                    className="inline-flex items-center gap-2 max-w-full px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 group hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
+                                  >
+                                    <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+                                      {capitalizeWords(sub.sub_category)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSub(sub.id)}
+                                      className="text-lg leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                      title="Remove"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {Object.keys(masterUser).length > 0 && (
+                        <div className="shrink-0 px-2 pb-2 bg-white">
+                          <PaginationBar
+                            page={dictUserPage}
+                            totalItems={filteredUserParents.length}
+                            pageSize={DICTIONARY_PARENT_PAGE_SIZE}
+                            onPageChange={setDictUserPage}
+                            aria-label="User-defined dictionary pagination"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
               </>
             )}
           </section>
           )}
 
           {/* ── Category rules — hidden from UI; change outer `false` to `true` to restore ─ */}
+          {/* eslint-disable-next-line no-constant-binary-expression */}
           {false && activeTab === "dictionary" && (
           <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

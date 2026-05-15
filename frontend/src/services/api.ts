@@ -78,3 +78,74 @@ export async function postResetCategorySync(
   const res = await api.post<CategoryResetSyncResult>("/categories/reset-sync", body);
   return res.data;
 }
+
+// ─── Category insights (PC × month × SC) ─────────────────────────────────────
+
+export type FlowMode = "debit" | "credit" | "both";
+
+export interface CategoryFlowRow {
+  parent_category: string;
+  month: string;
+  sub_category: string;
+  debit_total: number;
+  credit_total: number;
+  txn_count: number;
+}
+
+export interface CategoryFlowResponse {
+  rows: CategoryFlowRow[];
+  totals: { debit: number; credit: number; txn_count: number };
+  truncated: boolean;
+  truncated_reason?: string;
+}
+
+export async function fetchCategoryFlow(params: {
+  dateFrom: string;
+  dateTo: string;
+  parentCategory: string;
+  subCategories?: string[];
+  mode: FlowMode;
+}): Promise<CategoryFlowResponse> {
+  const q = new URLSearchParams();
+  q.set("date_from", params.dateFrom);
+  q.set("date_to", params.dateTo);
+  q.set("parent_category", params.parentCategory);
+  q.set("mode", params.mode);
+  if (params.subCategories?.length) {
+    for (const s of params.subCategories) {
+      q.append("sub_category", s);
+    }
+  }
+  const res = await api.get<CategoryFlowResponse>(`/analytics/category-flow?${q.toString()}`);
+  return res.data;
+}
+
+export interface CategoryFlowParentRow {
+  parent_category: string;
+  month: string;
+  debit_total: number;
+  credit_total: number;
+  txn_count: number;
+}
+
+export interface CategoryFlowByParentResponse {
+  rows: CategoryFlowParentRow[];
+  totals: { debit: number; credit: number; txn_count: number };
+  truncated: boolean;
+  truncated_reason?: string;
+}
+
+export async function fetchCategoryFlowByParent(params: {
+  dateFrom: string;
+  dateTo: string;
+  mode: FlowMode;
+}): Promise<CategoryFlowByParentResponse> {
+  const q = new URLSearchParams();
+  q.set("date_from", params.dateFrom);
+  q.set("date_to", params.dateTo);
+  q.set("mode", params.mode);
+  const res = await api.get<CategoryFlowByParentResponse>(
+    `/analytics/category-flow-by-parent?${q.toString()}`,
+  );
+  return res.data;
+}

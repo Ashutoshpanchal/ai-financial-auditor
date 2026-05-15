@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     # Dev-only bypass login (ignored in production)
     dev_login_password: str | None = None
 
+    # Widget Studio / dashboard preview — 0 disables per-user sliding-window limit.
+    widget_preview_rate_limit_per_minute: int = 0
+    # Reserved for future API/UI gating (defaults on).
+    widget_studio_enabled: bool = True
+
     @property
     def active_backends(self) -> list[str]:
         """Return list of enabled observability backend names."""

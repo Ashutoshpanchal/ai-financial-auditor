@@ -50,6 +50,14 @@ def _make_month_row(month: str, total: float) -> MagicMock:
     return row
 
 
+def _make_day_row(day: str, total: float) -> MagicMock:
+    """Return a mock result row with .day and .total attributes."""
+    row = MagicMock()
+    row.day = day
+    row.total = total
+    return row
+
+
 # ---------------------------------------------------------------------------
 # Validation — invalid aggregation
 # ---------------------------------------------------------------------------
@@ -191,7 +199,7 @@ class TestValidationGroupBy:
 
     def test_all_valid_group_by_do_not_raise_on_validation(self) -> None:
         """month / category / bank_name must all pass the group_by validation gate."""
-        valid = ["month", "category", "bank_name"]
+        valid = ["month", "day", "category", "bank_name"]
         for gb in valid:
             db = _make_db(all_rows=[])
             # Should not raise ValueError for the group_by check
@@ -336,6 +344,26 @@ class TestChartModeMonth:
             db=db,
         )
         assert result == []
+
+
+class TestChartModeDay:
+    """Chart mode with group_by day returns daily labels."""
+
+    def test_day_grouping_returns_list(self) -> None:
+        """group_by day must return chart rows with YYYY-MM-DD labels."""
+        rows = [
+            _make_day_row("2026-03-01", 100.0),
+            _make_day_row("2026-03-02", 250.0),
+        ]
+        db = _make_db(all_rows=rows)
+        result = resolve_widget_data(
+            config={"aggregation": "sum", "field": "debit", "group_by": "day"},
+            user_id=USER_ID,
+            db=db,
+        )
+        assert len(result) == 2
+        assert result[0]["label"] == "2026-03-01"
+        assert result[1]["value"] == 250.0
 
 
 # ---------------------------------------------------------------------------
@@ -518,6 +546,34 @@ class TestGlobalFilterOverride:
         assert result["value"] == 200.0
 
 
+class TestResolveWidgetDataRawSql:
+    """resolve_widget_data with raw_metric_sql."""
+
+    def test_raw_metric_returns_scalar_dict(self) -> None:
+        """Raw path returns metric shape with DB scalar."""
+        db = _make_db(scalar_value=99.5)
+        result = resolve_widget_data(
+            config={
+                "raw_metric_sql": "SELECT COALESCE(SUM(debit), 0) FROM transactions",
+                "format": "currency",
+            },
+            user_id=USER_ID,
+            db=db,
+        )
+        assert result == {"value": 99.5, "format": "currency"}
+        db.execute.assert_called_once()
+
+    def test_raw_metric_rejects_bad_sql(self) -> None:
+        """Invalid sandbox SQL must raise before execute."""
+        db = _make_db(scalar_value=1.0)
+        with pytest.raises(ValueError, match="FROM transactions"):
+            resolve_widget_data(
+                config={"raw_metric_sql": "SELECT 1"},
+                user_id=USER_ID,
+                db=db,
+            )
+
+
 # ---------------------------------------------------------------------------
 # validate_widget_query_config / describe_widget_query_human
 # ---------------------------------------------------------------------------
@@ -603,6 +659,12 @@ class TestValidateWidgetQueryConfig:
 
 class TestDescribeWidgetQueryHuman:
     """describe_widget_query_human returns abstract-table pseudo-SQL."""
+
+    def test_raw_metric_sql_returns_sql(self) -> None:
+        """Raw metric config returns the stripped SQL as the description."""
+        sql = "SELECT 1 FROM transactions"
+        text = describe_widget_query_human({"raw_metric_sql": f"  {sql}  "})
+        assert text == sql
 
     def test_includes_your_transactions(self) -> None:
         """Output must mention your_transactions and WHERE."""

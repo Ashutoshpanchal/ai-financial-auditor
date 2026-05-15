@@ -83,7 +83,7 @@ def search_transactions(query: str, user_id: str, db: Session) -> str:
 
     sql = text(
         """
-        SELECT id, bank_name, transaction_date, description, amount, category
+        SELECT id, bank_name, transaction_date, description, debit, credit, category
         FROM transactions
         WHERE user_id = :uid
         ORDER BY embedding <=> CAST(:qemb AS vector)
@@ -138,7 +138,7 @@ def get_spending_summary(user_id: str, db: Session) -> str:
         """
         SELECT
             COALESCE(category, 'Uncategorized') AS category,
-            SUM(amount) AS total
+            SUM(debit) AS total
         FROM transactions
         WHERE user_id = :uid
         GROUP BY COALESCE(category, 'Uncategorized')
@@ -194,7 +194,7 @@ def compare_months(month1: str, month2: str, user_id: str, db: Session) -> str:
         SELECT
             TO_CHAR(transaction_date, 'YYYY-MM') AS month,
             COALESCE(category, 'Uncategorized') AS category,
-            SUM(amount) AS total
+            SUM(debit) AS total
         FROM transactions
         WHERE user_id = :uid
           AND TO_CHAR(transaction_date, 'YYYY-MM') IN (:m1, :m2)

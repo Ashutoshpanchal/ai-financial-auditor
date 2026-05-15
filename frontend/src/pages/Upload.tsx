@@ -158,6 +158,9 @@ function CategorySyncModal({
   const [err, setErr] = useState<string | null>(null);
   const [updated, setUpdated] = useState<number | null>(null);
   const [breakdown, setBreakdown] = useState<{ auto: number; rules: number } | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resettingInModal, setResettingInModal] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -846,9 +849,6 @@ export default function Upload() {
   const [deleteDoc, setDeleteDoc] = useState<DocumentRow | null>(null);
   const [editingTxnField, setEditingTxnField] = useState<{ id: string; field: TxnEditableField } | null>(null);
   const [deletingTxnId, setDeletingTxnId] = useState<string | null>(null);
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const [resettingInModal, setResettingInModal] = useState(false);
-  const [resetError, setResetError] = useState<string | null>(null);
 
   // Split-pane state
   const [leftPaneWidth, setLeftPaneWidth] = useState(() => {

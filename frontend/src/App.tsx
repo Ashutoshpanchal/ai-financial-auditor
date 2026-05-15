@@ -8,6 +8,8 @@ import Upload from "./pages/Upload";
 import AuditReport from "./pages/AuditReport";
 import Admin from "./pages/Admin";
 import Categories from "./pages/Categories";
+import CategoryInsights from "./pages/CategoryInsights";
+import WidgetStudio from "./pages/WidgetStudio";
 
 export default function App() {
   return (
@@ -21,6 +23,8 @@ export default function App() {
             <Route path="/audit/:id" element={<AuditReport />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/categories" element={<Categories />} />
+            <Route path="/insights" element={<CategoryInsights />} />
+            <Route path="/widget-studio" element={<WidgetStudio />} />
           </Route>
         </Route>
       </Routes>

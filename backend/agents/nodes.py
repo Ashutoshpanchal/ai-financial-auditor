@@ -111,6 +111,28 @@ def _build_llm() -> ChatOpenAI:
     )
 
 
+def _rollback_rag_db_after_tool_error(db: Session, tool_name: str) -> None:
+    """End an aborted PostgreSQL transaction so later commits (e.g. chat_sessions) succeed.
+
+    When a SQL statement fails inside a tool, psycopg2 marks the transaction as
+    failed until ``ROLLBACK``. rag_node catches those errors to return a string to
+    the user, but without rolling back the shared session any subsequent statement
+    raises ``InFailedSqlTransaction``.
+
+    Args:
+        db:        Shared SQLAlchemy session passed into rag tools.
+        tool_name: Tool label for logs only.
+    """
+    try:
+        db.rollback()
+    except Exception as exc:
+        logger.warning(
+            "rag_node: rollback after tool error failed tool=%s err=%s",
+            tool_name,
+            exc,
+        )
+
+
 def _last_user_message(messages: list[dict]) -> str | None:
     """Return the content of the most recent user message in the history.
 
@@ -362,10 +384,12 @@ async def rag_node(state: AgentState, db: Session) -> AgentState:
         except RuntimeError as exc:
             result = f"Tool {tool_name} encountered an error: {exc}"
             logger.error("rag_node: RuntimeError from tool %s — %s", tool_name, exc)
+            _rollback_rag_db_after_tool_error(db, str(tool_name))
         except Exception as exc:
             # Catch-all so one tool failure doesn't abort the whole graph
             result = f"Tool {tool_name} failed unexpectedly: {exc}"
             logger.exception("rag_node: unexpected error from tool %s", tool_name)
+            _rollback_rag_db_after_tool_error(db, str(tool_name))
 
         results.append({"tool": tool_name, "result": result})
 

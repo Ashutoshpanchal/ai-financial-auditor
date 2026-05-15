@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FilterBar, FilterState } from "../components/dashboard/FilterBar";
 import { WidgetGrid } from "../components/dashboard/WidgetGrid";
 import { EditModePanel } from "../components/dashboard/EditModePanel";
-import { ChatPanel } from "../components/dashboard/ChatPanel";
+import { ChatPanel, type WidgetSuggestion } from "../components/dashboard/ChatPanel";
 
 const API = "http://localhost:8000";
 
@@ -21,20 +21,6 @@ interface GridItem {
   row: number;
   col: number;
   col_span: number;
-}
-
-interface QueryConfig {
-  aggregation: string;
-  field: string;
-  group_by?: string;
-  filters?: Record<string, string | null>;
-  format?: string;
-}
-
-interface WidgetSuggestion {
-  title: string;
-  widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
-  query_config: QueryConfig;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,6 +48,8 @@ export default function Dashboard() {
     dateTo: "",
     bankName: "",
     category: "",
+    parentCategory: "",
+    subCategory: "",
   });
   const [isEditMode, setIsEditMode] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);

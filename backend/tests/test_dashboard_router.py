@@ -633,10 +633,45 @@ class TestPreviewWidget:
 
         assert response.status_code == 422
 
+    def test_rate_limit_returns_429(self) -> None:
+        """When preview rate limit is enabled, excess requests return 429."""
+        from backend.services.preview_rate_limit import reset_widget_preview_rate_limits
 
-# ---------------------------------------------------------------------------
-# GET /dashboard/widgets/{widget_id}/data
-# ---------------------------------------------------------------------------
+        reset_widget_preview_rate_limits()
+        db = _make_db()
+        user = _make_user()
+        mock_data = {"value": 1.0, "format": "number"}
+
+        with (
+            patch("backend.routers.dashboard.set_rls_user"),
+            patch(
+                "backend.routers.dashboard.resolve_widget_data",
+                return_value=mock_data,
+            ),
+            patch("backend.routers.dashboard.get_settings") as gs,
+        ):
+            m = MagicMock()
+            m.widget_preview_rate_limit_per_minute = 2
+            gs.return_value = m
+            client = _client_with_overrides(db, user)
+            body = {
+                "widget_type": "metric",
+                "query_config": {
+                    "aggregation": "sum",
+                    "field": "debit",
+                    "format": "number",
+                },
+            }
+            assert (
+                client.post("/dashboard/widgets/preview", json=body).status_code == 200
+            )
+            assert (
+                client.post("/dashboard/widgets/preview", json=body).status_code == 200
+            )
+            r3 = client.post("/dashboard/widgets/preview", json=body)
+            assert r3.status_code == 429
+
+        reset_widget_preview_rate_limits()
 
 
 class TestGetWidgetData:

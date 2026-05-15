@@ -42,6 +42,7 @@ export function Layout() {
               <NavItem to="/dashboard">Dashboard</NavItem>
               <NavItem to="/upload">Upload</NavItem>
               <NavItem to="/categories">Categories</NavItem>
+              <NavItem to="/insights">Insights</NavItem>
               <NavItem to="/widget-studio" end>
                 Widget Studio
               </NavItem>

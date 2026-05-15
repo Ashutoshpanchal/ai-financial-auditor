@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { MetricCard } from "./MetricCard";
 import { BarChartWidget } from "./BarChartWidget";
 import { PieChartWidget } from "./PieChartWidget";
+import type { FilterState } from "./FilterBar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,13 +19,6 @@ interface GridItem {
   row: number;
   col: number;
   col_span: number;
-}
-
-export interface FilterState {
-  dateFrom: string;
-  dateTo: string;
-  bankName: string;
-  category: string;
 }
 
 interface WidgetGridProps {
@@ -73,6 +67,8 @@ function useWidgetData(widgetId: string, filters: FilterState) {
     if (filters.dateTo) params.set("date_to", filters.dateTo);
     if (filters.bankName) params.set("bank_name", filters.bankName);
     if (filters.category) params.set("category", filters.category);
+    if (filters.parentCategory) params.set("parent_category", filters.parentCategory);
+    if (filters.subCategory) params.set("sub_category", filters.subCategory);
 
     fetch(`${API_BASE}/dashboard/widgets/${widgetId}/data?${params}`, {
       credentials: "include",
@@ -90,7 +86,15 @@ function useWidgetData(widgetId: string, filters: FilterState) {
       });
 
     return () => { cancelled = true; };
-  }, [widgetId, filters.dateFrom, filters.dateTo, filters.bankName, filters.category]);
+  }, [
+    widgetId,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.bankName,
+    filters.category,
+    filters.parentCategory,
+    filters.subCategory,
+  ]);
 
   return { data, isLoading, error };
 }

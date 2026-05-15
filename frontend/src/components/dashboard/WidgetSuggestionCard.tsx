@@ -1,15 +1,7 @@
-interface QueryConfig {
-  aggregation: string;
-  field: string;
-  group_by?: string;
-  filters?: Record<string, string | null>;
-  format?: string;
-}
-
 interface WidgetSuggestion {
   title: string;
   widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
-  query_config: QueryConfig;
+  query_config: Record<string, unknown>;
 }
 
 interface WidgetSuggestionCardProps {
@@ -38,16 +30,22 @@ const WIDGET_TYPE_BADGE_COLORS: Record<WidgetSuggestion["widget_type"], string> 
  */
 function buildDescription(suggestion: WidgetSuggestion): string {
   const { query_config } = suggestion;
-  const agg = query_config.aggregation.toLowerCase();
-  const field = query_config.field.replace(/_/g, " ");
-  const groupBy = query_config.group_by?.replace(/_/g, " ");
+  const agg = String(query_config.aggregation ?? "sum").toLowerCase();
+  const field = String(query_config.field ?? "amount").replace(/_/g, " ");
+  const groupByRaw = query_config.group_by;
+  const groupBy =
+    groupByRaw !== undefined && groupByRaw !== null
+      ? String(groupByRaw).replace(/_/g, " ")
+      : undefined;
 
   let desc = `Shows the ${agg} of ${field}`;
   if (groupBy) {
     desc += ` grouped by ${groupBy}`;
   }
 
-  const activeFilters = Object.entries(query_config.filters ?? {}).filter(
+  const activeFilters = Object.entries(
+    (query_config.filters as Record<string, string | null> | undefined) ?? {},
+  ).filter(
     ([, v]) => v !== null && v !== undefined && v !== ""
   );
   if (activeFilters.length > 0) {

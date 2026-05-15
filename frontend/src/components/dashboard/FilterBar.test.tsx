@@ -2,7 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { FilterBar, FilterState } from "./FilterBar";
 
-const EMPTY: FilterState = { dateFrom: "", dateTo: "", bankName: "", category: "" };
+const EMPTY: FilterState = {
+  dateFrom: "",
+  dateTo: "",
+  bankName: "",
+  category: "",
+  parentCategory: "",
+  subCategory: "",
+};
 
 function renderBar(filters: FilterState = EMPTY, onChange = vi.fn()) {
   return render(<FilterBar filters={filters} onChange={onChange} />);
@@ -39,10 +46,12 @@ describe("FilterBar", () => {
       dateTo: "2024-12-31",
       bankName: "ANZ",
       category: "Food",
+      parentCategory: "Food & Dining",
+      subCategory: "Restaurants",
     };
     renderBar(filled, onChange);
     fireEvent.click(screen.getByRole("button", { name: /clear/i }));
-    expect(onChange).toHaveBeenCalledWith({ dateFrom: "", dateTo: "", bankName: "", category: "" });
+    expect(onChange).toHaveBeenCalledWith(EMPTY);
   });
 
   it("reflects controlled bankName value in input", () => {

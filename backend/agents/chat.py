@@ -25,6 +25,7 @@ from backend.agents.nodes import (
     response_node,
     suggest_widget_node,
 )
+from backend.agents.widget_studio import run_widget_studio_chat
 from backend.models.chat_session import ChatSession
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ finance_graph = finance_graph.compile()
 
 async def run_chat(
     session: ChatSession, user_message: str, db: Session
-) -> tuple[str, dict[str, Any] | None]:
+) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None, bool]:
     """Run the finance agent graph for one user turn and persist the updated history.
 
     Steps:
@@ -114,7 +115,8 @@ async def run_chat(
         db:           SQLAlchemy session (caller manages the transaction lifecycle).
 
     Returns:
-        A tuple of (response_text, widget_suggestion) where widget_suggestion may be None.
+        Tuple of (response_text, widget_suggestion, draft_state, clarification_only).
+        For general sessions, draft_state is None and clarification_only is False.
 
     Raises:
         ValueError:   If user_message is empty.
@@ -122,6 +124,12 @@ async def run_chat(
     """
     if not user_message or not user_message.strip():
         raise ValueError("run_chat: user_message must not be empty")
+
+    if getattr(session, "session_kind", "general") == "widget_studio":
+        text, widget, draft, clarify = await run_widget_studio_chat(
+            session, user_message, db
+        )
+        return text, widget, draft, clarify
 
     now_iso = datetime.now(UTC).isoformat()
 
@@ -157,13 +165,26 @@ async def run_chat(
     try:
         final_state: AgentState = await compiled.ainvoke(initial_state)
     except Exception as exc:
+        try:
+            db.rollback()
+        except Exception as rb_exc:
+            logger.warning("run_chat: rollback after graph failure failed: %s", rb_exc)
         raise RuntimeError(f"run_chat: graph invocation failed — {exc}") from exc
 
     # Persist the full updated message history (includes the new assistant turn)
-    session.messages = final_state["messages"]
-    db.add(session)
-    db.commit()
-    db.refresh(session)
+    try:
+        session.messages = final_state["messages"]
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+    except Exception as exc:
+        try:
+            db.rollback()
+        except Exception as rb_exc:
+            logger.warning(
+                "run_chat: rollback after persist failure failed: %s", rb_exc
+            )
+        raise RuntimeError(f"run_chat: failed to persist chat session — {exc}") from exc
 
     response_text = final_state.get("final_response", "")
     if not response_text:
@@ -177,4 +198,4 @@ async def run_chat(
         len(response_text),
         widget_suggestion is not None,
     )
-    return response_text, widget_suggestion
+    return response_text, widget_suggestion, None, False

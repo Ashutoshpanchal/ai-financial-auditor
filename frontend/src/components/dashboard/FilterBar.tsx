@@ -2,12 +2,18 @@ export interface FilterState {
   dateFrom: string; // ISO date string "YYYY-MM-DD" or ""
   dateTo: string; // ISO date string "YYYY-MM-DD" or ""
   bankName: string; // "" means no filter
-  category: string; // "" means no filter
+  category: string; // "" means no filter (legacy)
+  parentCategory: string; // "" means no filter
+  subCategory: string; // "" means no filter
 }
 
 interface FilterBarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
+  /** Parent category options for dropdown (Widget Studio / dashboard). */
+  parentCategoryOptions?: string[];
+  /** Sub-category options for the selected parent. */
+  subCategoryOptions?: string[];
 }
 
 const EMPTY_FILTERS: FilterState = {
@@ -15,6 +21,8 @@ const EMPTY_FILTERS: FilterState = {
   dateTo: "",
   bankName: "",
   category: "",
+  parentCategory: "",
+  subCategory: "",
 };
 
 /**
@@ -23,9 +31,18 @@ const EMPTY_FILTERS: FilterState = {
  * Controlled component: owns no state. Every field change calls `onChange`
  * with the full updated FilterState so the parent can broadcast to all widgets.
  */
-export function FilterBar({ filters, onChange }: FilterBarProps) {
+export function FilterBar({
+  filters,
+  onChange,
+  parentCategoryOptions = [],
+  subCategoryOptions = [],
+}: FilterBarProps) {
   function handleField(field: keyof FilterState, value: string) {
-    onChange({ ...filters, [field]: value });
+    const next = { ...filters, [field]: value };
+    if (field === "parentCategory") {
+      next.subCategory = "";
+    }
+    onChange(next);
   }
 
   function handleClear() {
@@ -77,6 +94,49 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
             className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 transition w-36"
           />
         </div>
+
+        {parentCategoryOptions.length > 0 && (
+          <div className="flex flex-col gap-0.5">
+            <label htmlFor="filter-parent-category" className="text-xs font-medium text-gray-500">
+              Parent category
+            </label>
+            <select
+              id="filter-parent-category"
+              value={filters.parentCategory}
+              onChange={(e) => handleField("parentCategory", e.target.value)}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 transition w-44"
+            >
+              <option value="">Any parent</option>
+              {parentCategoryOptions.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {parentCategoryOptions.length > 0 && (
+          <div className="flex flex-col gap-0.5">
+            <label htmlFor="filter-sub-category" className="text-xs font-medium text-gray-500">
+              Sub-category
+            </label>
+            <select
+              id="filter-sub-category"
+              value={filters.subCategory}
+              onChange={(e) => handleField("subCategory", e.target.value)}
+              disabled={!filters.parentCategory}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 transition w-44 disabled:opacity-50"
+            >
+              <option value="">Any sub</option>
+              {subCategoryOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Category */}
         <div className="flex flex-col gap-0.5">

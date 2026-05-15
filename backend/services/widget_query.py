@@ -14,6 +14,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.models.transaction import Transaction
+from backend.services.widget_metric_raw_sql import (
+    execute_raw_metric_sql,
+    validate_raw_metric_sql,
+)
+from backend.services.widget_placeholders import (
+    resolve_query_config_placeholders,
+    validate_placeholder_filter_values,
+)
 
 # --------------------------------------------------------------------------- #
 # Allowed enum values (domain constants — not config)
@@ -21,7 +29,7 @@ from backend.models.transaction import Transaction
 
 _ALLOWED_AGGREGATIONS: frozenset[str] = frozenset({"sum", "count", "avg", "max", "min"})
 _ALLOWED_FIELDS: frozenset[str] = frozenset({"credit", "debit"})
-_ALLOWED_GROUP_BY: frozenset[str] = frozenset({"month", "category", "bank_name"})
+_ALLOWED_GROUP_BY: frozenset[str] = frozenset({"month", "day", "category", "bank_name"})
 _CHART_WIDGET_TYPES: frozenset[str] = frozenset(
     {"bar_chart", "pie_chart", "line_chart"}
 )
@@ -46,15 +54,22 @@ def validate_widget_query_config(widget_type: str, config: dict[str, Any]) -> No
             f"Allowed: metric, {', '.join(sorted(_CHART_WIDGET_TYPES))}"
         )
 
-    # raw_metric_sql support disabled — widget_metric_raw_sql module not yet implemented
-    # raw_sql = config.get("raw_metric_sql")
-    # if isinstance(raw_sql, str) and raw_sql.strip():
-    #     if widget_type != "metric":
-    #         raise ValueError("raw_metric_sql is only supported for metric widgets.")
-    #     if config.get("group_by") is not None:
-    #         raise ValueError("Do not set group_by when using raw_metric_sql.")
-    #     validate_raw_metric_sql(raw_sql.strip())
-    #     return
+    raw_sql = config.get("raw_metric_sql")
+    if isinstance(raw_sql, str) and raw_sql.strip():
+        if widget_type != "metric":
+            raise ValueError("raw_metric_sql is only supported for metric widgets.")
+        if config.get("group_by") is not None:
+            raise ValueError("Do not set group_by when using raw_metric_sql.")
+        validate_raw_metric_sql(raw_sql.strip())
+        cfg_filters_raw: dict[str, Any] = config.get("filters", {}) or {}
+        txn_type_raw = cfg_filters_raw.get("transaction_type")
+        if txn_type_raw is not None and txn_type_raw not in ("credit", "debit"):
+            raise ValueError(
+                f"Invalid filters.transaction_type '{txn_type_raw}'. "
+                "Allowed: 'credit', 'debit', or omit."
+            )
+        validate_placeholder_filter_values(config)
+        return
 
     aggregation = config.get("aggregation", "")
     field = config.get("field", "")
@@ -82,6 +97,7 @@ def validate_widget_query_config(widget_type: str, config: dict[str, Any]) -> No
             f"Invalid filters.transaction_type '{txn_type}'. "
             "Allowed: 'credit', 'debit', or omit."
         )
+    validate_placeholder_filter_values(config)
 
     if widget_type == "metric":
         if group_by is not None:
@@ -102,12 +118,12 @@ def describe_widget_query_human(config: dict[str, Any]) -> str:
         config: Widget query_config dict.
 
     Returns:
-        A short multi-line human-readable description for UI display.
+        For builder configs: a short multi-line human-readable description for UI display.
+        For ``raw_metric_sql`` metric configs: the stripped SQL (server still injects user scope).
     """
-    # raw_metric_sql support disabled — widget_metric_raw_sql module not yet implemented
-    # raw_sql = config.get("raw_metric_sql")
-    # if isinstance(raw_sql, str) and raw_sql.strip():
-    #     return raw_sql.strip()
+    raw_sql = config.get("raw_metric_sql")
+    if isinstance(raw_sql, str) and raw_sql.strip():
+        return raw_sql.strip()
 
     aggregation = config.get("aggregation", "?")
     field = config.get("field", "?")
@@ -128,6 +144,10 @@ def describe_widget_query_human(config: dict[str, Any]) -> str:
         where_parts.append("debit > 0")
     if cfg_filters.get("category"):
         where_parts.append(f"category = '{cfg_filters['category']}'")
+    if cfg_filters.get("parent_category"):
+        where_parts.append(f"parent_category = '{cfg_filters['parent_category']}'")
+    if cfg_filters.get("sub_category"):
+        where_parts.append(f"sub_category = '{cfg_filters['sub_category']}'")
     if cfg_filters.get("bank_name"):
         where_parts.append(f"bank_name = '{cfg_filters['bank_name']}'")
 
@@ -144,6 +164,10 @@ def resolve_widget_data(
     date_to: date | None = None,
     bank_name: str | None = None,
     category: str | None = None,
+    parent_category: str | None = None,
+    sub_category: str | None = None,
+    *,
+    default_month_for_preview: bool = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Resolve dashboard widget data by executing the configured aggregation query.
 
@@ -168,7 +192,10 @@ def resolve_widget_data(
         date_from: Inclusive lower bound on ``Transaction.transaction_date``.
         date_to:   Inclusive upper bound on ``Transaction.transaction_date``.
         bank_name: Global bank filter (overrides ``config["filters"]["bank_name"]``).
-        category:  Global category filter (overrides ``config["filters"]["category"]``).
+        category:         Global category filter (overrides config filters).
+        parent_category:  Global parent category filter.
+        sub_category:     Global sub-category filter.
+        default_month_for_preview: Default unresolved date placeholders to current month.
 
     Returns:
         Metric mode  -> ``{"value": float, "format": str}``
@@ -179,14 +206,50 @@ def resolve_widget_data(
                     respective allowed sets, or if ``group_by`` is present but not
                     in the allowed set.
     """
-    # raw_metric_sql support disabled — widget_metric_raw_sql module not yet implemented
-    # raw_sql = config.get("raw_metric_sql")
-    # if isinstance(raw_sql, str) and raw_sql.strip():
-    #     group_by: str | None = config.get("group_by")
-    #     if group_by is not None:
-    #         raise ValueError("raw_metric_sql cannot be combined with group_by.")
-    #     value = execute_raw_metric_sql(raw_sql.strip(), user_id, db)
-    #     return {"value": value, "format": config.get("format", "number")}
+    resolved_config, runtime = resolve_query_config_placeholders(
+        config,
+        date_from=date_from,
+        date_to=date_to,
+        bank_name=bank_name,
+        category=category,
+        parent_category=parent_category,
+        sub_category=sub_category,
+        default_month_for_preview=default_month_for_preview,
+    )
+    config = resolved_config
+    date_from = runtime.date_from
+    date_to = runtime.date_to
+    bank_name = runtime.bank_name
+    category = runtime.category
+    parent_category = runtime.parent_category
+    sub_category = runtime.sub_category
+
+    raw_sql = config.get("raw_metric_sql")
+    if isinstance(raw_sql, str) and raw_sql.strip():
+        group_by_raw: str | None = config.get("group_by")
+        if group_by_raw is not None:
+            raise ValueError("raw_metric_sql cannot be combined with group_by.")
+        sql_body = raw_sql.strip()
+        validate_raw_metric_sql(sql_body)
+        cfg_filters_r: dict[str, Any] = config.get("filters", {}) or {}
+        effective_category_r: str | None = (
+            category if category is not None else cfg_filters_r.get("category")
+        )
+        effective_bank_name_r: str | None = (
+            bank_name if bank_name is not None else cfg_filters_r.get("bank_name")
+        )
+        transaction_type_r: str | None = cfg_filters_r.get("transaction_type")
+        value = execute_raw_metric_sql(
+            sql_body,
+            user_id,
+            db,
+            date_from=date_from,
+            date_to=date_to,
+            bank_name=effective_bank_name_r,
+            category=effective_category_r,
+            transaction_type=transaction_type_r,
+        )
+        return {"value": value, "format": config.get("format", "number")}
 
     aggregation = config.get("aggregation", "")
     field = config.get("field", "")
@@ -239,6 +302,14 @@ def resolve_widget_data(
     effective_bank_name: str | None = (
         bank_name if bank_name is not None else cfg_filters.get("bank_name")
     )
+    effective_parent_category: str | None = (
+        parent_category
+        if parent_category is not None
+        else cfg_filters.get("parent_category")
+    )
+    effective_sub_category: str | None = (
+        sub_category if sub_category is not None else cfg_filters.get("sub_category")
+    )
     transaction_type: str | None = cfg_filters.get("transaction_type")
 
     # ------------------------------------------------------------------ #
@@ -251,6 +322,8 @@ def resolve_widget_data(
             agg_col=agg_col,
             effective_category=effective_category,
             effective_bank_name=effective_bank_name,
+            effective_parent_category=effective_parent_category,
+            effective_sub_category=effective_sub_category,
             transaction_type=transaction_type,
             date_from=date_from,
             date_to=date_to,
@@ -264,6 +337,8 @@ def resolve_widget_data(
         group_by=group_by,
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
+        effective_parent_category=effective_parent_category,
+        effective_sub_category=effective_sub_category,
         transaction_type=transaction_type,
         date_from=date_from,
         date_to=date_to,
@@ -279,6 +354,8 @@ def _build_where_clauses(
     user_id: str,
     effective_category: str | None,
     effective_bank_name: str | None,
+    effective_parent_category: str | None,
+    effective_sub_category: str | None,
     transaction_type: str | None,
     date_from: date | None,
     date_to: date | None,
@@ -287,9 +364,11 @@ def _build_where_clauses(
 
     Args:
         user_id:              Mandatory tenant filter.
-        effective_category:   Optional category equality filter.
-        effective_bank_name:  Optional bank_name equality filter.
-        transaction_type:     Optional direction filter — "credit" or "debit".
+        effective_category:         Optional legacy category filter.
+        effective_bank_name:        Optional bank_name equality filter.
+        effective_parent_category:  Optional parent_category filter.
+        effective_sub_category:     Optional sub_category filter.
+        transaction_type:           Optional direction filter — "credit" or "debit".
         date_from:            Optional inclusive lower date bound.
         date_to:              Optional inclusive upper date bound.
 
@@ -300,6 +379,10 @@ def _build_where_clauses(
 
     if effective_category is not None:
         clauses.append(Transaction.category == effective_category)
+    if effective_parent_category is not None:
+        clauses.append(Transaction.parent_category == effective_parent_category)
+    if effective_sub_category is not None:
+        clauses.append(Transaction.sub_category == effective_sub_category)
     if effective_bank_name is not None:
         clauses.append(Transaction.bank_name == effective_bank_name)
     if transaction_type == "credit":
@@ -320,6 +403,8 @@ def _resolve_metric(
     agg_col: Any,
     effective_category: str | None,
     effective_bank_name: str | None,
+    effective_parent_category: str | None,
+    effective_sub_category: str | None,
     transaction_type: str | None,
     date_from: date | None,
     date_to: date | None,
@@ -345,6 +430,8 @@ def _resolve_metric(
         user_id=user_id,
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
+        effective_parent_category=effective_parent_category,
+        effective_sub_category=effective_sub_category,
         transaction_type=transaction_type,
         date_from=date_from,
         date_to=date_to,
@@ -362,6 +449,8 @@ def _resolve_chart(
     group_by: str,
     effective_category: str | None,
     effective_bank_name: str | None,
+    effective_parent_category: str | None,
+    effective_sub_category: str | None,
     transaction_type: str | None,
     date_from: date | None,
     date_to: date | None,
@@ -372,7 +461,7 @@ def _resolve_chart(
         db:                   Active SQLAlchemy session.
         user_id:              Tenant filter value.
         agg_col:              Pre-built SQLAlchemy aggregation expression.
-        group_by:             Grouping dimension — "month", "category", or "bank_name".
+        group_by:             Grouping dimension — month, day, category, or bank_name.
         effective_category:   Resolved category filter.
         effective_bank_name:  Resolved bank_name filter.
         transaction_type:     Optional direction filter from config filters.
@@ -387,6 +476,8 @@ def _resolve_chart(
         user_id=user_id,
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
+        effective_parent_category=effective_parent_category,
+        effective_sub_category=effective_sub_category,
         transaction_type=transaction_type,
         date_from=date_from,
         date_to=date_to,
@@ -404,6 +495,19 @@ def _resolve_chart(
         )
         rows = db.execute(stmt).all()
         return [{"label": row.month, "value": float(row.total or 0)} for row in rows]
+
+    if group_by == "day":
+        group_col = func.to_char(Transaction.transaction_date, "YYYY-MM-DD").label(
+            "day"
+        )
+        stmt = (
+            select(group_col, labeled_agg)
+            .where(*clauses)
+            .group_by(group_col)
+            .order_by(group_col.asc())
+        )
+        rows = db.execute(stmt).all()
+        return [{"label": row.day, "value": float(row.total or 0)} for row in rows]
 
     # category or bank_name grouping.
     # We assign the ORM column to an Any-typed intermediate first so that the
