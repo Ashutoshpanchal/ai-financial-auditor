@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import {
-  fetchCategoryFlowByParent,
+  fetchCategoryFlowByParentPaginated,
   type CategoryFlowParentRow,
   type FlowMode,
 } from "../../services/api";
@@ -111,12 +111,25 @@ export function InsightsComparePanel({
     setPcFlowRows(null);
     (async () => {
       try {
-        const res = await fetchCategoryFlowByParent({
-          dateFrom: appliedFrom,
-          dateTo: appliedTo,
-          mode,
-        });
-        if (!cancelled) setPcFlowRows(res.rows);
+        const allRows: CategoryFlowParentRow[] = [];
+        let monthCursor: string | null = null;
+        let hasMore = true;
+
+        // Fetch all pages
+        while (hasMore && !cancelled) {
+          const res = await fetchCategoryFlowByParentPaginated({
+            dateFrom: appliedFrom,
+            dateTo: appliedTo,
+            mode,
+            monthCursor: monthCursor ?? undefined,
+            limit: 100,
+          });
+          allRows.push(...res.rows);
+          monthCursor = res.pagination.next_cursor;
+          hasMore = res.pagination.has_more;
+        }
+
+        if (!cancelled) setPcFlowRows(allRows);
       } catch {
         if (!cancelled) {
           setPcError("Could not load primary-category (PC) totals.");
