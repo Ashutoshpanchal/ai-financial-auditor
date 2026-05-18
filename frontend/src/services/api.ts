@@ -147,6 +147,26 @@ export interface CategoryFlowByParentResponse {
   truncated_reason?: string;
 }
 
+export interface CategoryFlowMetadata {
+  date_from: string;
+  date_to: string;
+  months_available: string[];
+  years: number[];
+  total_rows: number;
+  parent_categories: string[];
+}
+
+export interface CategoryFlowByParentPaginatedResponse {
+  rows: CategoryFlowParentRow[];
+  pagination: {
+    current_cursor: string | null;
+    next_cursor: string | null;
+    has_more: boolean;
+    limit: number;
+    rows_returned: number;
+  };
+}
+
 export async function fetchCategoryFlowByParent(params: {
   dateFrom: string;
   dateTo: string;
@@ -158,6 +178,42 @@ export async function fetchCategoryFlowByParent(params: {
   q.set("mode", params.mode);
   const res = await api.get<CategoryFlowByParentResponse>(
     `/analytics/category-flow-by-parent?${q.toString()}`,
+  );
+  return res.data;
+}
+
+export async function fetchCategoryFlowMetadata(params: {
+  dateFrom: string;
+  dateTo: string;
+}): Promise<CategoryFlowMetadata> {
+  const q = new URLSearchParams();
+  q.set("date_from", params.dateFrom);
+  q.set("date_to", params.dateTo);
+  const res = await api.get<CategoryFlowMetadata>(
+    `/analytics/category-flow-by-parent/metadata?${q.toString()}`,
+  );
+  return res.data;
+}
+
+export async function fetchCategoryFlowByParentPaginated(params: {
+  dateFrom: string;
+  dateTo: string;
+  mode: FlowMode;
+  monthCursor?: string | null;
+  limit?: number;
+}): Promise<CategoryFlowByParentPaginatedResponse> {
+  const q = new URLSearchParams();
+  q.set("date_from", params.dateFrom);
+  q.set("date_to", params.dateTo);
+  q.set("mode", params.mode);
+  if (params.limit !== undefined) {
+    q.set("limit", params.limit.toString());
+  }
+  if (params.monthCursor) {
+    q.set("month_cursor", params.monthCursor);
+  }
+  const res = await api.get<CategoryFlowByParentPaginatedResponse>(
+    `/analytics/category-flow-by-parent/paginated?${q.toString()}`,
   );
   return res.data;
 }

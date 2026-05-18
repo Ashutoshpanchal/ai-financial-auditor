@@ -11,15 +11,26 @@ const EMPTY: FilterState = {
   subCategory: "",
 };
 
-function renderBar(filters: FilterState = EMPTY, onChange = vi.fn()) {
-  return render(<FilterBar filters={filters} onChange={onChange} />);
+const DEFAULT_RANGE = { from: "2026-04-01", to: "2026-04-30" };
+
+function renderBar(
+  filters: FilterState = EMPTY,
+  onChange = vi.fn(),
+  extra: { defaultDateRange?: { from: string; to: string } | null } = {},
+) {
+  return render(
+    <FilterBar
+      filters={filters}
+      onChange={onChange}
+      defaultDateRange={extra.defaultDateRange ?? null}
+    />,
+  );
 }
 
 describe("FilterBar", () => {
-  it("renders all four input fields and clear button", () => {
+  it("renders date range picker, bank, category, and clear", () => {
     renderBar();
-    expect(screen.getByLabelText(/from/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/to/i)).toBeInTheDocument();
+    expect(screen.getByText("Date range")).toBeInTheDocument();
     expect(screen.getByLabelText(/bank/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/category/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /clear/i })).toBeInTheDocument();
@@ -39,7 +50,7 @@ describe("FilterBar", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ category: "Food" }));
   });
 
-  it("Clear button resets all fields to empty strings", () => {
+  it("Clear resets filters and restores default date range when provided", () => {
     const onChange = vi.fn();
     const filled: FilterState = {
       dateFrom: "2024-01-01",
@@ -49,22 +60,21 @@ describe("FilterBar", () => {
       parentCategory: "Food & Dining",
       subCategory: "Restaurants",
     };
-    renderBar(filled, onChange);
+    renderBar(filled, onChange, { defaultDateRange: DEFAULT_RANGE });
     fireEvent.click(screen.getByRole("button", { name: /clear/i }));
-    expect(onChange).toHaveBeenCalledWith(EMPTY);
+    expect(onChange).toHaveBeenCalledWith({
+      ...EMPTY,
+      dateFrom: DEFAULT_RANGE.from,
+      dateTo: DEFAULT_RANGE.to,
+    });
   });
 
   it("reflects controlled bankName value in input", () => {
     const { rerender } = renderBar({ ...EMPTY, bankName: "HSBC" });
     expect(screen.getByLabelText(/bank/i)).toHaveValue("HSBC");
-    rerender(<FilterBar filters={{ ...EMPTY, bankName: "ANZ" }} onChange={vi.fn()} />);
+    rerender(
+      <FilterBar filters={{ ...EMPTY, bankName: "ANZ" }} onChange={vi.fn()} />,
+    );
     expect(screen.getByLabelText(/bank/i)).toHaveValue("ANZ");
-  });
-
-  it("calls onChange with updated dateFrom when From input changes", () => {
-    const onChange = vi.fn();
-    renderBar(EMPTY, onChange);
-    fireEvent.change(screen.getByLabelText(/from/i), { target: { value: "2024-01-01" } });
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ dateFrom: "2024-01-01" }));
   });
 });

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { DateRangePicker } from "../components/common/DateRangePicker";
 import { InsightsComparePanel } from "../components/insights/InsightsComparePanel";
+import { useTransactionDateScope } from "../hooks/useTransactionDateScope";
 import {
   api,
   fetchCategoryFlow,
   fetchCategoryFlowByParent,
+  fetchCategoryFlowByParentPaginated,
   type CategoryFlowParentRow,
   type CategoryFlowRow,
   type FlowMode,
@@ -44,13 +47,6 @@ interface MasterSplit {
   merged: MasterData;
 }
 
-function defaultDateRange(): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to);
-  from.setMonth(from.getMonth() - 36);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
-}
-
 function formatAmount(n: number): string {
   return n.toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -83,11 +79,13 @@ const SCROLL_TOP_THRESHOLD = 80;
 const PREPEND_MONTHS = 12;
 
 export default function CategoryInsights() {
-  const defaults = useMemo(() => defaultDateRange(), []);
-  const [draftFrom, setDraftFrom] = useState(defaults.from);
-  const [draftTo, setDraftTo] = useState(defaults.to);
-  const [appliedFrom, setAppliedFrom] = useState(defaults.from);
-  const [appliedTo, setAppliedTo] = useState(defaults.to);
+  const { scope: dateScope, defaultRange, loading: dateScopeLoading } =
+    useTransactionDateScope();
+  const datesInitialized = useRef(false);
+  const [draftFrom, setDraftFrom] = useState("");
+  const [draftTo, setDraftTo] = useState("");
+  const [appliedFrom, setAppliedFrom] = useState("");
+  const [appliedTo, setAppliedTo] = useState("");
   const [parentCategory, setParentCategory] = useState(ALL_PC_VALUE);
   const [selectedSubs, setSelectedSubs] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<FlowMode>("both");
@@ -106,6 +104,22 @@ export default function CategoryInsights() {
   const [compareB, setCompareB] = useState<CompareAnchor | null>(null);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  // Pagination state for all parent categories view
+  const [paginationCursor, setPaginationCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    if (datesInitialized.current || dateScopeLoading || !defaultRange) return;
+    if (!appliedFrom && !appliedTo) {
+      datesInitialized.current = true;
+      setDraftFrom(defaultRange.from);
+      setDraftTo(defaultRange.to);
+      setAppliedFrom(defaultRange.from);
+      setAppliedTo(defaultRange.to);
+    }
+  }, [dateScopeLoading, defaultRange, appliedFrom, appliedTo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,15 +153,20 @@ export default function CategoryInsights() {
     }
     setLoading(true);
     setError(null);
+    setPaginationCursor(null);
+    setHasMore(false);
     try {
       if (isAllPc) {
-        const res = await fetchCategoryFlowByParent({
+        const res = await fetchCategoryFlowByParentPaginated({
           dateFrom: appliedFrom,
           dateTo: appliedTo,
           mode,
+          limit: 50,
         });
         setTableRows(mapParentApiToDisplayRows(res.rows));
-        setFlowMeta({ truncated: res.truncated, truncated_reason: res.truncated_reason });
+        setPaginationCursor(res.pagination.next_cursor);
+        setHasMore(res.pagination.has_more);
+        setFlowMeta(null);
       } else {
         const subs = selectedSubs.size > 0 ? Array.from(selectedSubs) : undefined;
         const res = await fetchCategoryFlow({
@@ -159,6 +178,8 @@ export default function CategoryInsights() {
         });
         setTableRows(res.rows);
         setFlowMeta({ truncated: res.truncated, truncated_reason: res.truncated_reason });
+        setPaginationCursor(null);
+        setHasMore(false);
       }
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { detail?: unknown } } };
@@ -166,6 +187,8 @@ export default function CategoryInsights() {
       setTableRows([]);
       setFlowMeta(null);
       setError(typeof d === "string" ? d : "Failed to load insights.");
+      setPaginationCursor(null);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
@@ -174,6 +197,49 @@ export default function CategoryInsights() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMore || parentCategory !== ALL_PC_VALUE || !paginationCursor) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const res = await fetchCategoryFlowByParentPaginated({
+        dateFrom: appliedFrom,
+        dateTo: appliedTo,
+        mode,
+        monthCursor: paginationCursor,
+        limit: 50,
+      });
+      setTableRows((prev) => [...prev, ...mapParentApiToDisplayRows(res.rows)]);
+      setPaginationCursor(res.pagination.next_cursor);
+      setHasMore(res.pagination.has_more);
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { detail?: unknown } } };
+      const d = ax.response?.data?.detail;
+      setError(typeof d === "string" ? d : "Failed to load more insights.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [appliedFrom, appliedTo, mode, hasMore, loadingMore, parentCategory, paginationCursor]);
+
+  // Set up infinite scroll listener
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!mainScrollRef.current) return;
+      const element = mainScrollRef.current;
+      const isNearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 500;
+      if (isNearBottom && hasMore && !loadingMore && parentCategory === ALL_PC_VALUE) {
+        void loadMore();
+      }
+    };
+
+    const scrollElement = mainScrollRef.current;
+    if (scrollElement) {
+      scrollElement.addEventListener("scroll", handleScroll);
+      return () => scrollElement.removeEventListener("scroll", handleScroll);
+    }
+  }, [hasMore, loadingMore, parentCategory, loadMore]);
 
   const totalsDisplay = useMemo(() => totalsFromRows(tableRows), [tableRows]);
 
@@ -420,30 +486,16 @@ export default function CategoryInsights() {
       <header className="shrink-0 border-b border-gray-200 bg-white px-3 py-3 shadow-sm sm:px-5 lg:px-8">
         <div className="flex flex-wrap items-end gap-3 lg:gap-4">
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
-            <div className="flex min-w-0 flex-col gap-0.5 sm:w-36">
-              <label htmlFor="ci-draft-from" className="text-xs font-medium text-gray-500">
-                From
-              </label>
-              <input
-                id="ci-draft-from"
-                type="date"
-                value={draftFrom}
-                onChange={(e) => setDraftFrom(e.target.value)}
-                className="min-w-0 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-sm"
-              />
-            </div>
-            <div className="flex min-w-0 flex-col gap-0.5 sm:w-36">
-              <label htmlFor="ci-draft-to" className="text-xs font-medium text-gray-500">
-                To
-              </label>
-              <input
-                id="ci-draft-to"
-                type="date"
-                value={draftTo}
-                onChange={(e) => setDraftTo(e.target.value)}
-                className="min-w-0 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-sm"
-              />
-            </div>
+            <DateRangePicker
+              label="Date range"
+              value={{ from: draftFrom, to: draftTo }}
+              onChange={(range) => {
+                setDraftFrom(range.from);
+                setDraftTo(range.to);
+              }}
+              scope={dateScope}
+              loading={dateScopeLoading}
+            />
             <div className="col-span-2 flex min-w-0 flex-col gap-0.5 sm:col-span-1 sm:min-w-[10rem] sm:max-w-xs">
               <label htmlFor="ci-pc-top" className="text-xs font-medium text-gray-500">
                 View
@@ -864,6 +916,33 @@ export default function CategoryInsights() {
                       </section>
                     ))}
                   </div>
+                  {loadingMore && (
+                    <div className="flex justify-center py-6">
+                      <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+                        <svg
+                          className="h-4 w-4 animate-spin"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Loading more months...
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>

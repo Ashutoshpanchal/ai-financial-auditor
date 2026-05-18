@@ -32,6 +32,21 @@ vi.mock("../services/api", () => ({
   },
 }));
 
+vi.mock("../hooks/useTransactionDateScope", () => ({
+  useTransactionDateScope: () => ({
+    scope: {
+      min_date: "2020-01-01",
+      max_date: "2030-12-31",
+      months_with_data: ["2024-01"],
+      has_transactions: true,
+    },
+    defaultRange: null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 import { api } from "../services/api";
@@ -291,8 +306,10 @@ describe("Upload page — transaction dropdown filters", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
 
-    const fromInput = screen.getByLabelText("Transaction from date");
-    const toInput = screen.getByLabelText("Transaction to date");
+    fireEvent.click(screen.getByRole("button", { name: "Date range" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom range" }));
+    const fromInput = screen.getByLabelText("From");
+    const toInput = screen.getByLabelText("To");
     fireEvent.change(fromInput, { target: { value: "2024-01-01" } });
     fireEvent.change(toInput, { target: { value: "2024-01-31" } });
     fireEvent.change(screen.getByLabelText("Transaction amount filter mode"), { target: { value: "between" } });

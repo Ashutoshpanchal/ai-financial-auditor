@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { DateRangePicker } from "../components/common/DateRangePicker";
+import { useTransactionDateScope } from "../hooks/useTransactionDateScope";
 import { api, postApplyCategoryMappings, postResetCategorySync } from "../services/api";
 
 type ApiErr = { response?: { status?: number; data?: { detail?: string } } };
@@ -834,6 +836,20 @@ export default function Upload() {
   const [txnPage, setTxnPage] = useState(1);
   const [txnTotal, setTxnTotal] = useState(0);
   const txnPageSize = 10;
+  const { scope: dateScope, defaultRange, loading: dateScopeLoading } =
+    useTransactionDateScope();
+  const txnDatesInitialized = useRef(false);
+
+  useEffect(() => {
+    if (txnDatesInitialized.current || dateScopeLoading || !defaultRange) return;
+    if (!txnFromDate && !txnToDate) {
+      txnDatesInitialized.current = true;
+      setTxnFromDate(defaultRange.from);
+      setTxnToDate(defaultRange.to);
+      setDraftFromDate(defaultRange.from);
+      setDraftToDate(defaultRange.to);
+    }
+  }, [dateScopeLoading, defaultRange, txnFromDate, txnToDate]);
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -1351,23 +1367,16 @@ export default function Upload() {
           {filterOpen && (
             <div className="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm p-4 space-y-4 max-w-3xl">
               <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">Date</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="date"
-                    value={draftFromDate}
-                    onChange={(e) => setDraftFromDate(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    aria-label="Transaction from date"
-                  />
-                  <input
-                    type="date"
-                    value={draftToDate}
-                    onChange={(e) => setDraftToDate(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    aria-label="Transaction to date"
-                  />
-                </div>
+                <DateRangePicker
+                  label="Date range"
+                  value={{ from: draftFromDate, to: draftToDate }}
+                  onChange={(range) => {
+                    setDraftFromDate(range.from);
+                    setDraftToDate(range.to);
+                  }}
+                  scope={dateScope}
+                  loading={dateScopeLoading}
+                />
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-500 mb-2">Amount (debit or credit)</p>

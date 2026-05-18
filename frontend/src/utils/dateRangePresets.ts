@@ -144,8 +144,8 @@ export function clampRangeToScope(
   if (!scope?.min_date || !scope?.max_date) {
     return { from, to };
   }
-  let f = from < scope.min_date ? scope.min_date : from;
-  let t = to > scope.max_date ? scope.max_date : to;
+  const f = from < scope.min_date ? scope.min_date : from;
+  const t = to > scope.max_date ? scope.max_date : to;
   if (f > t) {
     return { from: scope.min_date, to: scope.max_date };
   }

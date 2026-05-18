@@ -9,6 +9,7 @@ import { MetricCard } from "../components/dashboard/MetricCard";
 import { PieChartWidget } from "../components/dashboard/PieChartWidget";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { useAuth } from "../hooks/useAuth";
+import { useTransactionDateScope } from "../hooks/useTransactionDateScope";
 import { api } from "../services/api";
 import {
   makeInitialWidgetDraft,
@@ -167,6 +168,21 @@ export default function WidgetStudio() {
 
   const previewAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { scope: dateScope, defaultRange, loading: dateScopeLoading } =
+    useTransactionDateScope();
+  const datesInitialized = useRef(false);
+
+  useEffect(() => {
+    if (datesInitialized.current || dateScopeLoading || !defaultRange) return;
+    if (!filters.dateFrom && !filters.dateTo) {
+      datesInitialized.current = true;
+      setFilters((prev) => ({
+        ...prev,
+        dateFrom: defaultRange.from,
+        dateTo: defaultRange.to,
+      }));
+    }
+  }, [dateScopeLoading, defaultRange, filters.dateFrom, filters.dateTo]);
 
   const parentOptions = useMemo(
     () => Object.keys(categoryMaster).sort(),
@@ -557,6 +573,9 @@ export default function WidgetStudio() {
               onChange={setFilters}
               parentCategoryOptions={parentOptions}
               subCategoryOptions={subOptions}
+              dateScope={dateScope}
+              dateScopeLoading={dateScopeLoading}
+              defaultDateRange={defaultRange}
             />
           </div>
 

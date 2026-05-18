@@ -1,0 +1,79 @@
+import { describe, expect, it } from "vitest";
+import {
+  applyPreset,
+  clampRangeToScope,
+  getPresetRange,
+  resolveDefaultRange,
+  type TransactionDateScope,
+} from "./dateRangePresets";
+
+const SCOPE: TransactionDateScope = {
+  min_date: "2024-03-01",
+  max_date: "2026-04-15",
+  months_with_data: ["2024-03", "2024-04", "2026-04"],
+  has_transactions: true,
+};
+
+const TODAY = new Date(2026, 4, 18); // 18 May 2026
+
+describe("getPresetRange", () => {
+  it("returns last month bounds", () => {
+    const r = getPresetRange("last_month", TODAY);
+    expect(r).toEqual({ from: "2026-04-01", to: "2026-04-30" });
+  });
+
+  it("returns this year bounds", () => {
+    const r = getPresetRange("this_year", TODAY);
+    expect(r).toEqual({ from: "2026-01-01", to: "2026-12-31" });
+  });
+
+  it("returns last quarter when in Q2", () => {
+    const r = getPresetRange("last_quarter", TODAY);
+    expect(r).toEqual({ from: "2026-01-01", to: "2026-03-31" });
+  });
+});
+
+describe("clampRangeToScope", () => {
+  it("clamps to min and max dates", () => {
+    const r = clampRangeToScope("2020-01-01", "2030-12-31", SCOPE);
+    expect(r).toEqual({ from: "2024-03-01", to: "2026-04-15" });
+  });
+});
+
+describe("resolveDefaultRange", () => {
+  it("picks last month with data when last calendar month is empty", () => {
+    const scope: TransactionDateScope = {
+      ...SCOPE,
+      months_with_data: ["2024-03", "2026-04"],
+    };
+    const r = resolveDefaultRange(scope, TODAY);
+    expect(r).toEqual({ from: "2026-04-01", to: "2026-04-30" });
+  });
+
+  it("walks back to earlier month when needed", () => {
+    const scope: TransactionDateScope = {
+      ...SCOPE,
+      months_with_data: ["2024-03"],
+    };
+    const r = resolveDefaultRange(scope, TODAY);
+    expect(r).toEqual({ from: "2024-03-01", to: "2024-03-31" });
+  });
+
+  it("returns null when no transactions", () => {
+    expect(resolveDefaultRange({ ...SCOPE, has_transactions: false, months_with_data: [] })).toBeNull();
+  });
+});
+
+describe("applyPreset", () => {
+  it("returns null when preset has no overlap with scope", () => {
+    const narrow: TransactionDateScope = {
+      min_date: "2024-03-10",
+      max_date: "2024-03-12",
+      months_with_data: ["2024-03"],
+      has_transactions: true,
+    };
+    const r = applyPreset("this_year", narrow, new Date(2026, 0, 15));
+    expect(r).not.toBeNull();
+    expect(r!.from).toBe("2024-03-10");
+  });
+});

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FilterBar, FilterState } from "../components/dashboard/FilterBar";
+import { useTransactionDateScope } from "../hooks/useTransactionDateScope";
 import { WidgetGrid } from "../components/dashboard/WidgetGrid";
 import { EditModePanel } from "../components/dashboard/EditModePanel";
 import { ChatPanel, type WidgetSuggestion } from "../components/dashboard/ChatPanel";
@@ -57,6 +58,21 @@ export default function Dashboard() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoadingLayout, setIsLoadingLayout] = useState(true);
+  const { scope: dateScope, defaultRange, loading: dateScopeLoading } =
+    useTransactionDateScope();
+  const datesInitialized = useRef(false);
+
+  useEffect(() => {
+    if (datesInitialized.current || dateScopeLoading || !defaultRange) return;
+    if (!filters.dateFrom && !filters.dateTo) {
+      datesInitialized.current = true;
+      setFilters((prev) => ({
+        ...prev,
+        dateFrom: defaultRange.from,
+        dateTo: defaultRange.to,
+      }));
+    }
+  }, [dateScopeLoading, defaultRange, filters.dateFrom, filters.dateTo]);
 
   // Load widgets + layout on mount
   useEffect(() => {
@@ -226,7 +242,13 @@ export default function Dashboard() {
 
           {/* Filter bar */}
           <div className="shrink-0">
-            <FilterBar filters={filters} onChange={setFilters} />
+            <FilterBar
+              filters={filters}
+              onChange={setFilters}
+              dateScope={dateScope}
+              dateScopeLoading={dateScopeLoading}
+              defaultDateRange={defaultRange}
+            />
           </div>
 
           {/* Widget grid */}

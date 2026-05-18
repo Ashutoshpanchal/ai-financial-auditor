@@ -1,3 +1,6 @@
+import { DateRangePicker } from "../common/DateRangePicker";
+import type { DateRangeValue, TransactionDateScope } from "../../utils/dateRangePresets";
+
 export interface FilterState {
   dateFrom: string; // ISO date string "YYYY-MM-DD" or ""
   dateTo: string; // ISO date string "YYYY-MM-DD" or ""
@@ -14,6 +17,11 @@ interface FilterBarProps {
   parentCategoryOptions?: string[];
   /** Sub-category options for the selected parent. */
   subCategoryOptions?: string[];
+  /** Transaction bounds for the date picker. */
+  dateScope?: TransactionDateScope | null;
+  dateScopeLoading?: boolean;
+  /** Data-aware default range used when Clear is pressed. */
+  defaultDateRange?: DateRangeValue | null;
 }
 
 const EMPTY_FILTERS: FilterState = {
@@ -36,6 +44,9 @@ export function FilterBar({
   onChange,
   parentCategoryOptions = [],
   subCategoryOptions = [],
+  dateScope = null,
+  dateScopeLoading = false,
+  defaultDateRange = null,
 }: FilterBarProps) {
   function handleField(field: keyof FilterState, value: string) {
     const next = { ...filters, [field]: value };
@@ -45,40 +56,29 @@ export function FilterBar({
     onChange(next);
   }
 
+  function handleDateChange(range: DateRangeValue) {
+    onChange({ ...filters, dateFrom: range.from, dateTo: range.to });
+  }
+
   function handleClear() {
-    onChange(EMPTY_FILTERS);
+    const dates = defaultDateRange ?? { from: "", to: "" };
+    onChange({
+      ...EMPTY_FILTERS,
+      dateFrom: dates.from,
+      dateTo: dates.to,
+    });
   }
 
   return (
     <div className="w-full bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-3">
       <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
-        {/* From date */}
-        <div className="flex flex-col gap-0.5">
-          <label htmlFor="filter-date-from" className="text-xs font-medium text-gray-500">
-            From
-          </label>
-          <input
-            id="filter-date-from"
-            type="date"
-            value={filters.dateFrom}
-            onChange={(e) => handleField("dateFrom", e.target.value)}
-            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 transition"
-          />
-        </div>
-
-        {/* To date */}
-        <div className="flex flex-col gap-0.5">
-          <label htmlFor="filter-date-to" className="text-xs font-medium text-gray-500">
-            To
-          </label>
-          <input
-            id="filter-date-to"
-            type="date"
-            value={filters.dateTo}
-            onChange={(e) => handleField("dateTo", e.target.value)}
-            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 transition"
-          />
-        </div>
+        <DateRangePicker
+          label="Date range"
+          value={{ from: filters.dateFrom, to: filters.dateTo }}
+          onChange={(range) => handleDateChange(range)}
+          scope={dateScope}
+          loading={dateScopeLoading}
+        />
 
         {/* Bank name */}
         <div className="flex flex-col gap-0.5">
