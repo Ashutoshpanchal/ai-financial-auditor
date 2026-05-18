@@ -14,6 +14,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.services.widget_sql_aliases import translate_llm_sql_to_real
+
 _MAX_SQL_LEN = 4096
 
 _DISALLOWED = re.compile(
@@ -62,10 +64,6 @@ def validate_raw_metric_sql(sql: str) -> None:
     if len(stripped) > _MAX_SQL_LEN:
         raise ValueError(f"raw_metric_sql exceeds {_MAX_SQL_LEN} characters.")
 
-    core = stripped.rstrip().rstrip(";")
-    if ";" in core:
-        raise ValueError("Multiple SQL statements are not allowed.")
-
     if "--" in stripped or "/*" in stripped:
         raise ValueError("SQL comments are not allowed in raw_metric_sql.")
 
@@ -73,11 +71,15 @@ def validate_raw_metric_sql(sql: str) -> None:
     if not lowered.startswith("select"):
         raise ValueError("raw_metric_sql must be a single SELECT statement.")
 
-    if _JOIN.search(stripped):
-        raise ValueError("JOIN is not allowed in raw_metric_sql.")
-
     if _DISALLOWED.search(stripped):
         raise ValueError("Disallowed keyword or construct in raw_metric_sql.")
+
+    core = stripped.rstrip().rstrip(";")
+    if ";" in core:
+        raise ValueError("Multiple SQL statements are not allowed.")
+
+    if _JOIN.search(stripped):
+        raise ValueError("JOIN is not allowed in raw_metric_sql.")
 
     if not _FROM_TRANSACTIONS.search(stripped):
         raise ValueError(
@@ -173,6 +175,8 @@ def _append_dashboard_filters(
     date_to: date | None,
     bank_name: str | None,
     category: str | None,
+    parent_category: str | None,
+    sub_category: str | None,
     transaction_type: str | None,
 ) -> tuple[str, dict[str, Any]]:
     """Append date/bank/category/direction predicates before trailing clauses."""
@@ -189,6 +193,12 @@ def _append_dashboard_filters(
     if category is not None:
         fragments.append("transactions.category = :_widget_cat")
         params["_widget_cat"] = category
+    if parent_category is not None:
+        fragments.append("transactions.parent_category = :_widget_pc")
+        params["_widget_pc"] = parent_category
+    if sub_category is not None:
+        fragments.append("transactions.sub_category = :_widget_sc")
+        params["_widget_sc"] = sub_category
     if transaction_type == "credit":
         fragments.append("transactions.credit > 0")
     elif transaction_type == "debit":
@@ -208,24 +218,29 @@ def execute_raw_metric_sql(
     date_to: date | None = None,
     bank_name: str | None = None,
     category: str | None = None,
+    parent_category: str | None = None,
+    sub_category: str | None = None,
     transaction_type: str | None = None,
 ) -> float:
     """Execute sandboxed metric SQL and return a single numeric scalar.
 
     Args:
-        sql: SELECT that passed ``validate_raw_metric_sql``.
+        sql: SELECT that passed ``validate_raw_metric_sql`` (may use LLM dummy names).
         user_id: Tenant id.
         db: SQLAlchemy session.
         date_from: Optional inclusive lower bound on ``transaction_date``.
         date_to: Optional inclusive upper bound on ``transaction_date``.
         bank_name: Optional bank filter.
-        category: Optional category filter.
+        category: Optional legacy category filter.
+        parent_category: Optional parent category filter.
+        sub_category: Optional sub-category filter.
         transaction_type: Optional ``credit`` or ``debit`` direction filter.
 
     Returns:
         Scalar result coerced to ``float`` (0.0 when NULL).
     """
-    augmented, bind = inject_user_scope(sql, user_id)
+    real_sql = translate_llm_sql_to_real(sql)
+    augmented, bind = inject_user_scope(real_sql, user_id)
     augmented, bind = _append_dashboard_filters(
         augmented,
         bind,
@@ -233,7 +248,12 @@ def execute_raw_metric_sql(
         date_to=date_to,
         bank_name=bank_name,
         category=category,
+        parent_category=parent_category,
+        sub_category=sub_category,
         transaction_type=transaction_type,
     )
+    print(f"[widget_metric_sql] user_id={user_id}", flush=True)
+    print(f"[widget_metric_sql] sql={augmented}", flush=True)
+    print(f"[widget_metric_sql] bind={bind}", flush=True)
     result = db.execute(text(augmented), bind).scalar()
     return float(result or 0)

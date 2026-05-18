@@ -1,16 +1,16 @@
-# Graph Report - AI-Finanical-Advisor  (2026-05-15)
+# Graph Report - AI-Finanical-Advisor  (2026-05-18)
 
 ## Corpus Check
-- 142 files · ~101,180 words
+- 145 files · ~102,378 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2243 nodes · 3216 edges · 219 communities (145 shown, 74 thin omitted)
-- Extraction: 84% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 526 edges (avg confidence: 0.76)
+- 2313 nodes · 3295 edges · 215 communities (149 shown, 66 thin omitted)
+- Extraction: 84% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 537 edges (avg confidence: 0.76)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1141c593`
+- Built from commit: `00afdf15`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -131,12 +131,12 @@
 - [[_COMMUNITY_Community 113|Community 113]]
 - [[_COMMUNITY_Community 114|Community 114]]
 - [[_COMMUNITY_Community 115|Community 115]]
+- [[_COMMUNITY_Community 116|Community 116]]
 - [[_COMMUNITY_Community 117|Community 117]]
 - [[_COMMUNITY_Community 118|Community 118]]
 - [[_COMMUNITY_Community 119|Community 119]]
 - [[_COMMUNITY_Community 120|Community 120]]
 - [[_COMMUNITY_Community 121|Community 121]]
-- [[_COMMUNITY_Community 122|Community 122]]
 - [[_COMMUNITY_Community 123|Community 123]]
 - [[_COMMUNITY_Community 124|Community 124]]
 - [[_COMMUNITY_Community 125|Community 125]]
@@ -144,10 +144,10 @@
 - [[_COMMUNITY_Community 127|Community 127]]
 - [[_COMMUNITY_Community 128|Community 128]]
 - [[_COMMUNITY_Community 129|Community 129]]
+- [[_COMMUNITY_Community 130|Community 130]]
 - [[_COMMUNITY_Community 131|Community 131]]
 - [[_COMMUNITY_Community 132|Community 132]]
 - [[_COMMUNITY_Community 133|Community 133]]
-- [[_COMMUNITY_Community 134|Community 134]]
 - [[_COMMUNITY_Community 135|Community 135]]
 - [[_COMMUNITY_Community 136|Community 136]]
 - [[_COMMUNITY_Community 137|Community 137]]
@@ -161,20 +161,20 @@
 - [[_COMMUNITY_Community 145|Community 145]]
 - [[_COMMUNITY_Community 146|Community 146]]
 - [[_COMMUNITY_Community 147|Community 147]]
-- [[_COMMUNITY_Community 148|Community 148]]
-- [[_COMMUNITY_Community 149|Community 149]]
-- [[_COMMUNITY_Community 150|Community 150]]
-- [[_COMMUNITY_Community 151|Community 151]]
+- [[_COMMUNITY_Community 152|Community 152]]
+- [[_COMMUNITY_Community 153|Community 153]]
+- [[_COMMUNITY_Community 154|Community 154]]
+- [[_COMMUNITY_Community 155|Community 155]]
 - [[_COMMUNITY_Community 156|Community 156]]
 - [[_COMMUNITY_Community 157|Community 157]]
-- [[_COMMUNITY_Community 158|Community 158]]
-- [[_COMMUNITY_Community 159|Community 159]]
-- [[_COMMUNITY_Community 160|Community 160]]
-- [[_COMMUNITY_Community 161|Community 161]]
-- [[_COMMUNITY_Community 175|Community 175]]
+- [[_COMMUNITY_Community 171|Community 171]]
+- [[_COMMUNITY_Community 172|Community 172]]
+- [[_COMMUNITY_Community 173|Community 173]]
+- [[_COMMUNITY_Community 174|Community 174]]
 - [[_COMMUNITY_Community 176|Community 176]]
 - [[_COMMUNITY_Community 177|Community 177]]
 - [[_COMMUNITY_Community 178|Community 178]]
+- [[_COMMUNITY_Community 179|Community 179]]
 - [[_COMMUNITY_Community 180|Community 180]]
 - [[_COMMUNITY_Community 181|Community 181]]
 - [[_COMMUNITY_Community 182|Community 182]]
@@ -183,10 +183,10 @@
 - [[_COMMUNITY_Community 185|Community 185]]
 - [[_COMMUNITY_Community 186|Community 186]]
 - [[_COMMUNITY_Community 187|Community 187]]
-- [[_COMMUNITY_Community 188|Community 188]]
 - [[_COMMUNITY_Community 189|Community 189]]
 - [[_COMMUNITY_Community 190|Community 190]]
 - [[_COMMUNITY_Community 191|Community 191]]
+- [[_COMMUNITY_Community 192|Community 192]]
 - [[_COMMUNITY_Community 193|Community 193]]
 - [[_COMMUNITY_Community 194|Community 194]]
 - [[_COMMUNITY_Community 195|Community 195]]
@@ -209,36 +209,32 @@
 - [[_COMMUNITY_Community 212|Community 212]]
 - [[_COMMUNITY_Community 213|Community 213]]
 - [[_COMMUNITY_Community 214|Community 214]]
-- [[_COMMUNITY_Community 215|Community 215]]
-- [[_COMMUNITY_Community 216|Community 216]]
-- [[_COMMUNITY_Community 217|Community 217]]
-- [[_COMMUNITY_Community 218|Community 218]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `resolve_widget_data()` - 48 edges
+1. `resolve_widget_data()` - 50 edges
 2. `_make_user()` - 40 edges
 3. `_client_with_overrides()` - 40 edges
-4. `set_rls_user()` - 38 edges
-5. `_make_db()` - 38 edges
-6. `validate_raw_metric_sql()` - 38 edges
+4. `validate_raw_metric_sql()` - 40 edges
+5. `set_rls_user()` - 38 edges
+6. `_make_db()` - 38 edges
 7. `TestValidateRawMetricSql` - 35 edges
 8. `analyze_and_categorize()` - 27 edges
 9. `get_settings()` - 23 edges
-10. `parse_csv()` - 22 edges
+10. `execute_raw_metric_sql()` - 23 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `test_returns_no_transactions_message_when_empty()` --calls--> `analyze_and_categorize()`  [INFERRED]
   backend/tests/test_categories_router.py → backend/routers/categories.py
+- `fmt()` --calls--> `formatAmount()`  [INFERRED]
+  frontend/src/components/insights/InsightsComparePanel.tsx → frontend/src/pages/CategoryInsights.tsx
 - `_make_engine()` --calls--> `get_settings()`  [INFERRED]
   backend/database.py → backend/config.py
 - `resolve_migrations_dir()` --calls--> `get_settings()`  [INFERRED]
   backend/db_migrations.py → backend/config.py
 - `analyze_and_categorize()` --calls--> `get_settings()`  [INFERRED]
   backend/routers/categories.py → backend/config.py
-- `preview_widget()` --calls--> `get_settings()`  [INFERRED]
-  backend/routers/dashboard.py → backend/config.py
 
-## Communities (219 total, 74 thin omitted)
+## Communities (215 total, 66 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.05
@@ -250,7 +246,7 @@ Nodes (48): apply_description_mappings_to_transactions(), Apply enabled ``catego
 
 ### Community 2 - "Community 2"
 Cohesion: 0.05
-Nodes (39): check_widget_preview_rate_limit(), In-process rate limiting for dashboard widget preview (per user).  Uses a 60-sec, Raised when a user exceeds the configured preview requests per minute., Clear all in-memory counters (for tests only)., Record one preview attempt for *user_id* or raise if over the limit.      Args:, reset_widget_preview_rate_limits(), WidgetPreviewRateLimited, Tests for backend.services.preview_rate_limit — widget preview rate limiting. (+31 more)
+Nodes (47): rag_node(), End an aborted PostgreSQL transaction so later commits (e.g. chat_sessions) succ, Execute the tool(s) identified by intake_node and collect results.      Iterates, Execute the tool(s) identified by intake_node and collect results.      Iterates, Execute the tool(s) identified by intake_node and collect results.      Iterates, _rollback_rag_db_after_tool_error(), _build_embeddings(), compare_months() (+39 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.05
@@ -262,323 +258,323 @@ Nodes (48): apply_pending_migrations(), ensure_orm_tables_exist(), _migration_fi
 
 ### Community 5 - "Community 5"
 Cohesion: 0.05
-Nodes (41): _build_embeddings(), compare_months(), _embed_query(), get_anomalies(), get_spending_summary(), LangChain tools for the AI Finance Agent.  Each tool is a plain function that qu, Aggregate total spend per category for all of the user's transactions.      Args, Compare total spend and category breakdown between two calendar months.      Arg (+33 more)
+Nodes (35): inject_user_scope(), Append ``transactions.user_id = :_widget_uid`` on each ``FROM transactions`` sco, Append ``transactions.user_id = :_widget_uid`` on each ``FROM transactions`` sco, Reject obviously unsafe or unsupported SQL before injection.      Args:, Append ``transactions.user_id = :_widget_uid`` before ORDER BY / LIMIT.      Arg, Tests for backend.services.widget_metric_raw_sql — user SQL validation and execu, SELECT with ORDER BY must pass validation., SELECT with ORDER BY must pass validation. (+27 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.06
-Nodes (32): execute_raw_metric_sql(), Append ``transactions.user_id = :_widget_uid`` on each ``FROM transactions`` sco, Execute sandboxed metric SQL and return a single numeric scalar.      Args:, Execute sandboxed metric SQL and return a single numeric scalar.      Args:, Tests for backend.services.widget_metric_raw_sql — user SQL validation and execu, execute_raw_metric_sql() runs validated SQL and returns a float., Return a mock SQLAlchemy session., Result must always be a float, even for integer results. (+24 more)
+Cohesion: 0.05
+Nodes (33): Reject obviously unsafe or unsupported SQL before injection.      Args:, Reject obviously unsafe or unsupported SQL before injection.      Args:, Reject obviously unsafe or unsupported SQL before injection.      Args:, validate_raw_metric_sql(), pg_sleep function must raise ValueError (disallowed keyword)., SELECT with WHERE clause must pass validation., SELECT with GROUP BY must pass validation., SELECT with WHERE clause must pass validation. (+25 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.07
-Nodes (39): main(), Backfill ``transactions.short_description`` from ``description``.  Run from repo, Parse CLI args and backfill ``short_description`` per user (RLS-safe)., _collapse_by_merchant_registry(), compute_short_description(), _dedupe_consecutive_tokens_ci(), _infer_rail(), _merchant_rules() (+31 more)
+Nodes (32): execute_raw_metric_sql(), Execute sandboxed metric SQL and return a single numeric scalar.      Args:, Execute sandboxed metric SQL and return a single numeric scalar.      Args:, Execute sandboxed metric SQL and return a single numeric scalar.      Args:, execute_raw_metric_sql() runs validated SQL and returns a float., Return a mock SQLAlchemy session., Result must always be a float, even for integer results., User ID must be injected into the SQL. (+24 more)
 
 ### Community 8 - "Community 8"
+Cohesion: 0.07
+Nodes (39): main(), Backfill ``transactions.short_description`` from ``description``.  Run from repo, Parse CLI args and backfill ``short_description`` per user (RLS-safe)., _collapse_by_merchant_registry(), compute_short_description(), _dedupe_consecutive_tokens_ci(), _infer_rail(), _merchant_rules() (+31 more)
+
+### Community 9 - "Community 9"
 Cohesion: 0.08
 Nodes (36): get_category_flow(), get_category_flow_by_parent(), Analytics API — category flow aggregates for insights UI., Return parent-category by month aggregates (all PCs in range)., Return PC-by-month-by-SC aggregates for the insights table.      Raises:, Return PC-by-month-by-SC aggregates for the insights table.      Raises:, _build_filters(), _build_filters_all_parents() (+28 more)
 
-### Community 9 - "Community 9"
-Cohesion: 0.07
-Nodes (27): inject_user_scope(), Append ``AND/WHERE transactions.user_id = :_studio_uid`` before ORDER/GROUP/LIMI, Append ``transactions.user_id = :_widget_uid`` before ORDER BY / LIMIT.      Arg, Simple SELECT without WHERE must add WHERE clause., SELECT with existing WHERE must add AND clause., WHERE/AND clause must be injected before ORDER BY., inject_user_scope() appends user_id filter before ORDER BY / LIMIT., Simple SELECT without WHERE must add WHERE clause. (+19 more)
-
 ### Community 10 - "Community 10"
-Cohesion: 0.06
-Nodes (34): preview_widget(), Run resolve_widget_data for a provisional config without saving.      Returns da, Run resolve_widget_data for a provisional config without saving.      Returns da, Run resolve_widget_data for a provisional config without saving.      Returns da, _build_where_clauses(), describe_widget_query_human(), Widget query service — resolves dashboard widget data from Transaction records., Build a read-only pseudo-SQL description using an abstract table name.      Omit (+26 more)
-
-### Community 11 - "Community 11"
 Cohesion: 0.1
 Nodes (24): _patch_category_rule(), Shared PATCH handler for a single category_rule row., Update fields on a category_rule row owned by the current user., Shared PATCH handler for a single category_rule row., Backward-compatible alias for ``PATCH /categories/rules/{entry_id}``., Shared PATCH handler for a single category_rule row., Shared PATCH handler for a single category_rule row., Update fields on a category_rule row owned by the current user. (+16 more)
 
-### Community 12 - "Community 12"
+### Community 11 - "Community 11"
 Cohesion: 0.08
 Nodes (30): analyze_and_categorize(), _build_llm(), _chunks(), _ensure_user_master_pair(), list_payment_methods(), _normalize_llm_message_content(), _normalize_payment(), FastAPI router for category management — master dictionary and per-user descript (+22 more)
 
-### Community 13 - "Community 13"
+### Community 12 - "Community 12"
 Cohesion: 0.08
 Nodes (8): ProtectedRoute(), AuthProvider(), useAuth(), handleCreateUser(), handleDelete(), handlePasswordChange(), handleRoleChange(), showSuccess()
 
+### Community 13 - "Community 13"
+Cohesion: 0.11
+Nodes (18): _make_db(), _make_user(), POST /dashboard/widgets — creates widget, 422 on bad widget_type., Return a mock DB that supports add/commit/refresh for widget creation., POST with valid body must return 201 Created., db.add and db.commit must be called on successful creation., POST with an invalid widget_type must return 422 Unprocessable Entity., Each of metric / bar_chart / pie_chart / line_chart must be accepted. (+10 more)
+
 ### Community 14 - "Community 14"
-Cohesion: 0.13
-Nodes (19): list_category_master(), Return merged category dictionary for the current user (global seed + user rows), Return merged category dictionary for the current user (global seed + user rows), _make_mock_category_master_row(), _make_mock_db_with_master_rows(), Return a mock Session whose select(CategoryMaster) returns the given rows., Create a minimal mock CategoryMaster row., Unit tests for list_category_master via direct function call. (+11 more)
+Cohesion: 0.09
+Nodes (18): _build_category_hierarchy(), Build a {parent_category: [sub_category, ...]} dict from ORM rows., Build a {parent_category: [sub_category, ...]} dict from ORM rows., Tests for the PAYMENT_METHODS constant used by the endpoint., PAYMENT_METHODS must be a list., PAYMENT_METHODS must contain at least one method., UPI must be in the payment methods list., Every payment method label must be a non-empty string. (+10 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.11
-Nodes (11): FilterBar(), isChartPreview(), isMetricPreview(), mergeMaster(), run(), WidgetStudio(), draftPreviewKey(), isNonEmptyRawSql() (+3 more)
+Cohesion: 0.08
+Nodes (24): Base, DeclarativeBase, AuditReport, AuditReport model — stores LangChain audit output including Graphify knowledge g, One audit report per document — stores structured insights + Graphify graph data, Base, SQLAlchemy declarative base — shared by all models., Base class for all ORM models. (+16 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.13
-Nodes (16): CategoryMaster, SQLAlchemy ORM model for the category_master table., Parent/sub-category dictionary: global seed rows and per-user extensions.      R, create_category_master_entry(), Add a user-owned parent/sub pair to category_master.      Raises 409 if this use, Add a user-owned parent/sub pair to category_master.      Raises 409 if this use, Unit tests for create_category_master_entry., DB mock that finds no duplicate (scalar_one_or_none returns None). (+8 more)
+Nodes (19): list_category_master(), Return merged category dictionary for the current user (global seed + user rows), Return merged category dictionary for the current user (global seed + user rows), _make_mock_category_master_row(), _make_mock_db_with_master_rows(), Return a mock Session whose select(CategoryMaster) returns the given rows., Create a minimal mock CategoryMaster row., Unit tests for list_category_master via direct function call. (+11 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.1
-Nodes (21): ChatSession, ChatSession model — persists LangGraph multi-agent conversation history., One session per user conversation thread with the finance agent., Request body for sending a message to an existing session., Request body for sending a message to an existing session., Request body for sending a message to an existing session., SendMessageRequest, _client() (+13 more)
+Nodes (21): list_category_rules(), list_description_categories(), Shape one category_rule row for API JSON., Shape one category_rule row for API JSON., Return all category_rules rows owned by the current user., Return all category_rules rows owned by the current user., Backward-compatible alias for ``GET /categories/rules`` (same payload shape)., Backward-compatible alias for ``GET /categories/rules`` (same payload shape). (+13 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.13
-Nodes (15): _client_with_overrides(), _make_db(), POST /dashboard/widgets — creates widget, 422 on bad widget_type., Return a mock DB that supports add/commit/refresh for widget creation., POST with valid body must return 201 Created., db.add and db.commit must be called on successful creation., POST with an invalid widget_type must return 422 Unprocessable Entity., Each of metric / bar_chart / pie_chart / line_chart must be accepted. (+7 more)
+Cohesion: 0.11
+Nodes (11): FilterBar(), isChartPreview(), isMetricPreview(), mergeMaster(), run(), WidgetStudio(), draftPreviewKey(), isNonEmptyRawSql() (+3 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.11
-Nodes (11): fmt(), formatAmount(), formatDelta(), dayBeforeMonth(), mergeCategoryFlowRows(), minMonth(), monthStartMinusMonths(), rowKey() (+3 more)
+Cohesion: 0.13
+Nodes (16): CategoryMaster, SQLAlchemy ORM model for the category_master table., Parent/sub-category dictionary: global seed rows and per-user extensions.      R, create_category_master_entry(), Add a user-owned parent/sub pair to category_master.      Raises 409 if this use, Add a user-owned parent/sub pair to category_master.      Raises 409 if this use, Unit tests for create_category_master_entry., DB mock that finds no duplicate (scalar_one_or_none returns None). (+8 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.1
-Nodes (18): Resolve dashboard widget data by executing the configured aggregation query., Resolve dashboard widget data by executing the configured aggregation query., Resolve dashboard widget data by executing the configured aggregation query., Resolve dashboard widget data by executing the configured aggregation query., resolve_widget_data(), resolve_widget_data returns a metric dict when group_by is absent., Metric mode must return {'value': float, 'format': str}., resolve_widget_data returns a metric dict when group_by is absent. (+10 more)
+Cohesion: 0.12
+Nodes (17): _make_widget(), Return a mock UserWidget ORM object., GET /dashboard/widgets/{id}/data — returns data, 404 on missing, 422 on bad conf, Return a mock DB for the data endpoint., GET /data for a valid metric widget must return 200 with value+format., GET /dashboard/widgets/{id}/data — returns data, 404 on missing, 422 on bad conf, GET /data for a chart widget must return 200 with a list., Return a mock DB for the data endpoint. (+9 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.1
-Nodes (21): create_session(), CreateSessionResponse, delete_session(), Chat router — FastAPI endpoints for managing chat sessions and sending messages., Create a new chat session for the authenticated user.      Args:         body:, Create a new chat session for the authenticated user.      Args:         body:, Create a new chat session for the authenticated user.      Args:         body:, Create a new chat session for the authenticated user.      Args:         body: (+13 more)
+Cohesion: 0.12
+Nodes (14): check_widget_preview_rate_limit(), Record one preview attempt for *user_id* or raise if over the limit.      Args:, Two users must have independent rate limit counters., After the 60-second window passes, old timestamps should expire and allow new re, When WidgetPreviewRateLimited is raised, it should have a message., When WidgetPreviewRateLimited is raised, it should have a message., check_widget_preview_rate_limit() enforces sliding window rate limits., When max_per_minute is 0, no exception should be raised. (+6 more)
 
 ### Community 22 - "Community 22"
+Cohesion: 0.12
+Nodes (10): formatAmount(), formatDelta(), dayBeforeMonth(), mergeCategoryFlowRows(), minMonth(), monthStartMinusMonths(), rowKey(), totalsFromRows() (+2 more)
+
+### Community 23 - "Community 23"
+Cohesion: 0.12
+Nodes (17): ChatSession, ChatSession model — persists LangGraph multi-agent conversation history., One session per user conversation thread with the finance agent., _client(), db(), Tests for chat session delete and safe error responses., TestClient with auth and DB overrides., Authenticated user mock. (+9 more)
+
+### Community 24 - "Community 24"
 Cohesion: 0.15
 Nodes (13): _client(), Tests for GET /categories/unmapped and POST /categories/resolve-unmapped., Missing parent_category returns 422., Happy path: creates CM entry, updates transactions, returns count., When CM entry already exists, it is reused (no duplicate created)., Tests for the unmapped short descriptions list endpoint., Endpoint returns a JSON list (empty when no unmapped rows)., RLS must be set before querying transactions. (+5 more)
 
-### Community 23 - "Community 23"
+### Community 25 - "Community 25"
 Cohesion: 0.13
 Nodes (20): BaseModel, User model — all roles share this table; role column controls access level., Role hierarchy: super_admin > admin > user., Represents an authenticated user — created on first Google OAuth login., User, UserRole, CreateUserRequest, Request body for creating a new user directly (no Google OAuth). (+12 more)
 
-### Community 24 - "Community 24"
-Cohesion: 0.12
-Nodes (15): GET /dashboard/widgets/{id}/data — returns data, 404 on missing, 422 on bad conf, Return a mock DB for the data endpoint., GET /data for a valid metric widget must return 200 with value+format., GET /dashboard/widgets/{id}/data — returns data, 404 on missing, 422 on bad conf, GET /data for a chart widget must return 200 with a list., Return a mock DB for the data endpoint., GET /data for a valid metric widget must return 200 with value+format., GET /data for a non-existent widget must return 404. (+7 more)
+### Community 26 - "Community 26"
+Cohesion: 0.11
+Nodes (19): _append_dashboard_filters(), _find_trailing_clause_start(), _inject_predicates_at_transactions_scopes(), Minimal sandbox for user-written metric SQL against ``transactions`` only.  For, Return index in *rest* (text after ``FROM transactions``) to insert predicates b, Append date/bank/category/direction predicates before trailing clauses., Remove date placeholder literals from SQL; dates are injected as bind params., Remove date placeholder literals from SQL; dates are injected as bind params. (+11 more)
 
-### Community 25 - "Community 25"
+### Community 27 - "Community 27"
 Cohesion: 0.12
 Nodes (15): PUT /dashboard/layout — saves layout (upsert)., Return a mock DB for the layout PUT endpoint., PUT /layout must call db.add when no dashboard row exists yet., PUT /layout must update the existing dashboard's layout in place., PUT /dashboard/layout — saves layout (upsert)., Return a mock DB for the layout PUT endpoint., PUT /layout on existing dashboard must NOT call db.add (update-only path)., PUT /layout must call db.add when no dashboard row exists yet. (+7 more)
 
-### Community 26 - "Community 26"
+### Community 28 - "Community 28"
+Cohesion: 0.1
+Nodes (14): Tests for backend.routers.dashboard — dashboard widget CRUD and layout endpoints, Reset dependency overrides before each test., Reset dependency overrides before each test., POST /dashboard/widgets/preview — returns data and human_query., Reset dependency overrides before each test., Reset dependency overrides before each test., Reset dependency overrides before each test., Clear all FastAPI dependency overrides. (+6 more)
+
+### Community 29 - "Community 29"
 Cohesion: 0.12
 Nodes (17): _apply_client(), TestClient with DB and user overrides for apply-mappings tests., TestClient with DB and user overrides for apply-mappings tests., Clear dependency overrides on the apply-mappings test app., POST /categories/apply-mappings — applies category_rules via resolver., Clear dependency overrides on the apply-mappings test app., Ensure overrides do not leak between tests., POST /categories/apply-mappings — applies category_rules via resolver. (+9 more)
 
-### Community 27 - "Community 27"
+### Community 30 - "Community 30"
+Cohesion: 0.11
+Nodes (19): CreateSessionRequest, delete_session(), Chat router — FastAPI endpoints for managing chat sessions and sending messages., Send a user message to the finance agent and receive a response.      Loads the, Send a user message to the finance agent and receive a response.      Loads the, Send a user message to the finance agent and receive a response.      Loads the, Send a user message to the finance agent and receive a response.      Loads the, Delete a chat session owned by the authenticated user.      Args:         sessio (+11 more)
+
+### Community 31 - "Community 31"
 Cohesion: 0.14
 Nodes (12): _find_column(), Return the first column whose header contains any keyword (case-insensitive)., Tests for the _find_column helper function., Exact keyword match should be returned regardless of case., Column header 'Withdrawal (Dr)' should match the 'withdrawal' keyword., Column header 'Deposit (Cr)' should match the 'deposit' keyword., Should return None when no keyword matches any column header., Exact keyword match should win over substring match. (+4 more)
 
-### Community 28 - "Community 28"
-Cohesion: 0.12
-Nodes (15): _make_db(), resolve_widget_data raises ValueError for unknown field values., A field not in {credit, debit} must raise ValueError., resolve_widget_data raises ValueError for unknown field values., A field not in {credit, debit} must raise ValueError., An empty field string must raise ValueError., An empty field string must raise ValueError., A config dict without 'field' defaults to '' and must raise ValueError. (+7 more)
-
-### Community 29 - "Community 29"
+### Community 32 - "Community 32"
 Cohesion: 0.11
 Nodes (15): _make_month_row(), resolve_widget_data returns a list of {label, value} dicts for month grouping., Chart mode must return a list, not a dict., resolve_widget_data returns a list of {label, value} dicts for month grouping., Chart mode must return a list, not a dict., Each item in the list must contain 'label' and 'value' keys., Each item in the list must contain 'label' and 'value' keys., Values must be floats even when the DB returns integers. (+7 more)
 
-### Community 30 - "Community 30"
-Cohesion: 0.14
-Nodes (12): _parse_llm_json(), Strip optional markdown fences from LLM output and parse as JSON array., Strip optional markdown fences from LLM output and parse as JSON array., Tests for the LLM JSON response parser., Plain JSON array without fences should parse correctly., JSON wrapped in ```json ... ``` fences should be stripped before parsing., JSON wrapped in ``` ... ``` without language hint should parse., Empty JSON array should return an empty list. (+4 more)
+### Community 33 - "Community 33"
+Cohesion: 0.12
+Nodes (15): _make_db(), resolve_widget_data raises ValueError for unknown field values., A field not in {credit, debit} must raise ValueError., resolve_widget_data raises ValueError for unknown field values., A field not in {credit, debit} must raise ValueError., An empty field string must raise ValueError., An empty field string must raise ValueError., A config dict without 'field' defaults to '' and must raise ValueError. (+7 more)
 
-### Community 31 - "Community 31"
+### Community 34 - "Community 34"
 Cohesion: 0.16
 Nodes (14): Tests for backend.routers.categories — category management endpoints and helpers, Tests for the analyze_and_categorize endpoint., Return a mock DB whose execute handles description query, master query, then ORM, Return a mock DB whose execute handles description query, master query, then ORM, Tests for the LLM factory helper., _build_llm should return a ChatOpenAI instance configured for OpenRouter., test_accepts_list_shaped_message_content_from_llm(), test_invokes_llm_chain_with_correct_inputs() (+6 more)
 
-### Community 32 - "Community 32"
+### Community 35 - "Community 35"
+Cohesion: 0.14
+Nodes (12): _parse_llm_json(), Strip optional markdown fences from LLM output and parse as JSON array., Strip optional markdown fences from LLM output and parse as JSON array., Tests for the LLM JSON response parser., Plain JSON array without fences should parse correctly., JSON wrapped in ```json ... ``` fences should be stripped before parsing., JSON wrapped in ``` ... ``` without language hint should parse., Empty JSON array should return an empty list. (+4 more)
+
+### Community 36 - "Community 36"
 Cohesion: 0.12
 Nodes (17): is_allowed_pdf_parse_strategy(), normalize_pdf_parse_strategy(), PDF parsing strategy constants and normalization utilities., Return a canonical strategy id, defaulting to *auto* when missing.      Args:, Return True if *value* is a supported strategy (case-insensitive)., Normalize and validate a PDF parsing strategy name.      Args:         strategy:, Tests for PDF parse strategy helpers., Empty or missing input should map to the default strategy. (+9 more)
 
-### Community 33 - "Community 33"
-Cohesion: 0.15
-Nodes (17): Set the PostgreSQL session variable used by Row Level Security policies., set_rls_user(), delete_document(), get_document(), list_all_transactions(), list_document_transactions(), list_documents(), Documents router — upload bank statements, list, and retrieve document details. (+9 more)
-
-### Community 34 - "Community 34"
-Cohesion: 0.11
-Nodes (17): db_session(), engine(), mock_embeddings(), mock_llm(), mock_settings(), Shared pytest fixtures for the AI Financial Auditor test suite., Return a sample user ID for tests., Return sample transaction data for tests. (+9 more)
-
-### Community 35 - "Community 35"
+### Community 37 - "Community 37"
 Cohesion: 0.15
 Nodes (17): create_user(), delete_user(), get_user(), list_users(), Admin router — user management endpoints for admin and super_admin roles.  Endpo, Return full details for a single user by their ID.      Only admin and super_adm, Create a new user account without requiring Google OAuth.      The password is h, Change the role of a user. Only super_admin may promote/demote others.      A su (+9 more)
 
-### Community 36 - "Community 36"
+### Community 38 - "Community 38"
+Cohesion: 0.11
+Nodes (17): db_session(), engine(), mock_embeddings(), mock_llm(), mock_settings(), Shared pytest fixtures for the AI Financial Auditor test suite., Return a sample user ID for tests., Return sample transaction data for tests. (+9 more)
+
+### Community 39 - "Community 39"
+Cohesion: 0.14
+Nodes (12): _drive_result(), _mock_db(), Integration tests for upload and transaction endpoints.  Uses FastAPI TestClient, Minimal mock User object that satisfies the router., Upload validation and edge cases., Second upload of the same file bytes should return 409 Conflict., CSV rows where debit=0 and credit=0 should be omitted from transactions., Return (db_mock, added_objects_list).      added_objects_list accumulates every (+4 more)
+
+### Community 40 - "Community 40"
+Cohesion: 0.11
+Nodes (13): resolve_widget_data returns a metric dict when group_by is absent., Metric mode must return {'value': float, 'format': str}., resolve_widget_data returns a metric dict when group_by is absent., Metric mode must return {'value': float, 'format': str}., The 'value' key must always be a float (not int)., The 'value' key must always be a float (not int)., If the DB returns None (no rows), value must default to 0.0., If the DB returns None (no rows), value must default to 0.0. (+5 more)
+
+### Community 41 - "Community 41"
 Cohesion: 0.14
 Nodes (12): is_sensitive_error_message(), User-safe error messages — never expose SQL, schema, or stack details., Return True if *message* looks like an internal/database error., Map an exception to a string safe to return in API ``detail`` or chat UI., user_safe_detail(), Tests for user-safe error sanitization., ProgrammingError-style messages must be redacted., Validation errors mentioning transactions table must be redacted. (+4 more)
 
-### Community 37 - "Community 37"
+### Community 42 - "Community 42"
 Cohesion: 0.18
-Nodes (11): _make_widget(), PATCH /dashboard/widgets/{id} — updates widget, 404 on missing., Return a mock DB for update — scalar_one_or_none returns *widget*., PATCH with a new title must return 200., PATCH must set the new title on the widget ORM object., PATCH with new query_config must update the widget's query_config., PATCH with invalid query_config for widget_type must return 422., PATCH on a non-existent widget must return 404. (+3 more)
+Nodes (11): _client_with_overrides(), PATCH /dashboard/widgets/{id} — updates widget, 404 on missing., Return a mock DB for update — scalar_one_or_none returns *widget*., PATCH with a new title must return 200., PATCH must set the new title on the widget ORM object., PATCH with new query_config must update the widget's query_config., PATCH with invalid query_config for widget_type must return 422., PATCH on a non-existent widget must return 404. (+3 more)
 
-### Community 38 - "Community 38"
+### Community 43 - "Community 43"
 Cohesion: 0.14
 Nodes (17): dev_login_endpoint(), google_callback(), Google OAuth2 callback — exchanges code for tokens, upserts user, sets JWT cooki, Development-only password login for the super_admin — disabled in production., create_app_jwt(), dev_login(), exchange_code_for_tokens(), get_google_user_info() (+9 more)
 
-### Community 39 - "Community 39"
+### Community 44 - "Community 44"
 Cohesion: 0.15
 Nodes (7): capitalizeWords(), formatAnalyzeApiError(), handleBulkApply(), handleResolveUnmapped(), runAnalyze(), wasRequestAborted(), resolveUnmapped()
 
-### Community 40 - "Community 40"
-Cohesion: 0.15
-Nodes (13): intake_node(), Validate the latest user message and extract structured intent.      Reads the l, Validate the latest user message and extract structured intent.      Reads the l, Format the final response and append both turns to the message history.      App, Format the final response and append both turns to the message history.      App, response_node(), Tests for backend.agents.nodes — LangGraph node functions., test_intake_node_compare_months_intent() (+5 more)
-
-### Community 41 - "Community 41"
-Cohesion: 0.13
-Nodes (15): Dashboard model — per-user dashboard layout configuration., Per-user dashboard layout — one row per user, stores grid widget positions., UserDashboard, Widget model — per-user saved chart/query widget definitions., Widget library entry — one row per widget definition owned by a user., UserWidget, LayoutUpdate, Request body for creating a new widget in the user's library. (+7 more)
-
-### Community 42 - "Community 42"
-Cohesion: 0.12
-Nodes (11): Reset dependency overrides before each test., Reset dependency overrides before each test., Reset dependency overrides before each test., Reset dependency overrides before each test., Reset dependency overrides before each test., Clear all FastAPI dependency overrides., Reset dependency overrides before each test., Reset dependency overrides before each test. (+3 more)
-
-### Community 43 - "Community 43"
-Cohesion: 0.18
-Nodes (11): list_description_categories(), Backward-compatible alias for ``GET /categories/rules`` (same payload shape)., Backward-compatible alias for ``GET /categories/rules`` (same payload shape)., Backward-compatible alias for ``GET /categories/rules`` (same payload shape)., Backward-compatible alias for ``GET /categories/rules`` (same payload shape)., Unit tests for list_description_categories., list_description_categories must return a list of dicts., Each result dict must contain all required fields. (+3 more)
-
-### Community 44 - "Community 44"
-Cohesion: 0.18
-Nodes (11): _build_category_hierarchy(), Build a {parent_category: [sub_category, ...]} dict from ORM rows., Build a {parent_category: [sub_category, ...]} dict from ORM rows., Tests for the category hierarchy builder., Return a mock CategoryMaster row., A single row should produce a single-key dict with one sub-category., Multiple rows with the same parent should be grouped under one key., Rows with different parents should produce separate keys. (+3 more)
-
 ### Community 45 - "Community 45"
-Cohesion: 0.15
-Nodes (15): _extract_widget_suggestion(), _last_ai_message(), rag_node(), LangGraph node functions for the AI Finance Agent.  Each node is an async functi, End an aborted PostgreSQL transaction so later commits (e.g. chat_sessions) succ, Return the content of the most recent assistant message in the history.      Arg, Scan *text* for a JSON code block that matches the widget suggestion shape., Return the content of the most recent assistant message in the history.      Arg (+7 more)
+Cohesion: 0.12
+Nodes (16): get_document(), list_all_transactions(), list_documents(), Documents router — upload bank statements, list, and retrieve document details., Return a summary list of all documents belonging to the authenticated user., Return a summary list of all documents belonging to the authenticated user., Return full details for a single document, including its transaction count., Return full details for a single document, including its transaction count. (+8 more)
 
 ### Community 46 - "Community 46"
-Cohesion: 0.28
-Nodes (15): Upload a bank statement (CSV or PDF), parse it, embed transactions, and queue au, upload_document(), _make_db(), _make_upload_file(), _make_user(), Tests for backend.routers.documents — upload and document management endpoints., # NOTE: current code uses `bank_name.strip() if bank_name else "Unknown Bank"`, Return a minimal UploadFile-like async mock. (+7 more)
+Cohesion: 0.26
+Nodes (16): Upload a bank statement (CSV or PDF), parse it, embed transactions, and queue au, Upload a bank statement (CSV or PDF), parse it, embed transactions, and queue au, upload_document(), _make_db(), _make_upload_file(), _make_user(), Tests for backend.routers.documents — upload and document management endpoints., # NOTE: current code uses `bank_name.strip() if bank_name else "Unknown Bank"` (+8 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.17
-Nodes (10): parse_csv(), Parse a bank CSV statement into a list of transaction dicts.      Supports commo, A row with a value in 'Withdrawal (Dr)' column should have debit > 0., A row with a value in 'Deposit (Cr)' column should have credit > 0., A row with both debit and credit values should preserve both as floats., bank_name from argument should appear on every transaction dict., Blank cells in split-column CSV should be treated as 0.0., Tests for parse_csv when the CSV has separate debit and credit columns. (+2 more)
+Cohesion: 0.13
+Nodes (14): Resolve dashboard widget data by executing the configured aggregation query., Resolve dashboard widget data by executing the configured aggregation query., Resolve dashboard widget data by executing the configured aggregation query., Resolve dashboard widget data by executing the configured aggregation query., Resolve dashboard widget data by executing the configured aggregation query., resolve_widget_data(), If neither global nor config filter is set, no category filter is applied., resolve_widget_data with raw_metric_sql. (+6 more)
 
 ### Community 48 - "Community 48"
+Cohesion: 0.17
+Nodes (10): fmt(), formatMonthLabel(), formatCompareAnchorLabel(), buildCompareChartData(), buildCompareKeyedFromParentAnchors(), buildCompareKeyedFromParentRows(), compareScRowsToKeyed(), parentAnchorSlice() (+2 more)
+
+### Community 49 - "Community 49"
+Cohesion: 0.13
+Nodes (16): Set the PostgreSQL session variable used by Row Level Security policies., set_rls_user(), list_mapped_categories(), list_unmapped_short_descriptions(), Return distinct short_descriptions that have no matching category_master entry., Return distinct short_descriptions with no ``category_master_id`` on the row., Return all categories with mapped transactions (parent_category, sub_category, t, Map an unmapped short_description to a parent/sub category.      Creates a user- (+8 more)
+
+### Community 50 - "Community 50"
+Cohesion: 0.17
+Nodes (10): _make_csv(), A row with a value in 'Withdrawal (Dr)' column should have debit > 0., A row with a value in 'Deposit (Cr)' column should have credit > 0., A row with both debit and credit values should preserve both as floats., bank_name from argument should appear on every transaction dict., Blank cells in split-column CSV should be treated as 0.0., Build CSV bytes from a header line and data row strings., Tests for parse_csv when the CSV has separate debit and credit columns. (+2 more)
+
+### Community 51 - "Community 51"
 Cohesion: 0.14
 Nodes (12): _make_day_row(), Tests for backend.services.widget_query — resolve_widget_data()., resolve_widget_data returns chart rows for category grouping., Chart mode with group_by day returns daily labels., group_by day must return chart rows with YYYY-MM-DD labels., resolve_widget_data returns chart rows for category grouping., Chart mode must execute exactly one DB query., category group_by must return a list. (+4 more)
 
-### Community 49 - "Community 49"
+### Community 52 - "Community 52"
 Cohesion: 0.17
 Nodes (7): handleConfirmReset(), handleFileChange(), handleReset(), handleSync(), isValidFile(), postApplyCategoryMappings(), postResetCategorySync()
 
-### Community 50 - "Community 50"
-Cohesion: 0.19
-Nodes (9): formatMonthLabel(), formatCompareAnchorLabel(), buildCompareChartData(), buildCompareKeyedFromParentAnchors(), buildCompareKeyedFromParentRows(), compareScRowsToKeyed(), parentAnchorSlice(), parentYearTotals() (+1 more)
-
-### Community 51 - "Community 51"
-Cohesion: 0.13
-Nodes (11): Each of sum / count / avg / max / min must not raise on aggregation validation., resolve_widget_data raises ValueError for unknown aggregation values., An aggregation not in the allowed set must raise ValueError., resolve_widget_data raises ValueError for unknown aggregation values., An aggregation not in the allowed set must raise ValueError., An empty aggregation string must raise ValueError., An empty aggregation string must raise ValueError., A config dict without 'aggregation' defaults to '' and must raise ValueError. (+3 more)
-
-### Community 52 - "Community 52"
-Cohesion: 0.14
-Nodes (12): Base, DeclarativeBase, AuditReport, AuditReport model — stores LangChain audit output including Graphify knowledge g, One audit report per document — stores structured insights + Graphify graph data, Base, SQLAlchemy declarative base — shared by all models., Base class for all ORM models. (+4 more)
-
 ### Community 53 - "Community 53"
-Cohesion: 0.16
-Nodes (11): GET /dashboard/layout — returns layout or default., Return a mock DB for the layout GET endpoint., GET /layout with no saved dashboard must return the default empty layout., GET /layout must return the saved layout when a UserDashboard row exists., GET /dashboard/layout — returns layout or default., Return a mock DB for the layout GET endpoint., GET /layout must always return 200 OK., GET /layout with no saved dashboard must return the default empty layout. (+3 more)
-
-### Community 54 - "Community 54"
 Cohesion: 0.17
 Nodes (10): Rename a user-owned category_master row (new parent and/or sub labels).      Upd, Rename a user-owned category_master row (new parent and/or sub labels).      Upd, update_category_master_entry(), Unit tests for update_category_master_entry., PATCH should update description_categories then master row and commit., Seed rows (user_id NULL) cannot be renamed., Unknown id should return 404., Renaming to an existing (parent, sub) for the same user should conflict. (+2 more)
 
+### Community 54 - "Community 54"
+Cohesion: 0.13
+Nodes (11): Each of sum / count / avg / max / min must not raise on aggregation validation., resolve_widget_data raises ValueError for unknown aggregation values., An aggregation not in the allowed set must raise ValueError., resolve_widget_data raises ValueError for unknown aggregation values., An aggregation not in the allowed set must raise ValueError., An empty aggregation string must raise ValueError., An empty aggregation string must raise ValueError., A config dict without 'aggregation' defaults to '' and must raise ValueError. (+3 more)
+
 ### Community 55 - "Community 55"
-Cohesion: 0.14
-Nodes (13): get_layout(), FastAPI router for dashboard widget CRUD and layout management., Update a widget's title and/or query_config.      Only the fields present in the, Update a widget's title and/or query_config.      Only the fields present in the, Update a widget's title and/or query_config.      Only the fields present in the, Return the current user's dashboard layout.      Returns a default empty layout, Return the current user's dashboard layout.      Returns a default empty layout, Return the current user's dashboard layout.      Returns a default empty layout (+5 more)
+Cohesion: 0.16
+Nodes (11): GET /dashboard/layout — returns layout or default., Return a mock DB for the layout GET endpoint., GET /layout with no saved dashboard must return the default empty layout., GET /layout must return the saved layout when a UserDashboard row exists., GET /dashboard/layout — returns layout or default., Return a mock DB for the layout GET endpoint., GET /layout must always return 200 OK., GET /layout with no saved dashboard must return the default empty layout. (+3 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.19
-Nodes (9): _make_csv(), Tests for parse_csv when the CSV has a single signed amount column., Negative signed amount should map to debit (absolute value)., Positive signed amount should map to credit., Rows where both debit and credit resolve to zero should be omitted., Combined-amount CSV should still produce debit/credit keys, not amount., All rows in a combined-amount CSV should split correctly., Build CSV bytes from a header line and data row strings. (+1 more)
+Cohesion: 0.14
+Nodes (13): delete_widget(), get_layout(), get_widget_data(), FastAPI router for dashboard widget CRUD and layout management., Delete a widget from the user's library and remove it from their layout.      Al, Delete a widget from the user's library and remove it from their layout.      Al, Delete a widget from the user's library and remove it from their layout.      Al, Execute the live data query for a widget and return the result.      Supports op (+5 more)
 
 ### Community 57 - "Community 57"
-Cohesion: 0.14
-Nodes (11): _make_row(), Each item label must be the category value from the DB row., Return a mock result row with .label and .total attributes., Each item label must be the category value from the DB row., resolve_widget_data returns chart rows for bank_name grouping., bank_name group_by must return a list., Each item label must be the bank_name value from the DB row., resolve_widget_data returns chart rows for bank_name grouping. (+3 more)
-
-### Community 58 - "Community 58"
 Cohesion: 0.15
 Nodes (12): _build_graph(), LangGraph StateGraph for the AI Finance Agent.  Builds and compiles the multi-no, Run the finance agent graph for one user turn and persist the updated history., Run the finance agent graph for one user turn and persist the updated history., Construct and compile the LangGraph StateGraph for the finance agent.      The r, Construct and compile the LangGraph StateGraph for the finance agent.      The r, # NOTE: Do NOT invoke `finance_graph` directly in production code — always call, # NOTE: Do NOT invoke `finance_graph` directly in production code — always call (+4 more)
 
+### Community 58 - "Community 58"
+Cohesion: 0.16
+Nodes (13): _default_draft_state(), _merge_draft_after_turn(), Widget Studio chat pipeline — multi-turn clarification and widget suggestions., Return a fresh Widget Studio draft_state dict., Return a fresh Widget Studio draft_state dict., Return a fresh Widget Studio draft_state dict., Update draft_state after one assistant turn.      Args:         draft:         E, Update draft_state after one assistant turn.      Args:         draft:         E (+5 more)
+
 ### Community 59 - "Community 59"
-Cohesion: 0.18
-Nodes (8): DELETE /dashboard/widgets/{id} — 204 on success, 404 on missing., Reset dependency overrides before each test., Return a mock DB for delete — two execute calls: widget then dashboard., DELETE on an existing widget must return 204 No Content., db.delete and db.commit must be called on a successful deletion., DELETE on a non-existent widget must return 404., After deletion the widget_id must be removed from the dashboard layout grid., TestDeleteWidget
+Cohesion: 0.19
+Nodes (9): parse_csv(), Parse a bank CSV statement into a list of transaction dicts.      Supports commo, Tests for parse_csv error conditions., CSV with no recognisable date column should raise ValueError., CSV with no recognisable description column should raise ValueError., CSV with no amount column at all should raise ValueError., Empty bytes input should raise (CSV parse failure)., category field must always be None from the parser. (+1 more)
 
 ### Community 60 - "Community 60"
+Cohesion: 0.14
+Nodes (11): _make_row(), Each item label must be the category value from the DB row., Return a mock result row with .label and .total attributes., Each item label must be the category value from the DB row., resolve_widget_data returns chart rows for bank_name grouping., bank_name group_by must return a list., Each item label must be the bank_name value from the DB row., resolve_widget_data returns chart rows for bank_name grouping. (+3 more)
+
+### Community 61 - "Community 61"
 Cohesion: 0.2
 Nodes (13): _build_llm(), _format_transactions(), _get_date_range(), _parse_llm_response(), LangChain audit pipeline — parses transactions, audits via OpenRouter LLM, runs, Extract date range string from transaction list., Save Graphify HTML to a static path and return the relative URL path.      TODO:, Build LangChain LLM client pointed at OpenRouter. (+5 more)
 
-### Community 61 - "Community 61"
+### Community 62 - "Community 62"
 Cohesion: 0.16
 Nodes (13): get_settings(), Return cached settings instance — call this everywhere instead of instantiating, Return cached settings instance — call this everywhere instead of instantiating, Return cached settings instance — call this everywhere instead of instantiating, get_current_user(), get_current_user_or_dev_analyze_bypass(), Auth middleware — JWT verification and role-based access control., Dependency factory — raises 403 if the current user's role is not in allowed rol (+5 more)
 
-### Community 62 - "Community 62"
-Cohesion: 0.28
-Nodes (6): _client(), _make_user(), Tests for GET /analytics/category-flow., _reset(), TestCategoryFlowByParentRouter, TestCategoryFlowRouter
-
 ### Community 63 - "Community 63"
-Cohesion: 0.19
-Nodes (9): delete_category_master_entry(), Delete a user-owned category_master row and remove rules that used that pair., Delete a user-owned category_master row and remove rules that used that pair., Unit tests for delete_category_master_entry., Deleting a user-owned entry should UPDATE descriptions then delete and commit., Seed rows (user_id NULL) cannot be deleted., Users may not delete another user's category_master rows., Deleting a non-existent entry should raise HTTP 404. (+1 more)
+Cohesion: 0.15
+Nodes (9): In-process rate limiting for dashboard widget preview (per user).  Uses a 60-sec, Clear all in-memory counters (for tests only)., reset_widget_preview_rate_limits(), reset_widget_preview_rate_limits() clears all counters., After reset, no user should have any recorded timestamps., Multiple resets must work correctly., Reset rate limits before each test., Reset rate limits after each test. (+1 more)
 
 ### Community 64 - "Community 64"
 Cohesion: 0.19
-Nodes (9): _hierarchy_to_text(), Convert category hierarchy dict to a human-readable string for LLM prompts., Convert category hierarchy dict to a human-readable string for LLM prompts., Each parent should appear on its own line., Empty hierarchy should return an empty string., Tests for the hierarchy-to-text converter., Single parent with one sub should produce one line., Multiple subs should be joined with ', '. (+1 more)
+Nodes (9): intake_node(), Validate the latest user message and extract structured intent.      Reads the l, Validate the latest user message and extract structured intent.      Reads the l, Validate the latest user message and extract structured intent.      Reads the l, Tests for backend.agents.nodes — LangGraph node functions., test_intake_node_compare_months_intent(), test_intake_node_no_user_message_raises(), test_intake_node_search_transactions_intent() (+1 more)
 
 ### Community 65 - "Community 65"
-Cohesion: 0.15
-Nodes (9): validate_raw_metric_sql rejects unsafe or invalid input., validate_raw_metric_sql() rejects unsafe or invalid SQL., validate_raw_metric_sql() rejects unsafe or invalid SQL., Whitespace-only SQL must raise., FROM transactions is required., Non-SELECT statement must raise ValueError., Non-SELECT statement must raise ValueError., Semicolon-separated statements must raise. (+1 more)
+Cohesion: 0.18
+Nodes (12): _extract_widget_suggestion(), _last_ai_message(), LangGraph node functions for the AI Finance Agent.  Each node is an async functi, Return the content of the most recent assistant message in the history.      Arg, Scan *text* for a JSON code block that matches the widget suggestion shape., Return the content of the most recent assistant message in the history.      Arg, Scan *text* for a JSON code block that matches the widget suggestion shape., Scan *text* for a JSON code block that matches the widget suggestion shape. (+4 more)
 
 ### Community 66 - "Community 66"
-Cohesion: 0.17
-Nodes (12): create_widget(), list_widgets(), Return all widgets in the current user's library.      Applies Row Level Securit, Return all widgets in the current user's library.      Applies Row Level Securit, Return all widgets in the current user's library.      Applies Row Level Securit, Create a new widget in the current user's library.      Validates widget_type ag, Create a new widget in the current user's library.      Validates widget_type ag, Create a new widget in the current user's library.      Validates widget_type ag (+4 more)
+Cohesion: 0.23
+Nodes (6): _detect_file_type(), Map a MIME content-type string to 'csv' or 'pdf', or return None if unsupported., Map a MIME content-type string to 'csv' or 'pdf', or return None if unsupported., Tests for the _detect_file_type MIME-type mapper., MIME type with charset parameter should still resolve to 'csv'., TestDetectFileType
 
 ### Community 67 - "Community 67"
-Cohesion: 0.21
-Nodes (11): get_audit_report(), get_audit_report_by_document(), list_audit_reports(), Audit router — retrieve AI audit reports by report ID, document ID, or paginated, Return the audit report for a specific document.      Applies Row Level Security, Return a single audit report by its report ID.      Applies Row Level Security b, Serialize an AuditReport ORM object to a full response dict.      Args:, Serialize an AuditReport ORM object to a lightweight summary dict.      Args: (+3 more)
+Cohesion: 0.28
+Nodes (6): _client(), _make_user(), Tests for GET /analytics/category-flow., _reset(), TestCategoryFlowByParentRouter, TestCategoryFlowRouter
 
 ### Community 68 - "Community 68"
-Cohesion: 0.23
-Nodes (11): _append_dashboard_filters(), _find_trailing_clause_start(), _inject_predicates_at_transactions_scopes(), Minimal sandbox for user-written metric SQL against ``transactions`` only.  For, Append date/bank/category/direction predicates before trailing clauses., Insert AND/WHERE predicates at each ``FROM transactions`` scope (not query tail), Append date/bank/category/direction predicates before trailing clauses., Return the index of the first trailing ORDER BY / LIMIT / … clause. (+3 more)
+Cohesion: 0.19
+Nodes (9): delete_category_master_entry(), Delete a user-owned category_master row and remove rules that used that pair., Delete a user-owned category_master row and remove rules that used that pair., Unit tests for delete_category_master_entry., Deleting a user-owned entry should UPDATE descriptions then delete and commit., Seed rows (user_id NULL) cannot be deleted., Users may not delete another user's category_master rows., Deleting a non-existent entry should raise HTTP 404. (+1 more)
 
 ### Community 69 - "Community 69"
-Cohesion: 0.26
-Nodes (5): _detect_file_type(), Map a MIME content-type string to 'csv' or 'pdf', or return None if unsupported., Tests for the _detect_file_type MIME-type mapper., MIME type with charset parameter should still resolve to 'csv'., TestDetectFileType
+Cohesion: 0.19
+Nodes (9): _hierarchy_to_text(), Convert category hierarchy dict to a human-readable string for LLM prompts., Convert category hierarchy dict to a human-readable string for LLM prompts., Each parent should appear on its own line., Empty hierarchy should return an empty string., Tests for the hierarchy-to-text converter., Single parent with one sub should produce one line., Multiple subs should be joined with ', '. (+1 more)
 
 ### Community 70 - "Community 70"
 Cohesion: 0.17
-Nodes (7): Document, DocumentStatus, Document model — tracks uploaded files and their Google Drive location., Processing lifecycle of an uploaded document., Represents one uploaded bank statement (CSV or PDF)., Basic upload success scenarios., TestUploadHappyPath
+Nodes (12): get_widget(), list_widgets(), Return all widgets in the current user's library.      Applies Row Level Securit, Return all widgets in the current user's library.      Applies Row Level Securit, Return all widgets in the current user's library.      Applies Row Level Securit, Return a single widget by id for the current user.      Raises 404 if the widget, Return a single widget by id for the current user.      Raises 404 if the widget, Return a single widget by id for the current user.      Raises 404 if the widget (+4 more)
 
 ### Community 71 - "Community 71"
-Cohesion: 0.17
-Nodes (7): Tests for parse_csv error conditions., CSV with no recognisable date column should raise ValueError., CSV with no recognisable description column should raise ValueError., CSV with no amount column at all should raise ValueError., Empty bytes input should raise (CSV parse failure)., category field must always be None from the parser., TestParseCsvErrors
+Cohesion: 0.21
+Nodes (11): get_audit_report(), get_audit_report_by_document(), list_audit_reports(), Audit router — retrieve AI audit reports by report ID, document ID, or paginated, Return the audit report for a specific document.      Applies Row Level Security, Return a single audit report by its report ID.      Applies Row Level Security b, Serialize an AuditReport ORM object to a full response dict.      Args:, Serialize an AuditReport ORM object to a lightweight summary dict.      Args: (+3 more)
 
 ### Community 72 - "Community 72"
 Cohesion: 0.17
-Nodes (9): resolve_widget_data raises ValueError for unknown group_by values., A group_by not in {month, category, bank_name} must raise ValueError., resolve_widget_data raises ValueError for unknown group_by values., A group_by not in {month, category, bank_name} must raise ValueError., An empty string group_by must raise ValueError (treated as invalid)., An empty string group_by must raise ValueError (treated as invalid)., month / category / bank_name must all pass the group_by validation gate., month / category / bank_name must all pass the group_by validation gate. (+1 more)
+Nodes (7): Document, DocumentStatus, Document model — tracks uploaded files and their Google Drive location., Processing lifecycle of an uploaded document., Represents one uploaded bank statement (CSV or PDF)., Basic upload success scenarios., TestUploadHappyPath
 
 ### Community 73 - "Community 73"
 Cohesion: 0.17
-Nodes (9): Global category and bank_name params override config-level filters., When global category is given, it overrides the config-level category filter., When global bank_name is given, it overrides the config-level bank_name filter., Global category and bank_name params override config-level filters., When global category is given, it overrides the config-level category filter., If global category is None, the config-level category filter is applied., When global bank_name is given, it overrides the config-level bank_name filter., If global category is None, the config-level category filter is applied. (+1 more)
+Nodes (7): Tests for parse_csv when the CSV has a single signed amount column., Negative signed amount should map to debit (absolute value)., Positive signed amount should map to credit., Rows where both debit and credit resolve to zero should be omitted., Combined-amount CSV should still produce debit/credit keys, not amount., All rows in a combined-amount CSV should split correctly., TestParseCsvCombinedAmountColumn
 
 ### Community 74 - "Community 74"
+Cohesion: 0.17
+Nodes (9): resolve_widget_data raises ValueError for unknown group_by values., A group_by not in {month, category, bank_name} must raise ValueError., resolve_widget_data raises ValueError for unknown group_by values., A group_by not in {month, category, bank_name} must raise ValueError., An empty string group_by must raise ValueError (treated as invalid)., An empty string group_by must raise ValueError (treated as invalid)., month / category / bank_name must all pass the group_by validation gate., month / category / bank_name must all pass the group_by validation gate. (+1 more)
+
+### Community 75 - "Community 75"
+Cohesion: 0.17
+Nodes (9): Global category and bank_name params override config-level filters., When global category is given, it overrides the config-level category filter., When global bank_name is given, it overrides the config-level bank_name filter., Global category and bank_name params override config-level filters., When global category is given, it overrides the config-level category filter., If global category is None, the config-level category filter is applied., When global bank_name is given, it overrides the config-level bank_name filter., If global category is None, the config-level category filter is applied. (+1 more)
+
+### Community 76 - "Community 76"
+Cohesion: 0.21
+Nodes (7): DELETE /dashboard/widgets/{id} — 204 on success, 404 on missing., Reset dependency overrides before each test., Return a mock DB for delete — two execute calls: widget then dashboard., DELETE on an existing widget must return 204 No Content., db.delete and db.commit must be called on a successful deletion., After deletion the widget_id must be removed from the dashboard layout grid., TestDeleteWidget
+
+### Community 77 - "Community 77"
 Cohesion: 0.21
 Nodes (7): GET /dashboard/widgets must return [] when user has no widgets., Each widget in the list must contain id, title, widget_type, query_config., GET /dashboard/widgets — returns list of widgets for the current user., Reset dependency overrides before each test., Return a mock DB whose execute().scalars().all() returns *widgets*., GET /dashboard/widgets must return 200 and a JSON list., TestListWidgets
 
-### Community 75 - "Community 75"
-Cohesion: 0.2
-Nodes (9): Return a copy of *config* with placeholders resolved and runtime bounds merged., Runtime filter values after placeholder resolution., resolve_query_config_placeholders(), ResolvedWidgetRuntime, resolve_query_config_placeholders merges runtime filters correctly., Runtime dates replace {{date_from}}/{{date_to}} in filters., Parent category placeholder promotes to runtime., Unresolved date placeholders default to current month in preview. (+1 more)
-
-### Community 76 - "Community 76"
+### Community 78 - "Community 78"
 Cohesion: 0.17
 Nodes (12): _dedupe_master_rows_for_user(), _fetch_raw_master_rows(), _grouped_master_response(), list_category_master_split(), Return global seed rows plus the given user's category_master rows., Return global seed rows plus the given user's category_master rows., For each (parent_category, sub_category), prefer the user's row over the global, For each (parent_category, sub_category), prefer the user's row over the global (+4 more)
 
-### Community 77 - "Community 77"
-Cohesion: 0.17
-Nodes (7): Tests for the PAYMENT_METHODS constant used by the endpoint., PAYMENT_METHODS must be a list., PAYMENT_METHODS must contain at least one method., UPI must be in the payment methods list., Every payment method label must be a non-empty string., Spot-check well-known methods are all present., TestPaymentMethodsConstant
-
-### Community 78 - "Community 78"
-Cohesion: 0.23
-Nodes (11): _build_drive_client(), fetch_file_bytes(), _get_or_create_folder(), _local_upload(), Google Drive service — creates per-user folders, uploads files, fetches content., Download a file from Google Drive by its file ID, or read from local disk., Build an authenticated Google Drive API client from stored tokens., Return folder ID for an existing folder, or create it if absent. (+3 more)
-
 ### Community 79 - "Community 79"
 Cohesion: 0.18
-Nodes (8): If neither global nor config filter is set, no category filter is applied., resolve_widget_data with raw_metric_sql., Raw path returns metric shape with DB scalar., If neither global nor config filter is set, no category filter is applied., resolve_widget_data with raw_metric_sql., Raw path returns metric shape with DB scalar., Invalid sandbox SQL must raise before execute., TestResolveWidgetDataRawSql
+Nodes (11): _current_month_bounds(), is_placeholder_token(), _parse_date_str(), Resolve ``{{placeholder}}`` tokens in widget query_config before SQL execution., Runtime filter values after placeholder resolution., Return True if *value* is a known ``{{...}}`` placeholder string., Return inclusive first/last day of the current calendar month., Parse YYYY-MM-DD or return None for empty input. (+3 more)
 
 ### Community 80 - "Community 80"
 Cohesion: 0.18
-Nodes (9): validate_widget_query_config enforces metric vs chart rules., Bar chart without group_by must raise., validate_widget_query_config enforces metric vs chart rules., Bar chart without group_by must raise., Pie chart with group_by must pass., validate_widget_query_config enforces metric vs chart rules., Bar chart without group_by must raise., Pie chart with group_by must pass. (+1 more)
+Nodes (10): Validate *config* for a widget of the given *widget_type* before save or preview, Validate *config* for a widget of the given *widget_type* before save or preview, Validate *config* for a widget of the given *widget_type* before save or preview, Validate *config* for a widget of the given *widget_type* before save or preview, validate_widget_query_config(), Metric with group_by must raise., Metric with group_by must raise., Metric with group_by must raise. (+2 more)
 
 ### Community 81 - "Community 81"
-Cohesion: 0.2
-Nodes (9): Validate *config* for a widget of the given *widget_type* before save or preview, Validate *config* for a widget of the given *widget_type* before save or preview, Validate *config* for a widget of the given *widget_type* before save or preview, validate_widget_query_config(), Metric with group_by must raise., Metric with group_by must raise., Metric with group_by must raise., raw_metric_sql on chart type must raise. (+1 more)
+Cohesion: 0.23
+Nodes (11): _build_drive_client(), fetch_file_bytes(), _get_or_create_folder(), _local_upload(), Google Drive service — creates per-user folders, uploads files, fetches content., Download a file from Google Drive by its file ID, or read from local disk., Build an authenticated Google Drive API client from stored tokens., Return folder ID for an existing folder, or create it if absent. (+3 more)
 
 ### Community 82 - "Community 82"
 Cohesion: 0.18
-Nodes (8): Reject obviously unsafe or unsupported SQL before injection.      Args:, Reject obviously unsafe or unsupported SQL before injection.      Args:, Reject obviously unsafe or unsupported SQL before injection.      Args:, validate_raw_metric_sql(), A minimal SELECT on transactions must pass., UNION must be rejected., Multiple SQL statements separated by ; must raise ValueError., Multiple SQL statements separated by ; must raise ValueError.
+Nodes (9): describe_widget_query_human returns abstract-table pseudo-SQL., Output must mention your_transactions and WHERE., describe_widget_query_human returns abstract-table pseudo-SQL., Raw metric config returns the stripped SQL as the description., Output must mention your_transactions and WHERE., describe_widget_query_human returns abstract-table pseudo-SQL., Raw metric config returns the stripped SQL as the description., Output must mention your_transactions and WHERE. (+1 more)
 
 ### Community 83 - "Community 83"
 Cohesion: 0.24
-Nodes (7): _last_user_message(), Return the content of the most recent user message in the history.      Args:, Tests for the _last_user_message helper., Should return the content of the most recent user message., Should return None when there are no user messages., Should return None for an empty message list., TestLastUserMessage
+Nodes (7): Raised when a user exceeds the configured preview requests per minute., WidgetPreviewRateLimited, WidgetPreviewRateLimited exception initialization and message., Raised with no args must have default message., Raised with custom message must store that message., WidgetPreviewRateLimited must be an Exception subclass., TestWidgetPreviewRateLimitedException
 
 ### Community 84 - "Community 84"
-Cohesion: 0.27
-Nodes (9): _build_text(), embed_transactions(), _get_embeddings_batch(), Generate pgvector embeddings for transactions using the OpenRouter API., Generate embeddings for every transaction and persist them to the database., Build a single text representation of a transaction for embedding.      Combines, Request embeddings for a single batch of texts from OpenRouter.      Args:, Insert or update a single Transaction row in the database.      Looks up an exis (+1 more)
+Cohesion: 0.18
+Nodes (9): validate_widget_query_config enforces metric vs chart rules., Bar chart without group_by must raise., validate_widget_query_config enforces metric vs chart rules., Bar chart without group_by must raise., Pie chart with group_by must pass., validate_widget_query_config enforces metric vs chart rules., Bar chart without group_by must raise., Pie chart with group_by must pass. (+1 more)
 
 ### Community 85 - "Community 85"
 Cohesion: 0.2
@@ -589,172 +585,188 @@ Cohesion: 0.2
 Nodes (10): get_session(), Retrieve a single chat session including its complete message history.      Args, Retrieve a single chat session including its complete message history.      Args, Retrieve a single chat session including its complete message history.      Args, Retrieve a single chat session including its complete message history.      Args, Full session record including complete message history., Full session record including complete message history., Full session record including complete message history. (+2 more)
 
 ### Community 87 - "Community 87"
-Cohesion: 0.24
-Nodes (7): _make_user(), Return a minimal mock User object., POST /dashboard/widgets/preview — returns data and human_query., Preview must return data and human_query., Preview with metric + group_by must return 422., When preview rate limit is enabled, excess requests return 429., TestPreviewWidget
+Cohesion: 0.2
+Nodes (7): Remove fenced widget JSON so chat UI shows only the natural-language reply., strip_widget_json_from_reply(), Tests for Widget Studio reply parsing (strip JSON from chat, extract widget)., strip_widget_json_from_reply and _extract_widget_suggestion stay in sync., Chat display text must not contain the json block., Parser returns widget dict for a valid fenced block., TestWidgetStudioReplyParsing
 
 ### Community 88 - "Community 88"
-Cohesion: 0.22
-Nodes (7): Ensure filter string values are literals, known placeholders, or credit/debit., validate_placeholder_filter_values(), Tests for widget query placeholder resolution., validate_placeholder_filter_values rejects unknown tokens., Known placeholders pass validation., Unknown {{token}} values raise ValueError., TestValidatePlaceholders
+Cohesion: 0.24
+Nodes (7): _last_user_message(), Return the content of the most recent user message in the history.      Args:, Tests for the _last_user_message helper., Should return the content of the most recent user message., Should return None when there are no user messages., Should return None for an empty message list., TestLastUserMessage
 
 ### Community 89 - "Community 89"
-Cohesion: 0.22
-Nodes (9): _current_month_bounds(), is_placeholder_token(), _parse_date_str(), Resolve ``{{placeholder}}`` tokens in widget query_config before SQL execution., Return True if *value* is a known ``{{...}}`` placeholder string., Return inclusive first/last day of the current calendar month., Parse YYYY-MM-DD or return None for empty input., Resolve one filter entry; may promote dates out of filters dict.      Returns: (+1 more)
+Cohesion: 0.27
+Nodes (9): _build_text(), embed_transactions(), _get_embeddings_batch(), Generate pgvector embeddings for transactions using the OpenRouter API., Generate embeddings for every transaction and persist them to the database., Build a single text representation of a transaction for embedding.      Combines, Request embeddings for a single batch of texts from OpenRouter.      Args:, Insert or update a single Transaction row in the database.      Looks up an exis (+1 more)
 
 ### Community 90 - "Community 90"
 Cohesion: 0.2
-Nodes (10): list_category_rules(), Shape one category_rule row for API JSON., Shape one category_rule row for API JSON., Return all category_rules rows owned by the current user., Return all category_rules rows owned by the current user., Shape one category_rule row for API JSON., Shape one category_rule row for API JSON., Return all category_rules rows owned by the current user. (+2 more)
+Nodes (7): Replace LLM dummy table/column names with real ``transactions`` identifiers., translate_llm_sql_to_real(), Tests for LLM dummy SQL alias translation., translate_llm_sql_to_real maps dummy identifiers to transactions schema., Peak-day pattern using LLM table/columns passes sandbox validation., Display helper rewrites real names to abstract vocabulary., TestWidgetSqlAliases
 
 ### Community 91 - "Community 91"
-Cohesion: 0.27
-Nodes (7): _clear_reset_sync_overrides(), TestClient with DB and user overrides for reset-sync tests., POST /categories/reset-sync — recompute short_description + remap., Unknown document_id yields 404., Without document_id, touches all user rows then auto + rules., _reset_sync_client(), TestResetSyncEndpoint
+Cohesion: 0.2
+Nodes (10): preview_widget(), Run resolve_widget_data for a provisional config without saving.      Returns da, Run resolve_widget_data for a provisional config without saving.      Returns da, Run resolve_widget_data for a provisional config without saving.      Returns da, describe_widget_query_human(), Build a read-only pseudo-SQL description using an abstract table name.      Omit, Build a read-only pseudo-SQL description using an abstract table name.      Omit, Build a read-only pseudo-SQL description using an abstract table name.      Omit (+2 more)
 
 ### Community 92 - "Community 92"
 Cohesion: 0.27
-Nodes (9): build_audit_graph(), _extract(), Graphify service — converts audit output into a knowledge graph.  Flow:   audit, Write audit data as structured markdown files for graphify to process., Run AST extraction (skips for markdown) — semantic extraction via graphify CLI., Run graphify on an audit result dict and return (graph_json, graph_html_string)., Internal — writes audit data to temp files and runs the graphify pipeline., _run_graphify_pipeline() (+1 more)
+Nodes (7): _clear_reset_sync_overrides(), TestClient with DB and user overrides for reset-sync tests., POST /categories/reset-sync — recompute short_description + remap., Unknown document_id yields 404., Without document_id, touches all user rows then auto + rules., _reset_sync_client(), TestResetSyncEndpoint
 
 ### Community 93 - "Community 93"
+Cohesion: 0.27
+Nodes (9): build_audit_graph(), _extract(), Graphify service — converts audit output into a knowledge graph.  Flow:   audit, Write audit data as structured markdown files for graphify to process., Run AST extraction (skips for markdown) — semantic extraction via graphify CLI., Run graphify on an audit result dict and return (graph_json, graph_html_string)., Internal — writes audit data to temp files and runs the graphify pipeline., _run_graphify_pipeline() (+1 more)
+
+### Community 94 - "Community 94"
 Cohesion: 0.2
 Nodes (9): get_me(), google_login(), logout(), Auth router — Google OAuth2 login, dev bypass, and session endpoints., Clear the JWT cookie to end the session., Return the authenticated user's profile., Redirect URL for Google OAuth2 — frontend sends user to this URL., get_google_auth_url() (+1 more)
 
-### Community 94 - "Community 94"
+### Community 95 - "Community 95"
+Cohesion: 0.24
+Nodes (7): Return a copy of *config* with placeholders resolved and runtime bounds merged., resolve_query_config_placeholders(), resolve_query_config_placeholders merges runtime filters correctly., Runtime dates replace {{date_from}}/{{date_to}} in filters., Parent category placeholder promotes to runtime., Unresolved date placeholders default to current month in preview., TestResolvePlaceholders
+
+### Community 96 - "Community 96"
+Cohesion: 0.22
+Nodes (7): Ensure filter string values are literals, known placeholders, or credit/debit., validate_placeholder_filter_values(), Tests for widget query placeholder resolution., validate_placeholder_filter_values rejects unknown tokens., Known placeholders pass validation., Unknown {{token}} values raise ValueError., TestValidatePlaceholders
+
+### Community 97 - "Community 97"
 Cohesion: 0.31
 Nodes (6): fetchCategoryFlow(), fetchCategoryFlowByParent(), fetchUnmapped(), pivotPcRows(), pivotScRows(), seriesDataKey()
 
-### Community 95 - "Community 95"
-Cohesion: 0.22
-Nodes (9): AgentState, Shared state passed between LangGraph nodes.      Attributes:         messages:, Tests for the response_node graph node., Tests for the _build_llm helper., Tests for the intake_node graph node., TestBuildLlm, TestIntakeNode, TestResponseNode (+1 more)
-
-### Community 96 - "Community 96"
-Cohesion: 0.31
-Nodes (8): _drive_result(), _mock_db(), Integration tests for upload and transaction endpoints.  Uses FastAPI TestClient, Minimal mock User object that satisfies the router., Return (db_mock, added_objects_list).      added_objects_list accumulates every, Yield a (TestClient, added_objects_list) tuple with all external deps mocked., _test_user(), upload_client()
-
-### Community 97 - "Community 97"
-Cohesion: 0.22
-Nodes (4): Upload validation and edge cases., Second upload of the same file bytes should return 409 Conflict., CSV rows where debit=0 and credit=0 should be omitted from transactions., TestUploadEdgeCases
-
 ### Community 98 - "Community 98"
 Cohesion: 0.22
-Nodes (7): date_from / date_to global filters must be forwarded to the query., Providing date_from and date_to must not raise any error., Even with date filters, exactly one DB execute must occur in metric mode., date_from / date_to global filters must be forwarded to the query., Providing date_from and date_to must not raise any error., Even with date filters, exactly one DB execute must occur in metric mode., TestDateFilters
+Nodes (9): create_session(), CreateSessionResponse, Create a new chat session for the authenticated user.      Args:         body:, Create a new chat session for the authenticated user.      Args:         body:, Create a new chat session for the authenticated user.      Args:         body:, Create a new chat session for the authenticated user.      Args:         body:, Response body returned when a session is created., Response body returned when a session is created. (+1 more)
 
 ### Community 99 - "Community 99"
 Cohesion: 0.22
-Nodes (4): Central configuration — all env vars loaded here, never hardcoded elsewhere., Application settings loaded from environment variables., Settings, BaseSettings
+Nodes (8): build_widget_studio_user_context(), Prompt templates for Widget Studio multi-turn widget design., Compose the user turn payload for the Widget Studio LLM.      Args:         user, Compose the user turn payload for the Widget Studio LLM.      Args:         user, Compose the user turn payload for the Widget Studio LLM.      Args:         user, Compose the user turn payload for the Widget Studio LLM.      Args:         user, Compose the user turn payload for the Widget Studio LLM.      Args:         user, Compose the user turn payload for the Widget Studio LLM.      Args:         user
 
 ### Community 100 - "Community 100"
-Cohesion: 0.32
-Nodes (7): _default_draft_state(), _merge_draft_after_turn(), Widget Studio chat pipeline — multi-turn clarification and widget suggestions., Return a fresh Widget Studio draft_state dict., Update draft_state after one assistant turn.      Args:         draft:         E, Run one Widget Studio turn: clarify or propose a widget with placeholders., run_widget_studio_chat()
+Cohesion: 0.22
+Nodes (9): AgentState, Shared state passed between LangGraph nodes.      Attributes:         messages:, Tests for the response_node graph node., Tests for the _build_llm helper., Tests for the intake_node graph node., TestBuildLlm, TestIntakeNode, TestResponseNode (+1 more)
 
 ### Community 101 - "Community 101"
+Cohesion: 0.22
+Nodes (8): Widget query service — resolves dashboard widget data from Transaction records., Execute a grouped aggregation and return a list of chart row dicts.      Args:, Execute a grouped aggregation and return a list of chart row dicts.      Args:, Execute a grouped aggregation and return a list of chart row dicts.      Args:, Execute a grouped aggregation and return a list of chart row dicts.      Args:, Execute a grouped aggregation and return a list of chart row dicts.      Args:, Execute a grouped aggregation and return a list of chart row dicts.      Args:, _resolve_chart()
+
+### Community 102 - "Community 102"
+Cohesion: 0.22
+Nodes (7): date_from / date_to global filters must be forwarded to the query., Providing date_from and date_to must not raise any error., Even with date filters, exactly one DB execute must occur in metric mode., date_from / date_to global filters must be forwarded to the query., Providing date_from and date_to must not raise any error., Even with date filters, exactly one DB execute must occur in metric mode., TestDateFilters
+
+### Community 103 - "Community 103"
+Cohesion: 0.22
+Nodes (4): Central configuration — all env vars loaded here, never hardcoded elsewhere., Application settings loaded from environment variables., Settings, BaseSettings
+
+### Community 104 - "Community 104"
 Cohesion: 0.32
 Nodes (7): _build_langfuse_handler(), _configure_langsmith(), get_callbacks(), ObservabilityManager — builds LangChain callback list from env toggle.  Usage:, Return active observability callback handlers based on OBSERVABILITY_BACKENDS en, Set LangSmith env vars — LangSmith uses env vars rather than a callback handler., Instantiate Langfuse callback handler, return None if import fails.
 
-### Community 102 - "Community 102"
+### Community 105 - "Community 105"
 Cohesion: 0.25
 Nodes (5): Guard against the SQLAlchemy f405 type-mismatch regression.      SQLAlchemy 2.0, transaction_date must be datetime.date, not a string., remarks must be None (SQL NULL), never the string 'null'., debit and credit must be float, not string., TestTransactionTypeSafety
 
-### Community 103 - "Community 103"
+### Community 106 - "Community 106"
 Cohesion: 0.25
 Nodes (7): Transaction model — single table for all banks, pgvector column for RAG., One row per bank transaction; bank_name column distinguishes sources., Transaction, Tests that Transaction rows are built with debit/credit, not amount., Tests that upload_document handles bank_name=None without AttributeError., TestUploadDocumentBankNameNone, TestUploadDocumentTransactionFields
 
-### Community 104 - "Community 104"
+### Community 107 - "Community 107"
 Cohesion: 0.25
-Nodes (5): Tests for backend.routers.dashboard — dashboard widget CRUD and layout endpoints, GET /dashboard/widgets/{id} — single widget, 404 on missing., Reset dependency overrides before each test., GET must return one widget dict., TestGetWidget
+Nodes (5): GET /dashboard/widgets/{id} — single widget, 404 on missing., Reset dependency overrides before each test., GET must return one widget dict., GET for unknown id must return 404., TestGetWidget
 
-### Community 105 - "Community 105"
+### Community 108 - "Community 108"
+Cohesion: 0.25
+Nodes (7): Tests for backend.services.preview_rate_limit — widget preview rate limiting., Clear counters before and after each test., max_per_minute <= 0 must not raise and must not block., After N calls within the window, the next call raises., _reset_limits(), test_limit_blocks_after_threshold(), test_zero_limit_is_noop()
+
+### Community 109 - "Community 109"
 Cohesion: 0.38
 Nodes (3): isMetricData(), useWidgetData(), WidgetCell()
 
-### Community 108 - "Community 108"
-Cohesion: 0.33
-Nodes (5): get_db(), _make_engine(), Database session factory and dependency injection for FastAPI., Create SQLAlchemy engine from DATABASE_URL in settings., FastAPI dependency — yields a DB session and closes it after the request.
+### Community 111 - "Community 111"
+Cohesion: 0.29
+Nodes (7): _build_where_clauses(), Assemble the list of SQLAlchemy WHERE predicates from all active filters.      A, Assemble the list of SQLAlchemy WHERE predicates from all active filters.      A, Assemble the list of SQLAlchemy WHERE predicates from all active filters.      A, Assemble the list of SQLAlchemy WHERE predicates from all active filters.      A, Assemble the list of SQLAlchemy WHERE predicates from all active filters.      A, Assemble the list of SQLAlchemy WHERE predicates from all active filters.      A
 
-### Community 109 - "Community 109"
+### Community 112 - "Community 112"
+Cohesion: 0.29
+Nodes (7): Execute a scalar aggregation and return a metric dict.      Args:         db:, Execute a scalar aggregation and return a metric dict.      Args:         db:, Execute a scalar aggregation and return a metric dict.      Args:         db:, Execute a scalar aggregation and return a metric dict.      Args:         db:, Execute a scalar aggregation and return a metric dict.      Args:         db:, Execute a scalar aggregation and return a metric dict.      Args:         db:, _resolve_metric()
+
+### Community 114 - "Community 114"
 Cohesion: 0.33
 Nodes (5): delete_transaction(), Transactions router — edit and delete individual transactions., Delete a single transaction.      Args:         transaction_id: UUID of the tran, Update editable fields on a single transaction.      Accepts any of: bank_name,, update_transaction()
 
-### Community 110 - "Community 110"
+### Community 115 - "Community 115"
 Cohesion: 0.33
-Nodes (5): build_widget_studio_user_context(), Prompt templates for Widget Studio multi-turn widget design., Compose the user turn payload for the Widget Studio LLM.      Args:         user, Compose the user turn payload for the Widget Studio LLM.      Args:         user, Compose the user turn payload for the Widget Studio LLM.      Args:         user
+Nodes (6): analysis_node(), _build_llm(), Call the LLM to synthesise tool outputs into a coherent financial insight., Call the LLM to synthesise tool outputs into a coherent financial insight., Call the LLM to synthesise tool outputs into a coherent financial insight., Build a ChatOpenAI client pointed at OpenRouter using settings from config.
 
-### Community 111 - "Community 111"
+### Community 116 - "Community 116"
+Cohesion: 0.33
+Nodes (6): Format the final response and append both turns to the message history.      App, Format the final response and append both turns to the message history.      App, Format the final response and append both turns to the message history.      App, response_node(), test_response_node_appends_assistant_message(), test_response_node_preserves_existing_messages()
+
+### Community 117 - "Community 117"
 Cohesion: 0.33
 Nodes (4): Tests for backend.parsers.csv_parser — CSV statement parsing logic., Bank exports often use tabs; file may still be named .csv., TSV with Narration + Withdrawal/Deposit must parse to transactions., TestParseTabSeparated
 
-### Community 112 - "Community 112"
-Cohesion: 0.4
-Nodes (5): list_mapped_categories(), Return all categories with mapped transactions (parent_category, sub_category, t, Map an unmapped short_description to a parent/sub category.      Creates a user-, Map an unmapped short_description to a parent/sub category.      Creates a user-, resolve_unmapped_short_description()
+### Community 118 - "Community 118"
+Cohesion: 0.33
+Nodes (5): abstract_sql_for_display(), get_llm_schema_doc(), Map LLM-facing dummy SQL identifiers to real ``transactions`` columns.  Widget S, Replace real identifiers with abstract names for UI display.      Args:, Return the data-model section for Widget Studio system prompts.
 
-### Community 113 - "Community 113"
+### Community 119 - "Community 119"
+Cohesion: 0.33
+Nodes (5): get_db(), _make_engine(), Database session factory and dependency injection for FastAPI., Create SQLAlchemy engine from DATABASE_URL in settings., FastAPI dependency — yields a DB session and closes it after the request.
+
+### Community 120 - "Community 120"
 Cohesion: 0.4
 Nodes (5): get_unmatched_category_summary(), Return counts of transactions with no category (for Upload nudges)., Return counts of transactions with no category (for Upload nudges)., Return counts of transactions with no category (for Upload nudges)., Return counts of transactions with no category (for Upload nudges).
 
-### Community 114 - "Community 114"
-Cohesion: 0.4
-Nodes (5): analysis_node(), _build_llm(), Call the LLM to synthesise tool outputs into a coherent financial insight., Call the LLM to synthesise tool outputs into a coherent financial insight., Build a ChatOpenAI client pointed at OpenRouter using settings from config.
-
-### Community 115 - "Community 115"
+### Community 121 - "Community 121"
 Cohesion: 0.4
 Nodes (3): JOIN clause must raise ValueError (not allowed)., JOIN clause must raise ValueError (not allowed)., SQL comments (--) must raise ValueError.
 
-### Community 117 - "Community 117"
-Cohesion: 0.5
-Nodes (4): get_widget_data(), Execute the live data query for a widget and return the result.      Supports op, Execute the live data query for a widget and return the result.      Supports op, Execute the live data query for a widget and return the result.      Supports op
-
-### Community 118 - "Community 118"
-Cohesion: 0.5
-Nodes (4): delete_widget(), Delete a widget from the user's library and remove it from their layout.      Al, Delete a widget from the user's library and remove it from their layout.      Al, Delete a widget from the user's library and remove it from their layout.      Al
-
-### Community 119 - "Community 119"
-Cohesion: 0.5
-Nodes (4): get_widget(), Return a single widget by id for the current user.      Raises 404 if the widget, Return a single widget by id for the current user.      Raises 404 if the widget, Return a single widget by id for the current user.      Raises 404 if the widget
-
-### Community 121 - "Community 121"
-Cohesion: 0.5
-Nodes (3): Remove date placeholder literals from SQL; dates are injected as bind params., strip_embedded_sql_placeholders(), Date placeholders embedded in SQL are removed before injection.
-
-### Community 122 - "Community 122"
-Cohesion: 0.5
-Nodes (3): Parse bank CSV statements into a normalised list of transaction dicts., Read CSV bytes into a DataFrame, trying UTF-8 then latin-1 encoding.      Args:, _read_csv_bytes()
-
 ### Community 123 - "Community 123"
 Cohesion: 0.5
-Nodes (3): raw_metric_sql combined with group_by must raise., raw_metric_sql combined with group_by must raise., raw_metric_sql combined with group_by must raise.
+Nodes (4): Save (upsert) the current user's dashboard layout.      Creates a new UserDashbo, Save (upsert) the current user's dashboard layout.      Creates a new UserDashbo, Save (upsert) the current user's dashboard layout.      Creates a new UserDashbo, save_layout()
 
 ### Community 124 - "Community 124"
 Cohesion: 0.5
-Nodes (3): Metric with sum/credit and no group_by must pass., Metric with sum/credit and no group_by must pass., Metric with sum/credit and no group_by must pass.
+Nodes (4): Update a widget's title and/or query_config.      Only the fields present in the, Update a widget's title and/or query_config.      Only the fields present in the, Update a widget's title and/or query_config.      Only the fields present in the, update_widget()
 
 ### Community 125 - "Community 125"
 Cohesion: 0.5
-Nodes (3): Metric with raw_metric_sql skips aggregation validation., Metric with raw_metric_sql skips aggregation validation., Metric with raw_metric_sql skips aggregation validation.
+Nodes (4): create_widget(), Create a new widget in the current user's library.      Validates widget_type ag, Create a new widget in the current user's library.      Validates widget_type ag, Create a new widget in the current user's library.      Validates widget_type ag
 
-### Community 126 - "Community 126"
+### Community 127 - "Community 127"
+Cohesion: 0.5
+Nodes (3): Parse bank CSV statements into a normalised list of transaction dicts., Read CSV bytes into a DataFrame, trying UTF-8 then latin-1 encoding.      Args:, _read_csv_bytes()
+
+### Community 128 - "Community 128"
+Cohesion: 0.5
+Nodes (3): Metric with sum/credit and no group_by must pass., Metric with sum/credit and no group_by must pass., Metric with sum/credit and no group_by must pass.
+
+### Community 129 - "Community 129"
 Cohesion: 0.5
 Nodes (3): Invalid transaction_type in filters must raise., Invalid transaction_type in filters must raise., Invalid transaction_type in filters must raise.
 
+### Community 130 - "Community 130"
+Cohesion: 0.5
+Nodes (3): raw_metric_sql combined with group_by must raise., raw_metric_sql combined with group_by must raise., raw_metric_sql combined with group_by must raise.
+
 ### Community 131 - "Community 131"
-Cohesion: 0.67
-Nodes (3): list_unmapped_short_descriptions(), Return distinct short_descriptions that have no matching category_master entry., Return distinct short_descriptions with no ``category_master_id`` on the row.
+Cohesion: 0.5
+Nodes (3): Metric with raw_metric_sql skips aggregation validation., Metric with raw_metric_sql skips aggregation validation., Metric with raw_metric_sql skips aggregation validation.
 
 ## Knowledge Gaps
-- **1140 isolated node(s):** `Central configuration — all env vars loaded here, never hardcoded elsewhere.`, `Application settings loaded from environment variables.`, `Return list of enabled observability backend names.`, `True if LangSmith is in the active backends list.`, `True if Langfuse is in the active backends list.` (+1135 more)
+- **1196 isolated node(s):** `Central configuration — all env vars loaded here, never hardcoded elsewhere.`, `Application settings loaded from environment variables.`, `Return list of enabled observability backend names.`, `True if LangSmith is in the active backends list.`, `True if Langfuse is in the active backends list.` (+1191 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **74 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **66 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `set_rls_user()` connect `Community 33` to `Community 1`, `Community 131`, `Community 7`, `Community 8`, `Community 10`, `Community 11`, `Community 12`, `Community 46`, `Community 54`, `Community 55`, `Community 63`, `Community 66`, `Community 67`, `Community 90`, `Community 108`, `Community 109`, `Community 112`, `Community 113`, `Community 117`, `Community 118`, `Community 119`?**
-  _High betweenness centrality (0.276) - this node is a cross-community bridge._
-- **Why does `preview_widget()` connect `Community 10` to `Community 33`, `Community 2`, `Community 81`, `Community 20`, `Community 55`, `Community 61`?**
-  _High betweenness centrality (0.275) - this node is a cross-community bridge._
-- **Why does `get_settings()` connect `Community 61` to `Community 99`, `Community 4`, `Community 5`, `Community 38`, `Community 101`, `Community 10`, `Community 12`, `Community 108`, `Community 78`, `Community 114`, `Community 84`, `Community 60`, `Community 93`?**
-  _High betweenness centrality (0.224) - this node is a cross-community bridge._
-- **Are the 41 inferred relationships involving `resolve_widget_data()` (e.g. with `preview_widget()` and `get_widget_data()`) actually correct?**
-  _`resolve_widget_data()` has 41 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `set_rls_user()` connect `Community 49` to `Community 1`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 17`, `Community 45`, `Community 46`, `Community 53`, `Community 56`, `Community 68`, `Community 70`, `Community 71`, `Community 91`, `Community 114`, `Community 119`, `Community 120`, `Community 123`, `Community 124`, `Community 125`?**
+  _High betweenness centrality (0.267) - this node is a cross-community bridge._
+- **Why does `preview_widget()` connect `Community 91` to `Community 47`, `Community 80`, `Community 49`, `Community 21`, `Community 56`, `Community 62`?**
+  _High betweenness centrality (0.258) - this node is a cross-community bridge._
+- **Why does `resolve_widget_data()` connect `Community 47` to `Community 32`, `Community 33`, `Community 101`, `Community 102`, `Community 6`, `Community 40`, `Community 7`, `Community 74`, `Community 75`, `Community 112`, `Community 51`, `Community 54`, `Community 56`, `Community 90`, `Community 91`, `Community 60`, `Community 95`?**
+  _High betweenness centrality (0.213) - this node is a cross-community bridge._
+- **Are the 42 inferred relationships involving `resolve_widget_data()` (e.g. with `preview_widget()` and `get_widget_data()`) actually correct?**
+  _`resolve_widget_data()` has 42 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 34 inferred relationships involving `validate_raw_metric_sql()` (e.g. with `.test_empty_sql_raises_valueerror()` and `.test_whitespace_only_sql_raises_valueerror()`) actually correct?**
+  _`validate_raw_metric_sql()` has 34 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 36 inferred relationships involving `set_rls_user()` (e.g. with `list_audit_reports()` and `get_audit_report_by_document()`) actually correct?**
   _`set_rls_user()` has 36 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Central configuration — all env vars loaded here, never hardcoded elsewhere.`, `Application settings loaded from environment variables.`, `Return list of enabled observability backend names.` to the rest of the system?**
-  _1140 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.05 - nodes in this community are weakly interconnected._
+  _1196 weakly-connected nodes found - possible documentation gaps or missing edges._

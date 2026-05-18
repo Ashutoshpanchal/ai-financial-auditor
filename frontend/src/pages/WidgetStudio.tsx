@@ -310,6 +310,20 @@ export default function WidgetStudio() {
     setAppliedHint("Widget ready — preview updated on the left.");
   }, []);
 
+  const handleDraftStateChange = useCallback((state: Record<string, unknown> | null) => {
+    setStudioDraftState(state);
+    const last = state?.last_suggestion;
+    if (
+      state?.status === "ready" &&
+      last &&
+      typeof last === "object" &&
+      "title" in last &&
+      "widget_type" in last
+    ) {
+      handleSuggestion(last as WidgetSuggestion);
+    }
+  }, [handleSuggestion]);
+
   const handleWidgetTypeChange = (wt: WidgetType) => {
     setDraft((d) => ({
       ...d,
@@ -318,10 +332,9 @@ export default function WidgetStudio() {
     }));
   };
 
-  const canSave =
-    validateDraftForPreview(draft) === null && lastOkPreviewKey === previewKey && preview !== null;
-
-  const hasLivePreview = canSave;
+  const draftValid = validateDraftForPreview(draft) === null;
+  const canSave = draftValid && lastOkPreviewKey === previewKey && preview !== null;
+  const showPreviewPanel = draftValid || preview !== null || previewError !== null;
 
   const formatSavedHint = useCallback(
     (base: string) => {
@@ -467,7 +480,7 @@ export default function WidgetStudio() {
               </div>
             )}
 
-            {!hasLivePreview && !previewError && (
+            {!showPreviewPanel && (
               <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center max-w-md mx-auto w-full">
                 <p className="text-sm text-gray-600">
                   Answer questions in chat on the right — your widget preview will appear here.
@@ -478,7 +491,7 @@ export default function WidgetStudio() {
               </div>
             )}
 
-            {(hasLivePreview || previewError || preview !== null) && (
+            {showPreviewPanel && (
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm max-w-md mx-auto w-full">
               <h2 className="text-sm font-semibold text-gray-900 mb-4">Live preview</h2>
               {draft.widget_type === "metric" && (
@@ -755,7 +768,7 @@ export default function WidgetStudio() {
             hideAnalyze
             mergeOnlyWhenReady
             showGeneratingLabel
-            onDraftStateChange={setStudioDraftState}
+            onDraftStateChange={handleDraftStateChange}
             onWidgetSuggestion={handleSuggestion}
             inputPlaceholder="Describe the widget you want… (Enter to send)"
           />

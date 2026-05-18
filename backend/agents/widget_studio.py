@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.agents.nodes import (
     _build_llm,
     _extract_widget_suggestion,
+    strip_widget_json_from_reply,
 )
 from backend.agents.widget_studio_prompts import (
     WIDGET_STUDIO_SYSTEM_PROMPT,
@@ -145,14 +147,41 @@ async def run_widget_studio_chat(
     if not response_text:
         raise RuntimeError("run_widget_studio_chat: empty LLM response")
 
+    print(
+        f"[widget_studio] session={session.id} user_message={user_message.strip()!r}",
+        flush=True,
+    )
+    print(
+        f"[widget_studio] assistant_reply={response_text[:800]!r}",
+        flush=True,
+    )
+
     widget: dict[str, Any] | None = _extract_widget_suggestion(response_text)
+    display_text = strip_widget_json_from_reply(response_text)
     clarification_only = widget is None
 
     if widget is not None:
+        print(
+            "[widget_studio] generated_query_config="
+            + json.dumps(widget.get("query_config") or {}, default=str),
+            flush=True,
+        )
+    else:
+        print(
+            "[widget_studio] no widget json in reply (clarification turn)", flush=True
+        )
+
+    if widget is not None:
         try:
+            qc_validate: dict[str, Any] = dict(widget.get("query_config") or {})
+            raw_val = qc_validate.get("raw_metric_sql")
+            if isinstance(raw_val, str) and raw_val.strip():
+                qc_validate["raw_metric_sql"] = translate_llm_sql_to_real(
+                    raw_val.strip()
+                )
             validate_widget_query_config(
                 str(widget.get("widget_type", "")),
-                widget.get("query_config") or {},
+                qc_validate,
             )
         except ValueError as exc:
             logger.warning(
@@ -160,6 +189,10 @@ async def run_widget_studio_chat(
             )
             widget = None
             clarification_only = True
+            display_text = (
+                f"{display_text}\n\n"
+                "(Widget spec was invalid — please try rephrasing your request.)"
+            ).strip()
 
     draft_state = _merge_draft_after_turn(
         draft_state,
@@ -169,7 +202,7 @@ async def run_widget_studio_chat(
 
     assistant_entry = {
         "role": "assistant",
-        "content": response_text,
+        "content": display_text,
         "timestamp": datetime.now(UTC).isoformat(),
     }
     updated_messages = [*current_messages, assistant_entry]
@@ -195,4 +228,4 @@ async def run_widget_studio_chat(
         widget is not None,
         clarification_only,
     )
-    return response_text, widget, draft_state, clarification_only
+    return display_text, widget, draft_state, clarification_only

@@ -163,6 +163,25 @@ def _last_ai_message(messages: list[dict]) -> str | None:
     return None
 
 
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
+
+
+def strip_widget_json_from_reply(text: str) -> str:
+    """Remove fenced widget JSON so chat UI shows only the natural-language reply.
+
+    Args:
+        text: Raw assistant message from the LLM.
+
+    Returns:
+        Text safe to display in chat (never includes the widget spec block).
+    """
+    stripped = _JSON_FENCE_RE.sub("", text)
+    stripped = re.sub(r"\n{3,}", "\n\n", stripped).strip()
+    if stripped:
+        return stripped
+    return "I'm generating your widget."
+
+
 def _extract_widget_suggestion(text: str) -> dict[str, Any] | None:
     """Scan *text* for a JSON code block that matches the widget suggestion shape.
 
@@ -176,9 +195,7 @@ def _extract_widget_suggestion(text: str) -> dict[str, Any] | None:
     Returns:
         Parsed widget suggestion dict, or None if not found / invalid.
     """
-    # Match the first ```json ... ``` block (non-greedy, DOTALL)
-    pattern = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL)
-    match = pattern.search(text)
+    match = _JSON_FENCE_RE.search(text)
     if not match:
         return None
 

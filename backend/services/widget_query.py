@@ -22,6 +22,10 @@ from backend.services.widget_placeholders import (
     resolve_query_config_placeholders,
     validate_placeholder_filter_values,
 )
+from backend.services.widget_sql_aliases import (
+    abstract_sql_for_display,
+    translate_llm_sql_to_real,
+)
 
 # --------------------------------------------------------------------------- #
 # Allowed enum values (domain constants — not config)
@@ -123,7 +127,7 @@ def describe_widget_query_human(config: dict[str, Any]) -> str:
     """
     raw_sql = config.get("raw_metric_sql")
     if isinstance(raw_sql, str) and raw_sql.strip():
-        return raw_sql.strip()
+        return abstract_sql_for_display(translate_llm_sql_to_real(raw_sql.strip()))
 
     aggregation = config.get("aggregation", "?")
     field = config.get("field", "?")
@@ -217,6 +221,11 @@ def resolve_widget_data(
         default_month_for_preview=default_month_for_preview,
     )
     config = resolved_config
+    print(
+        f"[widget_query] resolved_config={config!r} "
+        f"date_from={runtime.date_from!r} date_to={runtime.date_to!r}",
+        flush=True,
+    )
     date_from = runtime.date_from
     date_to = runtime.date_to
     bank_name = runtime.bank_name
@@ -229,7 +238,7 @@ def resolve_widget_data(
         group_by_raw: str | None = config.get("group_by")
         if group_by_raw is not None:
             raise ValueError("raw_metric_sql cannot be combined with group_by.")
-        sql_body = raw_sql.strip()
+        sql_body = translate_llm_sql_to_real(raw_sql.strip())
         validate_raw_metric_sql(sql_body)
         cfg_filters_r: dict[str, Any] = config.get("filters", {}) or {}
         effective_category_r: str | None = (
@@ -238,6 +247,28 @@ def resolve_widget_data(
         effective_bank_name_r: str | None = (
             bank_name if bank_name is not None else cfg_filters_r.get("bank_name")
         )
+        effective_parent_r: str | None = (
+            parent_category
+            if parent_category is not None
+            else cfg_filters_r.get("parent_category")
+        )
+        effective_sub_r: str | None = (
+            sub_category
+            if sub_category is not None
+            else cfg_filters_r.get("sub_category")
+        )
+        if isinstance(effective_parent_r, str) and effective_parent_r.startswith("{{"):
+            effective_parent_r = None
+        if isinstance(effective_sub_r, str) and effective_sub_r.startswith("{{"):
+            effective_sub_r = None
+        if isinstance(effective_bank_name_r, str) and effective_bank_name_r.startswith(
+            "{{"
+        ):
+            effective_bank_name_r = None
+        if isinstance(effective_category_r, str) and effective_category_r.startswith(
+            "{{"
+        ):
+            effective_category_r = None
         transaction_type_r: str | None = cfg_filters_r.get("transaction_type")
         value = execute_raw_metric_sql(
             sql_body,
@@ -247,6 +278,8 @@ def resolve_widget_data(
             date_to=date_to,
             bank_name=effective_bank_name_r,
             category=effective_category_r,
+            parent_category=effective_parent_r,
+            sub_category=effective_sub_r,
             transaction_type=transaction_type_r,
         )
         return {"value": value, "format": config.get("format", "number")}

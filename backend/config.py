@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # Langfuse
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
-    langfuse_host: str = "http://localhost:3001"
+    langfuse_host: str = "http://langfuse_app:3000"
 
     # Local file storage fallback (used when Google Drive creds are absent)
     local_storage_path: str = "storage"
