@@ -25,7 +25,6 @@ from backend.services.widget_placeholders import (
     validate_placeholder_filter_values,
 )
 from backend.services.widget_sql_aliases import (
-    abstract_sql_for_display,
     translate_llm_sql_to_real,
 )
 
@@ -174,7 +173,7 @@ def describe_widget_query_human(config: dict[str, Any]) -> str:
 
     raw_sql = config.get("raw_metric_sql")
     if isinstance(raw_sql, str) and raw_sql.strip():
-        return abstract_sql_for_display(translate_llm_sql_to_real(raw_sql.strip()))
+        return translate_llm_sql_to_real(raw_sql.strip())
 
     aggregation = config.get("aggregation", "?")
     field = config.get("field", "?")
@@ -211,9 +210,63 @@ def _strip_unresolved_placeholder(value: str | None) -> str | None:
     """Return None when a filter value is still an unresolved ``{{...}}`` token."""
     if value is None:
         return None
-    if isinstance(value, str) and value.startswith("{{"):
+    if value.startswith("{{"):
         return None
     return value
+
+
+def _request_sub_categories_list(
+    sub_categories: list[str] | None,
+    sub_category: str | None,
+) -> list[str] | None:
+    """Merge repeated query params and legacy single ``sub_category`` into a deduped list."""
+    out: list[str] = []
+    if sub_categories:
+        for s in sub_categories:
+            t = (s or "").strip()
+            if t and t not in out:
+                out.append(t)
+    if sub_category:
+        t = sub_category.strip()
+        if t and t not in out:
+            out.append(t)
+    return out or None
+
+
+def _sub_placeholder_for_resolve(request_subs: list[str] | None) -> str | None:
+    """Single sub string for ``{{sub_category}}`` resolution; None if zero or many."""
+    if request_subs is None:
+        return None
+    if len(request_subs) == 1:
+        return request_subs[0]
+    return None
+
+
+def _widget_sql_sub_categories(
+    request_subs: list[str] | None,
+    resolved_config: dict[str, Any],
+    runtime_sub: str | None,
+) -> list[str] | None:
+    """Explicit request subs win; else resolved config or runtime single string."""
+    if request_subs:
+        return request_subs
+    cfg_filters: dict[str, Any] = dict(resolved_config.get("filters") or {})
+    raw = cfg_filters.get("sub_category")
+    eff = _strip_unresolved_placeholder(raw) if isinstance(raw, str) else None
+    eff = eff or _strip_unresolved_placeholder(runtime_sub)
+    return [eff] if eff else None
+
+
+def _strip_sub_categories_placeholders(subs: list[str] | None) -> list[str] | None:
+    """Drop blanks and unresolved ``{{...}}`` tokens from a sub-category list."""
+    if not subs:
+        return None
+    out: list[str] = []
+    for raw in subs:
+        t = _strip_unresolved_placeholder(raw.strip())
+        if t and t not in out:
+            out.append(t)
+    return out or None
 
 
 def _compile_stmt_for_debug(stmt: Any) -> str:
@@ -235,6 +288,7 @@ def describe_widget_query_real(
     category: str | None = None,
     parent_category: str | None = None,
     sub_category: str | None = None,
+    sub_categories: list[str] | None = None,
     default_month_for_preview: bool = False,
 ) -> str:
     """Build real ``transactions`` SQL for super-admin debug (not executed).
@@ -247,12 +301,14 @@ def describe_widget_query_real(
         bank_name: Optional bank filter from UI.
         category: Optional category filter from UI.
         parent_category: Optional parent category filter from UI.
-        sub_category: Optional sub-category filter from UI.
+        sub_category: Optional single sub-category filter from UI (legacy).
+        sub_categories: Optional multi sub-category filters (merged with ``sub_category``).
         default_month_for_preview: Default unresolved date placeholders to current month.
 
     Returns:
         Representative SQL string matching what ``resolve_widget_data`` would run.
     """
+    request_subs = _request_sub_categories_list(sub_categories, sub_category)
     if config.get("template") == SPEND_RECEIVE_PAIR_TYPE:
         spend_cfg = {
             **config,
@@ -280,7 +336,8 @@ def describe_widget_query_real(
             bank_name=bank_name,
             category=category,
             parent_category=parent_category,
-            sub_category=sub_category,
+            sub_category=None,
+            sub_categories=request_subs,
             default_month_for_preview=default_month_for_preview,
         )
         recv_sql = describe_widget_query_real(
@@ -291,7 +348,8 @@ def describe_widget_query_real(
             bank_name=bank_name,
             category=category,
             parent_category=parent_category,
-            sub_category=sub_category,
+            sub_category=None,
+            sub_categories=request_subs,
             default_month_for_preview=default_month_for_preview,
         )
         return f"-- Spend\n{spend_sql}\n\n-- Received\n{recv_sql}"
@@ -303,7 +361,7 @@ def describe_widget_query_real(
         bank_name=bank_name,
         category=category,
         parent_category=parent_category,
-        sub_category=sub_category,
+        sub_category=_sub_placeholder_for_resolve(request_subs),
         default_month_for_preview=default_month_for_preview,
     )
     config = resolved_config
@@ -313,6 +371,10 @@ def describe_widget_query_real(
     category = runtime.category
     parent_category = runtime.parent_category
     sub_category = runtime.sub_category
+
+    sql_subs = _strip_sub_categories_placeholders(
+        _widget_sql_sub_categories(request_subs, config, runtime.sub_category)
+    )
 
     raw_sql = config.get("raw_metric_sql")
     if isinstance(raw_sql, str) and raw_sql.strip():
@@ -328,11 +390,6 @@ def describe_widget_query_real(
             if parent_category is not None
             else cfg_filters_r.get("parent_category")
         )
-        effective_sub_r = _strip_unresolved_placeholder(
-            sub_category
-            if sub_category is not None
-            else cfg_filters_r.get("sub_category")
-        )
         transaction_type_r: str | None = cfg_filters_r.get("transaction_type")
         return build_raw_metric_sql_preview(
             raw_sql.strip(),
@@ -342,7 +399,7 @@ def describe_widget_query_real(
             bank_name=effective_bank_name_r,
             category=effective_category_r,
             parent_category=effective_parent_r,
-            sub_category=effective_sub_r,
+            sub_categories=sql_subs,
             transaction_type=transaction_type_r,
         )
 
@@ -372,9 +429,6 @@ def describe_widget_query_real(
         if parent_category is not None
         else cfg_filters.get("parent_category")
     )
-    effective_sub_category = _strip_unresolved_placeholder(
-        sub_category if sub_category is not None else cfg_filters.get("sub_category")
-    )
     transaction_type: str | None = cfg_filters.get("transaction_type")
 
     clauses = _build_where_clauses(
@@ -382,7 +436,7 @@ def describe_widget_query_real(
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
         effective_parent_category=effective_parent_category,
-        effective_sub_category=effective_sub_category,
+        effective_sub_categories=sql_subs,
         transaction_type=transaction_type,
         date_from=date_from,
         date_to=date_to,
@@ -440,6 +494,7 @@ def resolve_widget_data(
     category: str | None = None,
     parent_category: str | None = None,
     sub_category: str | None = None,
+    sub_categories: list[str] | None = None,
     *,
     default_month_for_preview: bool = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
@@ -468,7 +523,8 @@ def resolve_widget_data(
         bank_name: Global bank filter (overrides ``config["filters"]["bank_name"]``).
         category:         Global category filter (overrides config filters).
         parent_category:  Global parent category filter.
-        sub_category:     Global sub-category filter.
+        sub_category:     Global single sub-category filter (legacy).
+        sub_categories:   Global multi sub-category filters (merged with ``sub_category``).
         default_month_for_preview: Default unresolved date placeholders to current month.
 
     Returns:
@@ -480,6 +536,7 @@ def resolve_widget_data(
                     respective allowed sets, or if ``group_by`` is present but not
                     in the allowed set.
     """
+    request_subs = _request_sub_categories_list(sub_categories, sub_category)
     resolved_config, runtime = resolve_query_config_placeholders(
         config,
         date_from=date_from,
@@ -487,7 +544,7 @@ def resolve_widget_data(
         bank_name=bank_name,
         category=category,
         parent_category=parent_category,
-        sub_category=sub_category,
+        sub_category=_sub_placeholder_for_resolve(request_subs),
         default_month_for_preview=default_month_for_preview,
     )
     config = resolved_config
@@ -503,6 +560,10 @@ def resolve_widget_data(
     parent_category = runtime.parent_category
     sub_category = runtime.sub_category
 
+    sql_subs = _strip_sub_categories_placeholders(
+        _widget_sql_sub_categories(request_subs, config, runtime.sub_category)
+    )
+
     if config.get("template") == SPEND_RECEIVE_PAIR_TYPE:
         return _resolve_spend_receive_pair(
             db=db,
@@ -511,7 +572,7 @@ def resolve_widget_data(
             effective_category=category,
             effective_bank_name=bank_name,
             effective_parent_category=parent_category,
-            effective_sub_category=sub_category,
+            effective_sub_categories=sql_subs,
             date_from=date_from,
             date_to=date_to,
         )
@@ -524,34 +585,17 @@ def resolve_widget_data(
         sql_body = translate_llm_sql_to_real(raw_sql.strip())
         validate_raw_metric_sql(sql_body)
         cfg_filters_r: dict[str, Any] = config.get("filters", {}) or {}
-        effective_category_r: str | None = (
+        effective_category_r: str | None = _strip_unresolved_placeholder(
             category if category is not None else cfg_filters_r.get("category")
         )
-        effective_bank_name_r: str | None = (
+        effective_bank_name_r: str | None = _strip_unresolved_placeholder(
             bank_name if bank_name is not None else cfg_filters_r.get("bank_name")
         )
-        effective_parent_r: str | None = (
+        effective_parent_r: str | None = _strip_unresolved_placeholder(
             parent_category
             if parent_category is not None
             else cfg_filters_r.get("parent_category")
         )
-        effective_sub_r: str | None = (
-            sub_category
-            if sub_category is not None
-            else cfg_filters_r.get("sub_category")
-        )
-        if isinstance(effective_parent_r, str) and effective_parent_r.startswith("{{"):
-            effective_parent_r = None
-        if isinstance(effective_sub_r, str) and effective_sub_r.startswith("{{"):
-            effective_sub_r = None
-        if isinstance(effective_bank_name_r, str) and effective_bank_name_r.startswith(
-            "{{"
-        ):
-            effective_bank_name_r = None
-        if isinstance(effective_category_r, str) and effective_category_r.startswith(
-            "{{"
-        ):
-            effective_category_r = None
         transaction_type_r: str | None = cfg_filters_r.get("transaction_type")
         value = execute_raw_metric_sql(
             sql_body,
@@ -562,7 +606,7 @@ def resolve_widget_data(
             bank_name=effective_bank_name_r,
             category=effective_category_r,
             parent_category=effective_parent_r,
-            sub_category=effective_sub_r,
+            sub_categories=sql_subs,
             transaction_type=transaction_type_r,
         )
         return {"value": value, "format": config.get("format", "number")}
@@ -623,9 +667,6 @@ def resolve_widget_data(
         if parent_category is not None
         else cfg_filters.get("parent_category")
     )
-    effective_sub_category: str | None = (
-        sub_category if sub_category is not None else cfg_filters.get("sub_category")
-    )
     transaction_type: str | None = cfg_filters.get("transaction_type")
 
     # ------------------------------------------------------------------ #
@@ -639,7 +680,7 @@ def resolve_widget_data(
             effective_category=effective_category,
             effective_bank_name=effective_bank_name,
             effective_parent_category=effective_parent_category,
-            effective_sub_category=effective_sub_category,
+            effective_sub_categories=sql_subs,
             transaction_type=transaction_type,
             date_from=date_from,
             date_to=date_to,
@@ -654,7 +695,7 @@ def resolve_widget_data(
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
         effective_parent_category=effective_parent_category,
-        effective_sub_category=effective_sub_category,
+        effective_sub_categories=sql_subs,
         transaction_type=transaction_type,
         date_from=date_from,
         date_to=date_to,
@@ -671,7 +712,7 @@ def _build_where_clauses(
     effective_category: str | None,
     effective_bank_name: str | None,
     effective_parent_category: str | None,
-    effective_sub_category: str | None,
+    effective_sub_categories: list[str] | None,
     transaction_type: str | None,
     date_from: date | None,
     date_to: date | None,
@@ -683,7 +724,7 @@ def _build_where_clauses(
         effective_category:         Optional legacy category filter.
         effective_bank_name:        Optional bank_name equality filter.
         effective_parent_category:  Optional parent_category filter.
-        effective_sub_category:     Optional sub_category filter.
+        effective_sub_categories:   Optional sub_category filters (``IN`` when multiple).
         transaction_type:           Optional direction filter — "credit" or "debit".
         date_from:            Optional inclusive lower date bound.
         date_to:              Optional inclusive upper date bound.
@@ -697,8 +738,11 @@ def _build_where_clauses(
         clauses.append(Transaction.category == effective_category)
     if effective_parent_category is not None:
         clauses.append(Transaction.parent_category == effective_parent_category)
-    if effective_sub_category is not None:
-        clauses.append(Transaction.sub_category == effective_sub_category)
+    if effective_sub_categories:
+        if len(effective_sub_categories) == 1:
+            clauses.append(Transaction.sub_category == effective_sub_categories[0])
+        else:
+            clauses.append(Transaction.sub_category.in_(effective_sub_categories))
     if effective_bank_name is not None:
         clauses.append(Transaction.bank_name == effective_bank_name)
     if transaction_type == "credit":
@@ -720,7 +764,7 @@ def _resolve_spend_receive_pair(
     effective_category: str | None,
     effective_bank_name: str | None,
     effective_parent_category: str | None,
-    effective_sub_category: str | None,
+    effective_sub_categories: list[str] | None,
     date_from: date | None,
     date_to: date | None,
 ) -> dict[str, Any]:
@@ -733,7 +777,7 @@ def _resolve_spend_receive_pair(
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
         effective_parent_category=effective_parent_category,
-        effective_sub_category=effective_sub_category,
+        effective_sub_categories=effective_sub_categories,
         transaction_type="debit",
         date_from=date_from,
         date_to=date_to,
@@ -746,7 +790,7 @@ def _resolve_spend_receive_pair(
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
         effective_parent_category=effective_parent_category,
-        effective_sub_category=effective_sub_category,
+        effective_sub_categories=effective_sub_categories,
         transaction_type="credit",
         date_from=date_from,
         date_to=date_to,
@@ -766,7 +810,7 @@ def _resolve_metric(
     effective_category: str | None,
     effective_bank_name: str | None,
     effective_parent_category: str | None,
-    effective_sub_category: str | None,
+    effective_sub_categories: list[str] | None,
     transaction_type: str | None,
     date_from: date | None,
     date_to: date | None,
@@ -793,7 +837,7 @@ def _resolve_metric(
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
         effective_parent_category=effective_parent_category,
-        effective_sub_category=effective_sub_category,
+        effective_sub_categories=effective_sub_categories,
         transaction_type=transaction_type,
         date_from=date_from,
         date_to=date_to,
@@ -812,7 +856,7 @@ def _resolve_chart(
     effective_category: str | None,
     effective_bank_name: str | None,
     effective_parent_category: str | None,
-    effective_sub_category: str | None,
+    effective_sub_categories: list[str] | None,
     transaction_type: str | None,
     date_from: date | None,
     date_to: date | None,
@@ -839,7 +883,7 @@ def _resolve_chart(
         effective_category=effective_category,
         effective_bank_name=effective_bank_name,
         effective_parent_category=effective_parent_category,
-        effective_sub_category=effective_sub_category,
+        effective_sub_categories=effective_sub_categories,
         transaction_type=transaction_type,
         date_from=date_from,
         date_to=date_to,

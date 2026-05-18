@@ -1,12 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
-import { fetchTransactionDateScope, type TransactionDateScope } from "../services/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  fetchTransactionDateScope,
+  type CategoryMasterSubEntry,
+  type TransactionDateScope,
+} from "../services/api";
 import {
   resolveDefaultRange,
   type DateRangeValue,
 } from "../utils/dateRangePresets";
 
+export type CategoryMasterMerged = Record<string, CategoryMasterSubEntry[]>;
+
 export interface UseTransactionDateScopeResult {
   scope: TransactionDateScope | null;
+  bankNames: string[];
+  categoryMaster: CategoryMasterMerged;
   defaultRange: DateRangeValue | null;
   loading: boolean;
   error: string | null;
@@ -14,7 +22,7 @@ export interface UseTransactionDateScopeResult {
 }
 
 /**
- * Load the user's transaction date bounds and derive a data-aware default range.
+ * Load filter scope: transaction date bounds, banks, category master, and default range.
  */
 export function useTransactionDateScope(): UseTransactionDateScopeResult {
   const [scope, setScope] = useState<TransactionDateScope | null>(null);
@@ -41,8 +49,17 @@ export function useTransactionDateScope(): UseTransactionDateScopeResult {
 
   const defaultRange = scope ? resolveDefaultRange(scope) : null;
 
+  const bankNames = useMemo(() => scope?.bank_names ?? [], [scope]);
+
+  const categoryMaster = useMemo(
+    (): CategoryMasterMerged => scope?.category_master ?? {},
+    [scope],
+  );
+
   return {
     scope,
+    bankNames,
+    categoryMaster,
     defaultRange,
     loading,
     error,

@@ -693,7 +693,7 @@ export default function Categories() {
   }, [dictSplitDragging, handleDictSplitMouseMove, handleDictSplitMouseUp]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+    <div className="min-h-screen bg-gray-50 p-4 dark:bg-gray-950 sm:p-6">
       {mutateError && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
           {mutateError}
@@ -787,7 +787,7 @@ export default function Categories() {
 
           {/* ── Unmapped tab ─────────────────────────────────────────────── */}
           {activeTab === "unmapped" && (
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
+            <section className="w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Unmapped Merchants
@@ -1023,7 +1023,7 @@ export default function Categories() {
 
           {/* ── Mapped tab ──────────────────────────────────────────── */}
           {activeTab === "mapped" && (
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-full">
+            <section className="w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Mapped Categories

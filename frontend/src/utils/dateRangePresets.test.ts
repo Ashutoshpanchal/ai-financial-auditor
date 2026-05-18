@@ -17,6 +17,22 @@ const SCOPE: TransactionDateScope = {
 const TODAY = new Date(2026, 4, 18); // 18 May 2026
 
 describe("getPresetRange", () => {
+  it("returns today as single day", () => {
+    expect(getPresetRange("today", TODAY)).toEqual({ from: "2026-05-18", to: "2026-05-18" });
+  });
+
+  it("returns yesterday as single day", () => {
+    expect(getPresetRange("yesterday", TODAY)).toEqual({ from: "2026-05-17", to: "2026-05-17" });
+  });
+
+  it("returns last 7 days inclusive", () => {
+    expect(getPresetRange("last_7_days", TODAY)).toEqual({ from: "2026-05-12", to: "2026-05-18" });
+  });
+
+  it("returns last 30 days inclusive", () => {
+    expect(getPresetRange("last_30_days", TODAY)).toEqual({ from: "2026-04-19", to: "2026-05-18" });
+  });
+
   it("returns last month bounds", () => {
     const r = getPresetRange("last_month", TODAY);
     expect(r).toEqual({ from: "2026-04-01", to: "2026-04-30" });
@@ -37,6 +53,11 @@ describe("clampRangeToScope", () => {
   it("clamps to min and max dates", () => {
     const r = clampRangeToScope("2020-01-01", "2030-12-31", SCOPE);
     expect(r).toEqual({ from: "2024-03-01", to: "2026-04-15" });
+  });
+
+  it("treats missing end as same day as start for comparison", () => {
+    const r = clampRangeToScope("2024-06-10", "", SCOPE);
+    expect(r).toEqual({ from: "2024-06-10", to: "2024-06-10" });
   });
 });
 

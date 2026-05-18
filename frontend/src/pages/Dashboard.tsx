@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FilterBar, FilterState } from "../components/dashboard/FilterBar";
 import { useTransactionDateScope } from "../hooks/useTransactionDateScope";
 import { WidgetGrid } from "../components/dashboard/WidgetGrid";
-import { EditModePanel } from "../components/dashboard/EditModePanel";
-import { ChatPanel, type WidgetSuggestion } from "../components/dashboard/ChatPanel";
+import { useAuth } from "../hooks/useAuth";
 
 const API = "http://localhost:8000";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Widget {
   id: string;
@@ -24,8 +21,6 @@ interface GridItem {
   col_span: number;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     credentials: "include",
@@ -39,28 +34,62 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+function formatFilterDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: "short", year: "numeric", day: "numeric" });
+}
+
+function buildFilterSummary(filters: FilterState, userName?: string | null): string {
+  const parts: string[] = [];
+  if (filters.dateFrom || filters.dateTo) {
+    const from = filters.dateFrom ? formatFilterDate(filters.dateFrom) : "…";
+    const to = filters.dateTo ? formatFilterDate(filters.dateTo) : "…";
+    parts.push(`${from} – ${to}`);
+  }
+  if (filters.bankName) parts.push(filters.bankName);
+  if (userName) parts.push(userName);
+  return parts.length > 0 ? parts.join(" · ") : "All transactions";
+}
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [grid, setGrid] = useState<GridItem[]>([]);
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: "",
     dateTo: "",
     bankName: "",
-    category: "",
     parentCategory: "",
-    subCategory: "",
+    subCategories: [],
   });
   const [isEditMode, setIsEditMode] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoadingLayout, setIsLoadingLayout] = useState(true);
-  const { scope: dateScope, defaultRange, loading: dateScopeLoading } =
-    useTransactionDateScope();
+  const {
+    scope: dateScope,
+    defaultRange,
+    loading: dateScopeLoading,
+    bankNames,
+    categoryMaster,
+  } = useTransactionDateScope();
   const datesInitialized = useRef(false);
+
+  const parentCategoryOptions = useMemo(
+    () => Object.keys(categoryMaster).sort((a, b) => a.localeCompare(b)),
+    [categoryMaster],
+  );
+
+  const subCategoryOptions = useMemo(() => {
+    if (!filters.parentCategory) return [];
+    const subs = categoryMaster[filters.parentCategory] ?? [];
+    return subs.map((s) => s.sub_category).sort((a, b) => a.localeCompare(b));
+  }, [categoryMaster, filters.parentCategory]);
+
+  const filterSummary = useMemo(
+    () => buildFilterSummary(filters, user?.name),
+    [filters, user?.name],
+  );
 
   useEffect(() => {
     if (datesInitialized.current || dateScopeLoading || !defaultRange) return;
@@ -74,7 +103,6 @@ export default function Dashboard() {
     }
   }, [dateScopeLoading, defaultRange, filters.dateFrom, filters.dateTo]);
 
-  // Load widgets + layout on mount
   useEffect(() => {
     const load = async () => {
       try {
@@ -93,28 +121,6 @@ export default function Dashboard() {
     void load();
   }, []);
 
-  // Create or load a chat session on mount
-  useEffect(() => {
-    const initSession = async () => {
-      try {
-        const sessions = await apiFetch<{ id: string }[]>("/chat/sessions");
-        if (sessions.length > 0) {
-          setSessionId(sessions[0].id);
-        } else {
-          const newSession = await apiFetch<{ id: string }>("/chat/sessions", {
-            method: "POST",
-            body: JSON.stringify({ title: "Dashboard Chat" }),
-          });
-          setSessionId(newSession.id);
-        }
-      } catch {
-        // no session — ChatPanel shows placeholder
-      }
-    };
-    void initSession();
-  }, []);
-
-  // Persist layout to backend whenever grid changes (after initial load)
   const saveLayout = useCallback(async (newGrid: GridItem[]) => {
     try {
       await apiFetch("/dashboard/layout", {
@@ -131,207 +137,72 @@ export default function Dashboard() {
       setGrid(newGrid);
       void saveLayout(newGrid);
     },
-    [saveLayout]
+    [saveLayout],
   );
 
-  // Remove widget from grid (not from library)
   const handleRemoveFromGrid = useCallback(
     (widgetId: string) => {
       const newGrid = grid.filter((g) => g.widget_id !== widgetId);
       setGrid(newGrid);
       void saveLayout(newGrid);
     },
-    [grid, saveLayout]
+    [grid, saveLayout],
   );
-
-  // Add widget to grid from the edit panel
-  const handleAddToGrid = useCallback(
-    (widgetId: string) => {
-      if (grid.find((g) => g.widget_id === widgetId)) return;
-      const newItem: GridItem = {
-        widget_id: widgetId,
-        row: Math.floor(grid.length / 3),
-        col: grid.length % 3,
-        col_span: 1,
-      };
-      const newGrid = [...grid, newItem];
-      setGrid(newGrid);
-      void saveLayout(newGrid);
-    },
-    [grid, saveLayout]
-  );
-
-  // Delete widget from library (and remove from grid)
-  const handleDeleteWidget = useCallback(
-    async (widgetId: string) => {
-      try {
-        await apiFetch(`/dashboard/widgets/${widgetId}`, { method: "DELETE" });
-        setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
-        setGrid((prev) => prev.filter((g) => g.widget_id !== widgetId));
-      } catch {
-        // ignore
-      }
-    },
-    []
-  );
-
-  // Add suggested widget to library, then to grid
-  const handleAddSuggestedWidget = useCallback(
-    async (suggestion: WidgetSuggestion) => {
-      try {
-        const created = await apiFetch<Widget>("/dashboard/widgets", {
-          method: "POST",
-          body: JSON.stringify({
-            title: suggestion.title,
-            widget_type: suggestion.widget_type,
-            query_config: suggestion.query_config,
-          }),
-        });
-        setWidgets((prev) => [...prev, created]);
-        handleAddToGrid(created.id);
-      } catch {
-        // ignore
-      }
-    },
-    [handleAddToGrid]
-  );
-
-  const placedIds = grid.map((g) => g.widget_id);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-gray-50">
-      {/* ── Left panel: widget grid ── */}
-      {!leftCollapsed && (
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-gray-200">
-          {/* Panel header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0">
-            <h1 className="text-base font-semibold text-gray-900">Dashboard</h1>
-            <div className="flex items-center gap-2">
-              {/* Add Widgets — opens library panel (no blocking overlay) */}
-              <button
-                type="button"
-                onClick={() => setIsLibraryOpen(true)}
-                className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition"
-              >
-                + Add Widgets
-              </button>
-
-              {/* Edit / Done — toggles inline remove+drag controls on cards */}
-              <button
-                type="button"
-                onClick={() => setIsEditMode((v) => !v)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                  isEditMode
-                    ? "border-indigo-400 bg-indigo-600 text-white hover:bg-indigo-700"
-                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {isEditMode ? "Done" : "Edit"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLeftCollapsed(true)}
-                className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-400 hover:bg-gray-50 transition"
-                title="Collapse dashboard"
-              >
-                ◀
-              </button>
-            </div>
+    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 dark:bg-gray-950">
+      <header className="border-b border-gray-200 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Spending overview</h1>
+            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{filterSummary}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsEditMode((v) => !v)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              isEditMode
+                ? "border-gray-700 bg-gray-800 text-white hover:bg-gray-700 dark:border-gray-500"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            }`}
+          >
+            {isEditMode ? "Done" : "Edit"}
+          </button>
+        </div>
+      </header>
 
-          {/* Filter bar */}
-          <div className="shrink-0">
-            <FilterBar
-              filters={filters}
-              onChange={setFilters}
-              dateScope={dateScope}
-              dateScopeLoading={dateScopeLoading}
-              defaultDateRange={defaultRange}
-            />
-          </div>
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        bankOptions={bankNames}
+        parentCategoryOptions={parentCategoryOptions}
+        subCategoryOptions={subCategoryOptions}
+        dateScope={dateScope}
+        dateScopeLoading={dateScopeLoading}
+        defaultDateRange={defaultRange}
+      />
 
-          {/* Widget grid */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {isLoadingLayout ? (
-              <div className="grid grid-cols-3 gap-4">
-                {[1, 2, 3, 4].map((n) => (
-                  <div key={n} className="bg-white rounded-2xl shadow-sm animate-pulse h-32" />
-                ))}
-              </div>
-            ) : (
-              <WidgetGrid
-                widgets={widgets}
-                grid={grid}
-                filters={filters}
-                isEditMode={isEditMode}
-                onGridChange={handleGridChange}
-                onRemove={handleRemoveFromGrid}
+      <main className="mx-auto max-w-7xl p-4 sm:px-6 lg:px-8">
+        {isLoadingLayout ? (
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3, 4].map((n) => (
+              <div
+                key={n}
+                className="h-32 animate-pulse rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
               />
-            )}
+            ))}
           </div>
-        </div>
-      )}
-
-      {/* Collapsed left expander */}
-      {leftCollapsed && (
-        <button
-          type="button"
-          onClick={() => setLeftCollapsed(false)}
-          className="flex items-center justify-center w-8 bg-white border-r border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition shrink-0"
-          title="Expand dashboard"
-        >
-          ▶
-        </button>
-      )}
-
-      {/* ── Right panel: chat ── */}
-      {!rightCollapsed && (
-        <div className="flex flex-col w-[380px] shrink-0 overflow-hidden bg-gray-50">
-          {/* Panel header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shrink-0">
-            <h2 className="text-base font-semibold text-gray-900">Finance Assistant</h2>
-            <button
-              type="button"
-              onClick={() => setRightCollapsed(true)}
-              className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-400 hover:bg-gray-50 transition"
-              title="Collapse chat"
-            >
-              ▶
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-hidden p-3">
-            <ChatPanel
-              sessionId={sessionId}
-              onAddWidget={(s) => void handleAddSuggestedWidget(s)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Collapsed right expander */}
-      {rightCollapsed && (
-        <button
-          type="button"
-          onClick={() => setRightCollapsed(false)}
-          className="flex items-center justify-center w-8 bg-white border-l border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition shrink-0"
-          title="Expand chat"
-        >
-          ◀
-        </button>
-      )}
-
-      {/* Widget library panel — opens without blocking the grid */}
-      {isLibraryOpen && (
-        <EditModePanel
-          widgets={widgets}
-          placedWidgetIds={placedIds}
-          onAdd={handleAddToGrid}
-          onDelete={(id) => void handleDeleteWidget(id)}
-          onClose={() => setIsLibraryOpen(false)}
-        />
-      )}
+        ) : (
+          <WidgetGrid
+            widgets={widgets}
+            grid={grid}
+            filters={filters}
+            isEditMode={isEditMode}
+            onGridChange={handleGridChange}
+            onRemove={handleRemoveFromGrid}
+          />
+        )}
+      </main>
     </div>
   );
 }

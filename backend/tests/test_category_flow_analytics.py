@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -189,8 +189,12 @@ def test_metadata_returns_months_years_totals() -> None:
     assert out["date_to"] == "2024-03-31"
 
 
-def test_transaction_date_scope_with_data() -> None:
-    """Scope returns min/max ISO dates and sorted months."""
+@patch("backend.services.category_flow_analytics.get_merged_grouped_master")
+def test_transaction_date_scope_with_data(mock_master: MagicMock) -> None:
+    """Scope returns min/max ISO dates, sorted months, banks, and category master."""
+    mock_master.return_value = {
+        "Food": [{"id": "m1", "sub_category": "Groceries", "is_global": True}]
+    }
     db = MagicMock()
     db.scalar.side_effect = [date(2024, 3, 12), date(2026, 4, 28)]
     months_exec = MagicMock()
@@ -199,7 +203,12 @@ def test_transaction_date_scope_with_data() -> None:
         MagicMock(month="2024-04"),
         MagicMock(month="2026-04"),
     ]
-    db.execute.return_value = months_exec
+    banks_exec = MagicMock()
+    banks_exec.all.return_value = [
+        MagicMock(bank_name="HDFC"),
+        MagicMock(bank_name="SBI"),
+    ]
+    db.execute.side_effect = [months_exec, banks_exec]
 
     out = compute_transaction_date_scope(db=db, user_id="u1")
 
@@ -207,15 +216,22 @@ def test_transaction_date_scope_with_data() -> None:
     assert out["max_date"] == "2026-04-28"
     assert out["months_with_data"] == ["2024-03", "2024-04", "2026-04"]
     assert out["has_transactions"] is True
+    assert out["bank_names"] == ["HDFC", "SBI"]
+    assert out["category_master"] == mock_master.return_value
+    mock_master.assert_called_once_with(db, "u1")
 
 
-def test_transaction_date_scope_empty_user() -> None:
-    """Scope with no transactions returns null dates and empty months."""
+@patch("backend.services.category_flow_analytics.get_merged_grouped_master")
+def test_transaction_date_scope_empty_user(mock_master: MagicMock) -> None:
+    """Scope with no transactions returns null dates, empty months, banks, master."""
+    mock_master.return_value = {}
     db = MagicMock()
     db.scalar.side_effect = [None, None]
     months_exec = MagicMock()
     months_exec.all.return_value = []
-    db.execute.return_value = months_exec
+    banks_exec = MagicMock()
+    banks_exec.all.return_value = []
+    db.execute.side_effect = [months_exec, banks_exec]
 
     out = compute_transaction_date_scope(db=db, user_id="u1")
 
@@ -223,6 +239,8 @@ def test_transaction_date_scope_empty_user() -> None:
     assert out["max_date"] is None
     assert out["months_with_data"] == []
     assert out["has_transactions"] is False
+    assert out["bank_names"] == []
+    assert out["category_master"] == {}
 
 
 def test_metadata_empty_range_returns_zeros() -> None:

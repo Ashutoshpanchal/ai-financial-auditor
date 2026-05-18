@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from backend.config import get_settings
@@ -79,6 +79,7 @@ class WidgetPreviewRequest(BaseModel):
     category: str | None = None
     parent_category: str | None = None
     sub_category: str | None = None
+    sub_categories: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +182,7 @@ def preview_widget(
             category=body.category,
             parent_category=body.parent_category,
             sub_category=body.sub_category,
+            sub_categories=body.sub_categories or None,
             default_month_for_preview=True,
         )
     except ValueError as exc:
@@ -201,6 +203,7 @@ def preview_widget(
             category=body.category,
             parent_category=body.parent_category,
             sub_category=body.sub_category,
+            sub_categories=body.sub_categories or None,
             default_month_for_preview=True,
         )
     return payload
@@ -396,7 +399,7 @@ def get_widget_data(
     bank_name: str | None = Query(default=None),
     category: str | None = Query(default=None),
     parent_category: str | None = Query(default=None),
-    sub_category: str | None = Query(default=None),
+    sub_category: Annotated[list[str] | None, Query()] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any] | list[dict[str, Any]]:
@@ -429,7 +432,7 @@ def get_widget_data(
             bank_name=bank_name,
             category=category,
             parent_category=parent_category,
-            sub_category=sub_category,
+            sub_categories=sub_category,
         )
     except ValueError as exc:
         raise HTTPException(

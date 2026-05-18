@@ -13,6 +13,7 @@ from sqlalchemy import func, literal, select
 from sqlalchemy.orm import Session
 
 from backend.models.transaction import Transaction
+from backend.services.category_master_service import get_merged_grouped_master
 
 UNCATEGORIZED_LABEL = "Uncategorized"
 MAX_CATEGORY_FLOW_ROWS = 5000
@@ -30,12 +31,21 @@ def _coalesce_sub() -> Any:
     return func.coalesce(Transaction.sub_category, literal(UNCATEGORIZED_LABEL))
 
 
+def _optional_bank_clause(bank_name: str) -> Any | None:
+    """Return ilike filter on bank_name when ``bank_name`` is non-empty after strip."""
+    needle = bank_name.strip()
+    if not needle:
+        return None
+    return Transaction.bank_name.ilike(f"%{needle}%")
+
+
 def _build_filters(
     user_id: str,
     date_from: date,
     date_to: date,
     parent_category: str,
     sub_categories: list[str] | None,
+    bank_name: str = "",
 ) -> list[Any]:
     """Return WHERE clauses for category-flow aggregates."""
     clauses: list[Any] = [
@@ -46,6 +56,9 @@ def _build_filters(
     ]
     if sub_categories:
         clauses.append(_coalesce_sub().in_(sub_categories))
+    bank_clause = _optional_bank_clause(bank_name)
+    if bank_clause is not None:
+        clauses.append(bank_clause)
     return clauses
 
 
@@ -66,6 +79,7 @@ def compute_category_flow(
     parent_category: str,
     sub_categories: list[str] | None,
     mode: FlowMode = "both",
+    bank_name: str = "",
 ) -> dict[str, Any]:
     """Aggregate debit/credit/count by (parent, YYYY-MM, sub) for one primary category.
 
@@ -77,6 +91,7 @@ def compute_category_flow(
         parent_category: Primary category label (matches coalesced ``parent_category``).
         sub_categories: If non-empty, restrict to these sub-categories (coalesced labels).
         mode: ``debit`` / ``credit`` / ``both`` — filters grouped rows with zero relevant totals.
+        bank_name: Optional substring filter on ``bank_name`` (ilike).
 
     Returns:
         Dict with ``rows``, ``totals``, ``truncated``, ``truncated_reason`` (optional).
@@ -89,7 +104,7 @@ def compute_category_flow(
         raise ValueError("parent_category is required.")
 
     clauses = _build_filters(
-        user_id, date_from, date_to, parent_category, sub_categories
+        user_id, date_from, date_to, parent_category, sub_categories, bank_name
     )
 
     parent_expr = _coalesce_parent().label("parent_category")
@@ -153,13 +168,18 @@ def _build_filters_all_parents(
     user_id: str,
     date_from: date,
     date_to: date,
+    bank_name: str = "",
 ) -> list[Any]:
     """WHERE clauses for aggregates across all primary categories."""
-    return [
+    clauses: list[Any] = [
         Transaction.user_id == user_id,
         Transaction.transaction_date >= date_from,
         Transaction.transaction_date <= date_to,
     ]
+    bank_clause = _optional_bank_clause(bank_name)
+    if bank_clause is not None:
+        clauses.append(bank_clause)
+    return clauses
 
 
 def compute_category_flow_by_parent_month(
@@ -168,6 +188,7 @@ def compute_category_flow_by_parent_month(
     date_from: date,
     date_to: date,
     mode: FlowMode = "both",
+    bank_name: str = "",
 ) -> dict[str, Any]:
     """Aggregate debit/credit/count by (parent_category, YYYY-MM) for all parents.
 
@@ -179,11 +200,12 @@ def compute_category_flow_by_parent_month(
         date_from: Inclusive lower bound on ``transaction_date``.
         date_to: Inclusive upper bound on ``transaction_date``.
         mode: ``debit`` / ``credit`` / ``both`` for HAVING on grouped sums.
+        bank_name: Optional substring filter on ``bank_name`` (ilike).
 
     Returns:
         Dict with ``rows`` (no ``sub_category``), ``totals``, ``truncated``, optional reason.
     """
-    clauses = _build_filters_all_parents(user_id, date_from, date_to)
+    clauses = _build_filters_all_parents(user_id, date_from, date_to, bank_name)
 
     parent_expr = _coalesce_parent().label("parent_category")
     month_expr = func.to_char(Transaction.transaction_date, "YYYY-MM").label("month")
@@ -245,6 +267,7 @@ def compute_category_flow_metadata(
     user_id: str,
     date_from: date,
     date_to: date,
+    bank_name: str = "",
 ) -> dict[str, Any]:
     """Return scope metadata: months, years, total paginated rows, parent categories.
 
@@ -253,12 +276,13 @@ def compute_category_flow_metadata(
         user_id: Tenant id.
         date_from: Inclusive lower bound on transaction_date.
         date_to: Inclusive upper bound on transaction_date.
+        bank_name: Optional substring filter on ``bank_name`` (ilike).
 
     Returns:
         Dict with months_available (YYYY-MM list), years, total_rows (count of distinct
         (parent, month) groups), parent_categories (list of all parents).
     """
-    clauses = _build_filters_all_parents(user_id, date_from, date_to)
+    clauses = _build_filters_all_parents(user_id, date_from, date_to, bank_name)
     month_expr = func.to_char(Transaction.transaction_date, "YYYY-MM")
 
     # Distinct months (sorted)
@@ -312,6 +336,7 @@ def compute_category_flow_by_parent_paginated(
     mode: FlowMode = "both",
     month_cursor: str | None = None,
     limit: int = 50,
+    bank_name: str = "",
 ) -> dict[str, Any]:
     """Paginate (parent_category, month) aggregates via a YYYY-MM month cursor.
 
@@ -326,12 +351,13 @@ def compute_category_flow_by_parent_paginated(
         mode: debit / credit / both for HAVING on grouped sums.
         month_cursor: Start from this YYYY-MM month (inclusive). None = start from beginning.
         limit: Max rows to return (1-200).
+        bank_name: Optional substring filter on ``bank_name`` (ilike).
 
     Returns:
         Dict with rows (list of aggregates), pagination metadata (current_cursor, next_cursor,
         has_more, limit, rows_returned).
     """
-    clauses = _build_filters_all_parents(user_id, date_from, date_to)
+    clauses = _build_filters_all_parents(user_id, date_from, date_to, bank_name)
     month_expr = func.to_char(Transaction.transaction_date, "YYYY-MM")
 
     if month_cursor:
@@ -387,7 +413,7 @@ def compute_transaction_date_scope(
     db: Session,
     user_id: str,
 ) -> dict[str, Any]:
-    """Return global transaction date bounds and months with data for the user.
+    """Return filter metadata: date bounds, months, banks, and merged category master.
 
     Args:
         db: Active SQLAlchemy session (caller sets RLS).
@@ -395,7 +421,10 @@ def compute_transaction_date_scope(
 
     Returns:
         Dict with ``min_date``, ``max_date`` (ISO strings or null), sorted
-        ``months_with_data`` (YYYY-MM), and ``has_transactions`` flag.
+        ``months_with_data`` (YYYY-MM), ``has_transactions``, sorted distinct
+        ``bank_names`` (non-empty trimmed), and ``category_master`` (parent ->
+        list of ``{id, sub_category, is_global}``), same shape as
+        ``GET /categories/master/split`` merged view.
     """
     clauses: list[Any] = [Transaction.user_id == user_id]
 
@@ -415,9 +444,25 @@ def compute_transaction_date_scope(
     )
     months_with_data: list[str] = [row.month for row in db.execute(months_stmt).all()]
 
+    trimmed_bank = func.nullif(func.trim(Transaction.bank_name), "")
+    banks_stmt = (
+        select(trimmed_bank.label("bank_name"))
+        .where(*clauses)
+        .where(trimmed_bank.isnot(None))
+        .distinct()
+        .order_by(trimmed_bank)
+    )
+    bank_names: list[str] = [
+        str(row.bank_name) for row in db.execute(banks_stmt).all() if row.bank_name
+    ]
+
+    category_master = get_merged_grouped_master(db, user_id)
+
     return {
         "min_date": min_date.isoformat() if min_date else None,
         "max_date": max_date.isoformat() if max_date else None,
         "months_with_data": months_with_data,
         "has_transactions": min_date is not None,
+        "bank_names": bank_names,
+        "category_master": category_master,
     }

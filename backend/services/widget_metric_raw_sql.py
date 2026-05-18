@@ -176,7 +176,7 @@ def _append_dashboard_filters(
     bank_name: str | None,
     category: str | None,
     parent_category: str | None,
-    sub_category: str | None,
+    sub_categories: list[str] | None,
     transaction_type: str | None,
 ) -> tuple[str, dict[str, Any]]:
     """Append date/bank/category/direction predicates before trailing clauses."""
@@ -196,9 +196,17 @@ def _append_dashboard_filters(
     if parent_category is not None:
         fragments.append("transactions.parent_category = :_widget_pc")
         params["_widget_pc"] = parent_category
-    if sub_category is not None:
-        fragments.append("transactions.sub_category = :_widget_sc")
-        params["_widget_sc"] = sub_category
+    if sub_categories:
+        if len(sub_categories) == 1:
+            fragments.append("transactions.sub_category = :_widget_sc")
+            params["_widget_sc"] = sub_categories[0]
+        else:
+            parts = [f":_widget_sc{i}" for i in range(len(sub_categories))]
+            fragments.append(
+                f"transactions.sub_category IN ({', '.join(parts)})",
+            )
+            for i, sc in enumerate(sub_categories):
+                params[f"_widget_sc{i}"] = sc
     if transaction_type == "credit":
         fragments.append("transactions.credit > 0")
     elif transaction_type == "debit":
@@ -234,7 +242,7 @@ def build_raw_metric_sql_preview(
     bank_name: str | None = None,
     category: str | None = None,
     parent_category: str | None = None,
-    sub_category: str | None = None,
+    sub_categories: list[str] | None = None,
     transaction_type: str | None = None,
 ) -> str:
     """Build the final sandboxed SQL string without executing it.
@@ -247,7 +255,7 @@ def build_raw_metric_sql_preview(
         bank_name: Optional bank filter.
         category: Optional legacy category filter.
         parent_category: Optional parent category filter.
-        sub_category: Optional sub-category filter.
+        sub_categories: Optional sub-category filters (one value uses ``=``, many use ``IN``).
         transaction_type: Optional ``credit`` or ``debit`` direction filter.
 
     Returns:
@@ -263,7 +271,7 @@ def build_raw_metric_sql_preview(
         bank_name=bank_name,
         category=category,
         parent_category=parent_category,
-        sub_category=sub_category,
+        sub_categories=sub_categories,
         transaction_type=transaction_type,
     )
     return _format_sql_with_binds(augmented, bind)
@@ -279,7 +287,7 @@ def execute_raw_metric_sql(
     bank_name: str | None = None,
     category: str | None = None,
     parent_category: str | None = None,
-    sub_category: str | None = None,
+    sub_categories: list[str] | None = None,
     transaction_type: str | None = None,
 ) -> float:
     """Execute sandboxed metric SQL and return a single numeric scalar.
@@ -293,7 +301,7 @@ def execute_raw_metric_sql(
         bank_name: Optional bank filter.
         category: Optional legacy category filter.
         parent_category: Optional parent category filter.
-        sub_category: Optional sub-category filter.
+        sub_categories: Optional sub-category filters (one value uses ``=``, many use ``IN``).
         transaction_type: Optional ``credit`` or ``debit`` direction filter.
 
     Returns:
@@ -309,7 +317,7 @@ def execute_raw_metric_sql(
         bank_name=bank_name,
         category=category,
         parent_category=parent_category,
-        sub_category=sub_category,
+        sub_categories=sub_categories,
         transaction_type=transaction_type,
     )
     print(f"[widget_metric_sql] user_id={user_id}", flush=True)

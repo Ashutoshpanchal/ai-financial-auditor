@@ -73,9 +73,10 @@ function useWidgetData(widgetId: string, filters: FilterState) {
     if (filters.dateFrom) params.set("date_from", filters.dateFrom);
     if (filters.dateTo) params.set("date_to", filters.dateTo);
     if (filters.bankName) params.set("bank_name", filters.bankName);
-    if (filters.category) params.set("category", filters.category);
     if (filters.parentCategory) params.set("parent_category", filters.parentCategory);
-    if (filters.subCategory) params.set("sub_category", filters.subCategory);
+    for (const s of filters.subCategories) {
+      params.append("sub_category", s);
+    }
 
     fetch(`${API_BASE}/dashboard/widgets/${widgetId}/data?${params}`, {
       credentials: "include",
@@ -98,9 +99,8 @@ function useWidgetData(widgetId: string, filters: FilterState) {
     filters.dateFrom,
     filters.dateTo,
     filters.bankName,
-    filters.category,
     filters.parentCategory,
-    filters.subCategory,
+    filters.subCategories.join("\0"),
   ]);
 
   return { data, isLoading, error };
@@ -161,7 +161,7 @@ function WidgetCell({
       onDragOver={(e) => onDragOver(e, item.widget_id)}
       onDrop={() => onDrop(item.widget_id)}
       style={{
-        outline: isDragOver && isEditMode ? "2px dashed #6366f1" : undefined,
+        outline: isDragOver && isEditMode ? "2px dashed #6366f1" : undefined, // indigo accent for drag target
         borderRadius: isDragOver && isEditMode ? "16px" : undefined,
         opacity: isEditMode ? 0.95 : 1,
         cursor: isEditMode ? "grab" : "default",
@@ -171,7 +171,7 @@ function WidgetCell({
       {isEditMode && (
         <div className="absolute top-2 right-2 z-10 flex gap-1">
           <span
-            className="flex items-center justify-center w-7 h-7 bg-white/90 border border-gray-200 rounded-lg shadow-sm text-gray-400 cursor-grab select-none text-xs"
+            className="flex h-7 w-7 cursor-grab select-none items-center justify-center rounded-lg border border-gray-200 bg-white/90 text-xs text-gray-400 shadow-sm dark:border-gray-700 dark:bg-gray-800/95 dark:text-gray-300"
             title="Drag to reorder"
           >
             ⠿
@@ -179,7 +179,7 @@ function WidgetCell({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove(item.widget_id); }}
-            className="flex items-center justify-center w-7 h-7 bg-white/90 border border-red-200 rounded-lg shadow-sm text-red-400 hover:text-red-600 hover:bg-red-50 transition"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-red-200 bg-white/90 text-red-400 shadow-sm transition hover:bg-red-50 hover:text-red-600 dark:border-red-900 dark:bg-gray-800/95 dark:hover:bg-red-950"
             title="Remove from dashboard"
           >
             ✕
@@ -244,9 +244,11 @@ export function WidgetGrid({ widgets, grid, filters, isEditMode, onGridChange, o
 
   if (grid.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-        <p className="text-lg font-medium">No widgets on your dashboard.</p>
-        <p className="text-sm mt-1">Click "Edit" then "Add Widgets" to get started.</p>
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-500">
+        <p className="text-lg font-medium text-gray-600 dark:text-gray-300">No widgets on your dashboard.</p>
+        <p className="mt-1 text-sm text-center max-w-md">
+          Upload statements or ask an admin to configure default widgets in Widget Studio.
+        </p>
       </div>
     );
   }

@@ -32,7 +32,7 @@ def get_transaction_date_scope(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Return min/max transaction dates and months with data for date pickers."""
+    """Return min/max transaction dates, months with data, bank names, and category master."""
     set_rls_user(db, current_user.id)
 
     try:
@@ -71,6 +71,10 @@ def get_category_flow(
         "both",
         description="debit: spending rows only; credit: income rows only; both: all groups.",
     ),
+    bank_name: str = Query(
+        "",
+        description="Optional substring filter on transaction bank_name (ilike).",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -102,6 +106,7 @@ def get_category_flow(
             parent_category=parent_category,
             sub_categories=subs,
             mode=mode,
+            bank_name=bank_name,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -122,6 +127,10 @@ def get_category_flow_by_parent_metadata(
         ..., description="Inclusive start of transaction_date range."
     ),
     date_to: date = Query(..., description="Inclusive end of transaction_date range."),
+    bank_name: str = Query(
+        "",
+        description="Optional substring filter on transaction bank_name (ilike).",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -140,6 +149,7 @@ def get_category_flow_by_parent_metadata(
             user_id=current_user.id,
             date_from=date_from,
             date_to=date_to,
+            bank_name=bank_name,
         )
     except Exception as exc:
         logger.exception(
@@ -172,6 +182,10 @@ def get_category_flow_by_parent_paginated_endpoint(
         le=200,
         description="Max rows per page.",
     ),
+    bank_name: str = Query(
+        "",
+        description="Optional substring filter on transaction bank_name (ilike).",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -193,6 +207,7 @@ def get_category_flow_by_parent_paginated_endpoint(
             mode=mode,
             month_cursor=month_cursor,
             limit=limit,
+            bank_name=bank_name,
         )
     except Exception as exc:
         logger.exception(
@@ -216,6 +231,10 @@ def get_category_flow_by_parent(
         "both",
         description="debit: spending groups only; credit: income groups only; both: all groups.",
     ),
+    bank_name: str = Query(
+        "",
+        description="Optional substring filter on transaction bank_name (ilike).",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -235,6 +254,7 @@ def get_category_flow_by_parent(
             date_from=date_from,
             date_to=date_to,
             mode=mode,
+            bank_name=bank_name,
         )
     except Exception as exc:
         logger.exception(

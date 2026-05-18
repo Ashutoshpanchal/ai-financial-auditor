@@ -44,6 +44,8 @@ class TestTransactionDateScopeRouter:
             "max_date": "2026-04-01",
             "months_with_data": ["2024-01", "2026-04"],
             "has_transactions": True,
+            "bank_names": ["HDFC"],
+            "category_master": {},
         }
         with (
             patch("backend.routers.analytics.set_rls_user"),
@@ -111,8 +113,34 @@ class TestCategoryFlowRouter:
         assert kwargs["parent_category"] == "Food"
         assert kwargs["mode"] == "debit"
 
+    def test_category_flow_passes_bank_name(self) -> None:
+        """Optional bank_name query is forwarded to compute_category_flow."""
+        db = MagicMock()
+        payload = {
+            "rows": [],
+            "totals": {"debit": 0.0, "credit": 0.0, "txn_count": 0},
+            "truncated": False,
+        }
+        with (
+            patch("backend.routers.analytics.set_rls_user"),
+            patch(
+                "backend.routers.analytics.compute_category_flow",
+                return_value=payload,
+            ) as mock_cf,
+        ):
+            client = _client(db, _make_user())
+            r = client.get(
+                "/analytics/category-flow",
+                params={
+                    "date_from": "2024-01-01",
+                    "date_to": "2024-01-31",
+                    "parent_category": "Food",
+                    "bank_name": "HDFC",
+                },
+            )
+        assert r.status_code == 200
+        assert mock_cf.call_args.kwargs["bank_name"] == "HDFC"
 
-class TestCategoryFlowByParentRouter:
     def setup_method(self) -> None:
         _reset()
 
@@ -162,8 +190,32 @@ class TestCategoryFlowByParentRouter:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs["mode"] == "credit"
 
+    def test_by_parent_passes_bank_name(self) -> None:
+        db = MagicMock()
+        payload = {
+            "rows": [],
+            "totals": {"debit": 0.0, "credit": 0.0, "txn_count": 0},
+            "truncated": False,
+        }
+        with (
+            patch("backend.routers.analytics.set_rls_user"),
+            patch(
+                "backend.routers.analytics.compute_category_flow_by_parent_month",
+                return_value=payload,
+            ) as mock_fn,
+        ):
+            client = _client(db, _make_user())
+            r = client.get(
+                "/analytics/category-flow-by-parent",
+                params={
+                    "date_from": "2024-01-01",
+                    "date_to": "2024-01-31",
+                    "bank_name": "SBI",
+                },
+            )
+        assert r.status_code == 200
+        assert mock_fn.call_args.kwargs["bank_name"] == "SBI"
 
-class TestMetadataEndpoint:
     def setup_method(self) -> None:
         _reset()
 

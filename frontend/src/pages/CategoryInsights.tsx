@@ -3,7 +3,6 @@ import { DateRangePicker } from "../components/common/DateRangePicker";
 import { InsightsComparePanel } from "../components/insights/InsightsComparePanel";
 import { useTransactionDateScope } from "../hooks/useTransactionDateScope";
 import {
-  api,
   fetchCategoryFlow,
   fetchCategoryFlowByParent,
   fetchCategoryFlowByParentPaginated,
@@ -22,6 +21,7 @@ import {
   totalsFromRows,
 } from "../utils/insightsMerge";
 import { aggregateYearIntoRows } from "../utils/insightsYearAgg";
+import { capitalizeWords } from "../utils/capitalizeWords";
 
 const ALL_PC_VALUE = "__all_pc__";
 
@@ -36,26 +36,11 @@ function mapParentApiToDisplayRows(rows: CategoryFlowParentRow[]): CategoryFlowR
   }));
 }
 
-interface SubEntry {
-  id: string;
-  sub_category: string;
-}
-
-type MasterData = Record<string, SubEntry[]>;
-
-interface MasterSplit {
-  merged: MasterData;
-}
-
 function formatAmount(n: number): string {
   return n.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-}
-
-function capitalizeWords(str: string): string {
-  return str.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function formatMonthLabel(ym: string): string {
@@ -79,8 +64,13 @@ const SCROLL_TOP_THRESHOLD = 80;
 const PREPEND_MONTHS = 12;
 
 export default function CategoryInsights() {
-  const { scope: dateScope, defaultRange, loading: dateScopeLoading } =
-    useTransactionDateScope();
+  const {
+    scope: dateScope,
+    defaultRange,
+    loading: dateScopeLoading,
+    bankNames,
+    categoryMaster: master,
+  } = useTransactionDateScope();
   const datesInitialized = useRef(false);
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
@@ -89,7 +79,7 @@ export default function CategoryInsights() {
   const [parentCategory, setParentCategory] = useState(ALL_PC_VALUE);
   const [selectedSubs, setSelectedSubs] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<FlowMode>("both");
-  const [master, setMaster] = useState<MasterData>({});
+  const [bankFilter, setBankFilter] = useState("");
   const [tableRows, setTableRows] = useState<CategoryFlowRow[]>([]);
   const [flowMeta, setFlowMeta] = useState<{
     truncated: boolean;
@@ -121,21 +111,6 @@ export default function CategoryInsights() {
     }
   }, [dateScopeLoading, defaultRange, appliedFrom, appliedTo]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.get<MasterSplit>("/categories/master/split");
-        if (!cancelled) setMaster(res.data.merged ?? {});
-      } catch {
-        if (!cancelled) setError("Could not load category list.");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const parentOptions = useMemo(() => Object.keys(master).sort((a, b) => a.localeCompare(b)), [master]);
 
   const subOptions = useMemo(() => {
@@ -162,6 +137,7 @@ export default function CategoryInsights() {
           dateTo: appliedTo,
           mode,
           limit: 50,
+          bankName: bankFilter.trim() || undefined,
         });
         setTableRows(mapParentApiToDisplayRows(res.rows));
         setPaginationCursor(res.pagination.next_cursor);
@@ -175,6 +151,7 @@ export default function CategoryInsights() {
           parentCategory: parentCategory.trim(),
           subCategories: subs,
           mode,
+          bankName: bankFilter.trim() || undefined,
         });
         setTableRows(res.rows);
         setFlowMeta({ truncated: res.truncated, truncated_reason: res.truncated_reason });
@@ -192,7 +169,7 @@ export default function CategoryInsights() {
     } finally {
       setLoading(false);
     }
-  }, [appliedFrom, appliedTo, parentCategory, selectedSubs, mode]);
+  }, [appliedFrom, appliedTo, parentCategory, selectedSubs, mode, bankFilter]);
 
   useEffect(() => {
     void load();
@@ -210,6 +187,7 @@ export default function CategoryInsights() {
         mode,
         monthCursor: paginationCursor,
         limit: 50,
+        bankName: bankFilter.trim() || undefined,
       });
       setTableRows((prev) => [...prev, ...mapParentApiToDisplayRows(res.rows)]);
       setPaginationCursor(res.pagination.next_cursor);
@@ -221,7 +199,7 @@ export default function CategoryInsights() {
     } finally {
       setLoadingMore(false);
     }
-  }, [appliedFrom, appliedTo, mode, hasMore, loadingMore, parentCategory, paginationCursor]);
+  }, [appliedFrom, appliedTo, mode, hasMore, loadingMore, parentCategory, paginationCursor, bankFilter]);
 
   // Set up infinite scroll listener
   useEffect(() => {
@@ -383,6 +361,7 @@ export default function CategoryInsights() {
           dateFrom: chunkFrom,
           dateTo: chunkEnd,
           mode,
+          bankName: bankFilter.trim() || undefined,
         });
         setTableRows((prev) => mergeCategoryFlowRows(prev, mapParentApiToDisplayRows(res.rows)));
         setFlowMeta((m) => ({
@@ -397,6 +376,7 @@ export default function CategoryInsights() {
           parentCategory: parentCategory.trim(),
           subCategories: subs,
           mode,
+          bankName: bankFilter.trim() || undefined,
         });
         setTableRows((prev) => mergeCategoryFlowRows(prev, res.rows));
         setFlowMeta((m) => ({
@@ -409,7 +389,7 @@ export default function CategoryInsights() {
     } finally {
       setLoadingOlder(false);
     }
-  }, [parentCategory, loadingOlder, loading, tableRows, appliedFrom, selectedSubs, mode]);
+  }, [parentCategory, loadingOlder, loading, tableRows, appliedFrom, selectedSubs, mode, bankFilter]);
 
   const onMainScroll = useCallback(() => {
     const el = mainScrollRef.current;
@@ -482,20 +462,41 @@ export default function CategoryInsights() {
   }
 
   return (
-    <div className="flex max-h-[calc(100vh-4rem)] min-h-[calc(100vh-4rem)] w-full flex-col bg-gray-50">
-      <header className="shrink-0 border-b border-gray-200 bg-white px-3 py-3 shadow-sm sm:px-5 lg:px-8">
+    <div className="flex max-h-[calc(100vh-4rem)] min-h-[calc(100vh-4rem)] w-full flex-col bg-gray-50 dark:bg-gray-950">
+      <header className="shrink-0 border-b border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:px-5 lg:px-8">
         <div className="flex flex-wrap items-end gap-3 lg:gap-4">
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
-            <DateRangePicker
-              label="Date range"
-              value={{ from: draftFrom, to: draftTo }}
-              onChange={(range) => {
-                setDraftFrom(range.from);
-                setDraftTo(range.to);
-              }}
-              scope={dateScope}
-              loading={dateScopeLoading}
-            />
+        <DateRangePicker
+          label="Date range"
+          value={{ from: draftFrom, to: draftTo }}
+          onChange={(range) => {
+            setDraftFrom(range.from);
+            setDraftTo(range.to);
+          }}
+          scope={dateScope}
+          loading={dateScopeLoading}
+          applyMode="live"
+        />
+            {bankNames.length > 0 ? (
+              <div className="col-span-2 flex min-w-0 flex-col gap-0.5 sm:col-span-1 sm:min-w-[8rem] sm:max-w-xs">
+                <label htmlFor="ci-bank-filter" className="text-xs font-medium text-gray-500">
+                  Bank
+                </label>
+                <select
+                  id="ci-bank-filter"
+                  value={bankFilter}
+                  onChange={(e) => setBankFilter(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-sm"
+                >
+                  <option value="">All banks</option>
+                  {bankNames.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="col-span-2 flex min-w-0 flex-col gap-0.5 sm:col-span-1 sm:min-w-[10rem] sm:max-w-xs">
               <label htmlFor="ci-pc-top" className="text-xs font-medium text-gray-500">
                 View

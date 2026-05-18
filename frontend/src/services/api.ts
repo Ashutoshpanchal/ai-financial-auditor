@@ -99,11 +99,21 @@ export interface CategoryFlowResponse {
   truncated_reason?: string;
 }
 
+export interface CategoryMasterSubEntry {
+  id: string;
+  sub_category: string;
+  is_global?: boolean;
+}
+
 export interface TransactionDateScope {
   min_date: string | null;
   max_date: string | null;
   months_with_data: string[];
   has_transactions: boolean;
+  /** Distinct non-empty bank_name values from transactions (sorted). */
+  bank_names?: string[];
+  /** Merged category master (same shape as GET /categories/master/split merged). */
+  category_master?: Record<string, CategoryMasterSubEntry[]>;
 }
 
 export async function fetchTransactionDateScope(): Promise<TransactionDateScope> {
@@ -117,6 +127,7 @@ export async function fetchCategoryFlow(params: {
   parentCategory: string;
   subCategories?: string[];
   mode: FlowMode;
+  bankName?: string;
 }): Promise<CategoryFlowResponse> {
   const q = new URLSearchParams();
   q.set("date_from", params.dateFrom);
@@ -127,6 +138,9 @@ export async function fetchCategoryFlow(params: {
     for (const s of params.subCategories) {
       q.append("sub_category", s);
     }
+  }
+  if (params.bankName?.trim()) {
+    q.set("bank_name", params.bankName.trim());
   }
   const res = await api.get<CategoryFlowResponse>(`/analytics/category-flow?${q.toString()}`);
   return res.data;
@@ -171,11 +185,15 @@ export async function fetchCategoryFlowByParent(params: {
   dateFrom: string;
   dateTo: string;
   mode: FlowMode;
+  bankName?: string;
 }): Promise<CategoryFlowByParentResponse> {
   const q = new URLSearchParams();
   q.set("date_from", params.dateFrom);
   q.set("date_to", params.dateTo);
   q.set("mode", params.mode);
+  if (params.bankName?.trim()) {
+    q.set("bank_name", params.bankName.trim());
+  }
   const res = await api.get<CategoryFlowByParentResponse>(
     `/analytics/category-flow-by-parent?${q.toString()}`,
   );
@@ -185,10 +203,14 @@ export async function fetchCategoryFlowByParent(params: {
 export async function fetchCategoryFlowMetadata(params: {
   dateFrom: string;
   dateTo: string;
+  bankName?: string;
 }): Promise<CategoryFlowMetadata> {
   const q = new URLSearchParams();
   q.set("date_from", params.dateFrom);
   q.set("date_to", params.dateTo);
+  if (params.bankName?.trim()) {
+    q.set("bank_name", params.bankName.trim());
+  }
   const res = await api.get<CategoryFlowMetadata>(
     `/analytics/category-flow-by-parent/metadata?${q.toString()}`,
   );
@@ -201,11 +223,15 @@ export async function fetchCategoryFlowByParentPaginated(params: {
   mode: FlowMode;
   monthCursor?: string | null;
   limit?: number;
+  bankName?: string;
 }): Promise<CategoryFlowByParentPaginatedResponse> {
   const q = new URLSearchParams();
   q.set("date_from", params.dateFrom);
   q.set("date_to", params.dateTo);
   q.set("mode", params.mode);
+  if (params.bankName?.trim()) {
+    q.set("bank_name", params.bankName.trim());
+  }
   if (params.limit !== undefined) {
     q.set("limit", params.limit.toString());
   }

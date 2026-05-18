@@ -17,18 +17,41 @@ describe("DateRangePicker", () => {
         value={{ from: "2026-04-01", to: "2026-04-30" }}
         onChange={vi.fn()}
         scope={SCOPE}
+        applyMode="confirm"
       />,
     );
     expect(screen.getByText("Last month")).toBeInTheDocument();
   });
 
-  it("calls onChange when a preset is selected", () => {
+  it("confirm mode: preset updates draft; Apply commits to parent", () => {
     const onChange = vi.fn();
     render(
       <DateRangePicker
         value={{ from: "", to: "" }}
         onChange={onChange}
         scope={SCOPE}
+        applyMode="confirm"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Date range" }));
+    fireEvent.click(screen.getByRole("button", { name: "This year" }));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const [range, preset] = onChange.mock.calls[0]!;
+    expect(preset).toBe("this_year");
+    expect(range.from).toBe("2026-01-01");
+    expect(range.to).toBe("2026-12-31");
+  });
+
+  it("live mode: preset commits immediately", () => {
+    const onChange = vi.fn();
+    render(
+      <DateRangePicker
+        value={{ from: "", to: "" }}
+        onChange={onChange}
+        scope={SCOPE}
+        applyMode="live"
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Date range" }));

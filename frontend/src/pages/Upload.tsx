@@ -1199,11 +1199,11 @@ export default function Upload() {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   return (
-    <div className="flex flex-col h-screen" data-upload-container>
+    <div className="flex h-screen flex-col dark:bg-gray-950" data-upload-container>
       {/* Header — shared across both panes */}
-      <div className="px-4 sm:px-6 lg:px-8 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+      <div className="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-gray-900">Uploads</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Uploads</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={handleRefreshAll}
@@ -1225,7 +1225,7 @@ export default function Upload() {
       {/* Split-pane grid */}
       <div className="flex-1 grid" style={{ gridTemplateColumns: `${leftPaneWidth}px 4px 1fr`, gap: 0 }}>
         {/* LEFT PANE: Documents */}
-        <div className="overflow-y-auto border-r border-gray-200 bg-white">
+        <div className="overflow-y-auto border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="px-4 sm:px-6 py-8 space-y-8">
             {/* ═══════════════════════════════════════════════════════════════════════
                 DOCUMENTS SECTION
@@ -1322,7 +1322,7 @@ export default function Upload() {
         />
 
         {/* RIGHT PANE: Transactions */}
-        <div className="overflow-y-auto bg-white">
+        <div className="overflow-y-auto bg-white dark:bg-gray-900">
           <div className="px-4 sm:px-6 py-8 space-y-8">
             {/* ═══════════════════════════════════════════════════════════════════════
                 TRANSACTIONS SECTION
@@ -1376,6 +1376,7 @@ export default function Upload() {
                   }}
                   scope={dateScope}
                   loading={dateScopeLoading}
+                  applyMode="live"
                 />
               </div>
               <div>

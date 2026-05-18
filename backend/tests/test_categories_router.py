@@ -11,15 +11,15 @@ from fastapi.testclient import TestClient
 
 from backend.routers.categories import (
     PAYMENT_METHODS,
-    _build_category_hierarchy,
     _build_llm,
     _hierarchy_to_text,
     _parse_llm_json,
     router as categories_router,
 )
+from backend.services.category_master_service import build_category_hierarchy
 
 # ---------------------------------------------------------------------------
-# Helper: _build_category_hierarchy
+# Helper: build_category_hierarchy
 # ---------------------------------------------------------------------------
 
 
@@ -36,7 +36,7 @@ class TestBuildCategoryHierarchy:
     def test_single_parent_single_sub(self) -> None:
         """A single row should produce a single-key dict with one sub-category."""
         rows = [self._make_row("Food & Dining", "Swiggy")]
-        result = _build_category_hierarchy(rows)
+        result = build_category_hierarchy(rows)
         assert result == {"Food & Dining": ["Swiggy"]}
 
     def test_single_parent_multiple_subs(self) -> None:
@@ -46,7 +46,7 @@ class TestBuildCategoryHierarchy:
             self._make_row("Food & Dining", "Zomato"),
             self._make_row("Food & Dining", "Blinkit"),
         ]
-        result = _build_category_hierarchy(rows)
+        result = build_category_hierarchy(rows)
         assert result == {"Food & Dining": ["Swiggy", "Zomato", "Blinkit"]}
 
     def test_multiple_parents(self) -> None:
@@ -56,14 +56,14 @@ class TestBuildCategoryHierarchy:
             self._make_row("Transport", "Uber"),
             self._make_row("Entertainment", "Netflix"),
         ]
-        result = _build_category_hierarchy(rows)
+        result = build_category_hierarchy(rows)
         assert result["Food & Dining"] == ["Swiggy"]
         assert result["Transport"] == ["Uber"]
         assert result["Entertainment"] == ["Netflix"]
 
     def test_empty_rows_returns_empty_dict(self) -> None:
         """Empty input should return an empty dict."""
-        assert _build_category_hierarchy([]) == {}
+        assert build_category_hierarchy([]) == {}
 
     def test_preserves_insertion_order(self) -> None:
         """Sub-categories should appear in the order they were inserted."""
@@ -72,7 +72,7 @@ class TestBuildCategoryHierarchy:
             self._make_row("Shopping", "Flipkart"),
             self._make_row("Shopping", "Myntra"),
         ]
-        result = _build_category_hierarchy(rows)
+        result = build_category_hierarchy(rows)
         assert result["Shopping"] == ["Amazon", "Flipkart", "Myntra"]
 
 

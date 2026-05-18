@@ -830,12 +830,14 @@ class TestGetWidgetData:
             client = _client_with_overrides(db, user)
             client.get(
                 f"/dashboard/widgets/{WIDGET_ID}/data",
-                params={
-                    "date_from": "2024-01-01",
-                    "date_to": "2024-06-30",
-                    "bank_name": "Chase",
-                    "category": "Groceries",
-                },
+                params=[
+                    ("date_from", "2024-01-01"),
+                    ("date_to", "2024-06-30"),
+                    ("bank_name", "Chase"),
+                    ("category", "Groceries"),
+                    ("sub_category", "Dining"),
+                    ("sub_category", "Coffee"),
+                ],
             )
 
         from datetime import date
@@ -844,6 +846,7 @@ class TestGetWidgetData:
         assert captured_kwargs.get("category") == "Groceries"
         assert captured_kwargs.get("date_from") == date(2024, 1, 1)
         assert captured_kwargs.get("date_to") == date(2024, 6, 30)
+        assert captured_kwargs.get("sub_categories") == ["Dining", "Coffee"]
 
 
 # ---------------------------------------------------------------------------

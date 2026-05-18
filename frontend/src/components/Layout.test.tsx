@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Layout } from "./Layout";
+import { ThemeProvider } from "../contexts/ThemeContext";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -58,9 +59,10 @@ function renderLayout(
   });
 
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <Routes>
-        <Route element={<Layout />}>
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route element={<Layout />}>
           <Route
             path="/dashboard"
             element={<div data-testid="outlet-child">Dashboard page</div>}
@@ -85,9 +87,10 @@ function renderLayout(
             path="/admin"
             element={<div data-testid="outlet-child">Admin page</div>}
           />
-        </Route>
-      </Routes>
-    </MemoryRouter>
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
@@ -151,8 +154,8 @@ describe("Layout — NavLink active-state highlighting", () => {
   it("applies active classes to the Dashboard link when path is /dashboard", () => {
     renderLayout({}, "/dashboard");
     const link = screen.getByRole("link", { name: "Dashboard" });
-    expect(link.className).toContain("bg-indigo-50");
-    expect(link.className).toContain("text-indigo-600");
+    expect(link.className).toContain("bg-gray-100");
+    expect(link.className).toContain("text-gray-900");
     expect(link.className).toContain("font-semibold");
   });
 
@@ -165,30 +168,30 @@ describe("Layout — NavLink active-state highlighting", () => {
   it("applies active classes to the Upload link when path is /upload", () => {
     renderLayout({}, "/upload");
     const link = screen.getByRole("link", { name: "Upload" });
-    expect(link.className).toContain("bg-indigo-50");
-    expect(link.className).toContain("text-indigo-600");
+    expect(link.className).toContain("bg-gray-100");
+    expect(link.className).toContain("text-gray-900");
     expect(link.className).toContain("font-semibold");
   });
 
   it("applies active classes to the Categories link when path is /categories", () => {
     renderLayout({}, "/categories");
     const link = screen.getByRole("link", { name: "Categories" });
-    expect(link.className).toContain("bg-indigo-50");
-    expect(link.className).toContain("text-indigo-600");
+    expect(link.className).toContain("bg-gray-100");
+    expect(link.className).toContain("text-gray-900");
   });
 
   it("applies active classes to the Widget Studio link when path is /widget-studio", () => {
     renderLayout({}, "/widget-studio");
     const link = screen.getByRole("link", { name: "Widget Studio" });
-    expect(link.className).toContain("bg-indigo-50");
-    expect(link.className).toContain("text-indigo-600");
+    expect(link.className).toContain("bg-gray-100");
+    expect(link.className).toContain("text-gray-900");
   });
 
   it("applies active classes to the Admin link when path is /admin (admin user)", () => {
     renderLayout({ role: "admin" }, "/admin");
     const link = screen.getByRole("link", { name: "Admin" });
-    expect(link.className).toContain("bg-indigo-50");
-    expect(link.className).toContain("text-indigo-600");
+    expect(link.className).toContain("bg-gray-100");
+    expect(link.className).toContain("text-gray-900");
   });
 });
 
@@ -229,6 +232,28 @@ describe("Layout — logout button", () => {
     renderLayout();
     fireEvent.click(screen.getByRole("button", { name: "Logout" }));
     expect(mockLogout).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Tests: Theme toggle ───────────────────────────────────────────────────────
+
+describe("Layout — theme toggle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    document.documentElement.classList.remove("dark");
+  });
+
+  it("renders the theme toggle button", () => {
+    renderLayout();
+    expect(screen.getByRole("button", { name: "Switch to dark mode" })).toBeInTheDocument();
+  });
+
+  it("toggles dark mode when clicked", () => {
+    renderLayout();
+    fireEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }));
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(screen.getByRole("button", { name: "Switch to light mode" })).toBeInTheDocument();
   });
 });
 

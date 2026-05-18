@@ -40,6 +40,8 @@ vi.mock("../hooks/useTransactionDateScope", () => ({
       months_with_data: ["2024-01"],
       has_transactions: true,
     },
+    bankNames: [],
+    categoryMaster: {},
     defaultRange: null,
     loading: false,
     error: null,
@@ -307,7 +309,6 @@ describe("Upload page — transaction dropdown filters", () => {
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Date range" }));
-    fireEvent.click(screen.getByRole("button", { name: "Custom range" }));
     const fromInput = screen.getByLabelText("From");
     const toInput = screen.getByLabelText("To");
     fireEvent.change(fromInput, { target: { value: "2024-01-01" } });

@@ -148,9 +148,8 @@ export default function WidgetStudio() {
     dateFrom: "",
     dateTo: "",
     bankName: "",
-    category: "",
     parentCategory: "",
-    subCategory: "",
+    subCategories: [],
   });
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -168,7 +167,7 @@ export default function WidgetStudio() {
 
   const previewAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { scope: dateScope, defaultRange, loading: dateScopeLoading } =
+  const { scope: dateScope, defaultRange, loading: dateScopeLoading, bankNames } =
     useTransactionDateScope();
   const datesInitialized = useRef(false);
 
@@ -198,9 +197,10 @@ export default function WidgetStudio() {
       date_from: filters.dateFrom || "",
       date_to: filters.dateTo || "",
       bank_name: filters.bankName || "",
-      category: filters.category || "",
       parent_category: filters.parentCategory || "",
-      sub_category: filters.subCategory || "",
+      sub_categories: filters.subCategories.length
+        ? [...filters.subCategories].sort().join("|")
+        : "",
     }),
     [filters],
   );
@@ -321,9 +321,8 @@ export default function WidgetStudio() {
         if (filters.dateFrom) body.date_from = filters.dateFrom;
         if (filters.dateTo) body.date_to = filters.dateTo;
         if (filters.bankName) body.bank_name = filters.bankName;
-        if (filters.category) body.category = filters.category;
         if (filters.parentCategory) body.parent_category = filters.parentCategory;
-        if (filters.subCategory) body.sub_category = filters.subCategory;
+        if (filters.subCategories.length) body.sub_categories = filters.subCategories;
 
         const res = await api.post<PreviewResponse>("/dashboard/widgets/preview", body, { signal });
         setPreview(res.data);
@@ -571,6 +570,7 @@ export default function WidgetStudio() {
             <FilterBar
               filters={filters}
               onChange={setFilters}
+              bankOptions={bankNames}
               parentCategoryOptions={parentOptions}
               subCategoryOptions={subOptions}
               dateScope={dateScope}

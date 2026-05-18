@@ -1,5 +1,13 @@
 /** Preset keys for the shared date-range picker. */
+import type { TransactionDateScope } from "../services/api";
+
+export type { TransactionDateScope } from "../services/api";
+
 export type DateRangePreset =
+  | "today"
+  | "yesterday"
+  | "last_7_days"
+  | "last_30_days"
   | "this_week"
   | "last_week"
   | "this_month"
@@ -9,18 +17,30 @@ export type DateRangePreset =
   | "this_year"
   | "last_year";
 
-export const DATE_RANGE_PRESETS: DateRangePreset[] = [
-  "this_week",
-  "last_week",
+/** Order shown in the picker left rail (quick options first, then weeks/quarters/years). */
+export const PICKER_PRESET_ORDER: DateRangePreset[] = [
+  "today",
+  "yesterday",
+  "last_7_days",
+  "last_30_days",
   "this_month",
   "last_month",
+  "this_week",
+  "last_week",
   "this_quarter",
   "last_quarter",
   "this_year",
   "last_year",
 ];
 
+/** @deprecated Use PICKER_PRESET_ORDER — kept for tests that iterate “standard” periods only. */
+export const DATE_RANGE_PRESETS: DateRangePreset[] = PICKER_PRESET_ORDER;
+
 export const PRESET_LABELS: Record<DateRangePreset, string> = {
+  today: "Today",
+  yesterday: "Yesterday",
+  last_7_days: "Last 7 days",
+  last_30_days: "Last 30 days",
   this_week: "This week",
   last_week: "Last week",
   this_month: "This month",
@@ -30,13 +50,6 @@ export const PRESET_LABELS: Record<DateRangePreset, string> = {
   this_year: "This year",
   last_year: "Last year",
 };
-
-export interface TransactionDateScope {
-  min_date: string | null;
-  max_date: string | null;
-  months_with_data: string[];
-  has_transactions: boolean;
-}
 
 export interface DateRangeValue {
   from: string;
@@ -90,6 +103,28 @@ export function getPresetRange(preset: DateRangePreset, today: Date = new Date()
   const m = today.getMonth();
 
   switch (preset) {
+    case "today": {
+      const iso = toIsoDate(today);
+      return { from: iso, to: iso };
+    }
+    case "yesterday": {
+      const d = new Date(today);
+      d.setDate(d.getDate() - 1);
+      const iso = toIsoDate(d);
+      return { from: iso, to: iso };
+    }
+    case "last_7_days": {
+      const to = new Date(today);
+      const from = new Date(today);
+      from.setDate(from.getDate() - 6);
+      return { from: toIsoDate(from), to: toIsoDate(to) };
+    }
+    case "last_30_days": {
+      const to = new Date(today);
+      const from = new Date(today);
+      from.setDate(from.getDate() - 29);
+      return { from: toIsoDate(from), to: toIsoDate(to) };
+    }
     case "this_week": {
       const from = startOfIsoWeek(today);
       const to = endOfIsoWeek(today);
@@ -141,11 +176,20 @@ export function clampRangeToScope(
   to: string,
   scope: TransactionDateScope | null,
 ): DateRangeValue {
-  if (!scope?.min_date || !scope?.max_date) {
-    return { from, to };
+  const a = from.trim();
+  const b = to.trim();
+  if (!a && !b) {
+    return { from: "", to: "" };
   }
-  const f = from < scope.min_date ? scope.min_date : from;
-  const t = to > scope.max_date ? scope.max_date : to;
+  let effFrom = a;
+  let effTo = b;
+  if (!effFrom) effFrom = effTo;
+  if (!effTo) effTo = effFrom;
+  if (!scope?.min_date || !scope?.max_date) {
+    return { from: effFrom, to: effTo };
+  }
+  const f = effFrom < scope.min_date ? scope.min_date : effFrom;
+  const t = effTo > scope.max_date ? scope.max_date : effTo;
   if (f > t) {
     return { from: scope.min_date, to: scope.max_date };
   }
@@ -196,7 +240,7 @@ export function detectPreset(
   scope: TransactionDateScope | null,
   today: Date = new Date(),
 ): DateRangePreset | null {
-  for (const preset of DATE_RANGE_PRESETS) {
+  for (const preset of PICKER_PRESET_ORDER) {
     const applied = applyPreset(preset, scope, today);
     if (applied && applied.from === from && applied.to === to) {
       return preset;
@@ -216,6 +260,9 @@ export function formatDateRangeLabel(
   }
   if (!from && !to) {
     return "Select dates";
+  }
+  if (from && to) {
+    return `${from} ~ ${to}`;
   }
   const fmt = (iso: string) => {
     const [y, mo, d] = iso.split("-").map(Number);

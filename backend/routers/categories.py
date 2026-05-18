@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from langchain_openai import ChatOpenAI
-from sqlalchemy import delete, func, or_, select, text, update
+from sqlalchemy import delete, func, select, text, update
 
 from backend.config import Settings, get_settings
 from backend.database import get_db, set_rls_user
@@ -25,6 +25,12 @@ from backend.models.document import Document
 from backend.models.transaction import Transaction
 from backend.prompts.category_prompt import category_prompt
 from backend.services.auto_categorize import auto_categorize_transactions
+from backend.services.category_master_service import (
+    build_category_hierarchy,
+    dedupe_master_rows_for_user,
+    fetch_raw_master_rows,
+    grouped_master_response,
+)
 from backend.services.category_rules_apply import apply_category_rules_to_transactions
 from backend.services.short_description import compute_short_description
 
@@ -60,14 +66,6 @@ PAYMENT_METHODS = [
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
-
-
-def _build_category_hierarchy(rows: list[CategoryMaster]) -> dict[str, list[str]]:
-    """Build a {parent_category: [sub_category, ...]} dict from ORM rows."""
-    hierarchy: dict[str, list[str]] = {}
-    for row in rows:
-        hierarchy.setdefault(row.parent_category, []).append(row.sub_category)
-    return hierarchy
 
 
 def _hierarchy_to_text(hierarchy: dict[str, list[str]]) -> str:
@@ -126,47 +124,6 @@ def _truncate_for_llm_log(text: str, max_chars: int = _LLM_LOG_PREVIEW_CHARS) ->
     if len(text) <= max_chars:
         return text
     return f"{text[:max_chars]}...<truncated {len(text) - max_chars} more chars>"
-
-
-def _fetch_raw_master_rows(db: Session, user_id: str) -> list[CategoryMaster]:
-    """Return global seed rows plus the given user's category_master rows."""
-    return list(
-        db.execute(
-            select(CategoryMaster).where(
-                or_(CategoryMaster.user_id.is_(None), CategoryMaster.user_id == user_id)
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-
-def _dedupe_master_rows_for_user(
-    rows: list[CategoryMaster], user_id: str
-) -> list[CategoryMaster]:
-    """For each (parent_category, sub_category), prefer the user's row over the global seed."""
-    by_key: dict[tuple[str, str], CategoryMaster] = {}
-    for row in rows:
-        if row.user_id is not None and row.user_id != user_id:
-            continue
-        key = (row.parent_category, row.sub_category)
-        if row.user_id == user_id or key not in by_key:
-            by_key[key] = row
-    return list(by_key.values())
-
-
-def _grouped_master_response(rows: list[CategoryMaster]) -> dict[str, list[dict]]:
-    """Shape API JSON: parent -> [{id, sub_category, is_global}, ...]."""
-    grouped: dict[str, list[dict]] = {}
-    for row in rows:
-        grouped.setdefault(row.parent_category, []).append(
-            {
-                "id": row.id,
-                "sub_category": row.sub_category,
-                "is_global": row.user_id is None,
-            }
-        )
-    return grouped
 
 
 def _normalize_payment(value: object) -> str | None:
@@ -259,9 +216,9 @@ def list_category_master(
     For duplicate (parent, sub), the user's row wins. Each sub entry includes
     ``is_global`` so the UI can hide delete on seed rows.
     """
-    raw = _fetch_raw_master_rows(db, current_user.id)
-    deduped = _dedupe_master_rows_for_user(raw, current_user.id)
-    return _grouped_master_response(deduped)
+    raw = fetch_raw_master_rows(db, current_user.id)
+    deduped = dedupe_master_rows_for_user(raw, current_user.id)
+    return grouped_master_response(deduped)
 
 
 @router.get("/master/split")
@@ -275,14 +232,14 @@ def list_category_master_split(
     * ``user_defined`` — only the current user's ``category_master`` rows.
     * ``merged`` — same shape as ``GET /categories/master`` (user wins on duplicate pairs).
     """
-    raw = _fetch_raw_master_rows(db, current_user.id)
-    deduped = _dedupe_master_rows_for_user(raw, current_user.id)
+    raw = fetch_raw_master_rows(db, current_user.id)
+    deduped = dedupe_master_rows_for_user(raw, current_user.id)
     builtin_only = [r for r in raw if r.user_id is None]
     user_only = [r for r in raw if r.user_id == current_user.id]
     return {
-        "merged": _grouped_master_response(deduped),
-        "builtin": _grouped_master_response(builtin_only),
-        "user_defined": _grouped_master_response(user_only),
+        "merged": grouped_master_response(deduped),
+        "builtin": grouped_master_response(builtin_only),
+        "user_defined": grouped_master_response(user_only),
     }
 
 
@@ -1001,12 +958,12 @@ async def analyze_and_categorize(
             "mapped": 0,
             "transactions_updated": 0,
         }
-    raw_master = _fetch_raw_master_rows(db, current_user.id)
-    deduped = _dedupe_master_rows_for_user(raw_master, current_user.id)
+    raw_master = fetch_raw_master_rows(db, current_user.id)
+    deduped = dedupe_master_rows_for_user(raw_master, current_user.id)
     allowed: set[tuple[str, str]] = {
         (r.parent_category, r.sub_category) for r in deduped
     }
-    hierarchy = _build_category_hierarchy(list(deduped))
+    hierarchy = build_category_hierarchy(list(deduped))
     category_hierarchy_text = _hierarchy_to_text(hierarchy)
     logger.debug(
         "AI Sync: loaded category_master pairs=%s (%.2fs)",

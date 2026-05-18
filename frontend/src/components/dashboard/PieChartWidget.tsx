@@ -6,8 +6,7 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { useChartTheme } from "../../utils/chartTheme";
 
 interface ChartRow {
   label: string;
@@ -21,29 +20,23 @@ interface PieChartWidgetProps {
   error?: string | null;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 const COLORS = [
-  "#6366f1", // indigo-500
-  "#10b981", // emerald-500
-  "#f59e0b", // amber-500
-  "#ef4444", // red-500
-  "#3b82f6", // blue-500
-  "#8b5cf6", // violet-500
-  "#ec4899", // pink-500
+  "#6366f1",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
 ];
-
-// ─── Loading placeholder ──────────────────────────────────────────────────────
 
 function LoadingPlaceholder() {
   return (
     <div className="flex items-center justify-center" style={{ height: 280 }}>
-      <div className="w-40 h-40 rounded-full bg-gray-200 animate-pulse" />
+      <div className="h-40 w-40 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700" />
     </div>
   );
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function PieChartWidget({
   title,
@@ -51,19 +44,21 @@ export function PieChartWidget({
   isLoading = false,
   error = null,
 }: PieChartWidgetProps) {
+  const chartTheme = useChartTheme();
+
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm">
-      <h2 className="text-base font-semibold text-gray-800 mb-4">{title}</h2>
+    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
 
       {isLoading ? (
         <LoadingPlaceholder />
       ) : error ? (
         <div className="flex items-center justify-center" style={{ height: 280 }}>
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       ) : data.length === 0 ? (
         <div className="flex items-center justify-center" style={{ height: 280 }}>
-          <p className="text-sm text-gray-400">No data available</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">No data available</p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={280}>
@@ -77,28 +72,23 @@ export function PieChartWidget({
               outerRadius={100}
             >
               {data.map((_entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={COLORS[index % COLORS.length]}
-                />
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => [
-                value.toLocaleString("en-IN"),
-                "Amount",
-              ]}
+              formatter={(value: number) => [value.toLocaleString("en-IN"), "Amount"]}
               contentStyle={{
                 borderRadius: 8,
-                border: "none",
-                boxShadow: "0 4px 16px rgba(0,0,0,.08)",
+                border: `1px solid ${chartTheme.tooltipBorder}`,
+                backgroundColor: chartTheme.tooltipBg,
+                color: chartTheme.tooltipText,
               }}
             />
             <Legend
               iconType="circle"
               iconSize={8}
               formatter={(val: string) => (
-                <span style={{ fontSize: 12, color: "#6b7280" }}>{val}</span>
+                <span style={{ fontSize: 12, color: chartTheme.tick }}>{val}</span>
               )}
             />
           </PieChart>
