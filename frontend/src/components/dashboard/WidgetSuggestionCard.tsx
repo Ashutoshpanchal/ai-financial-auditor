@@ -1,6 +1,6 @@
 interface WidgetSuggestion {
   title: string;
-  widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
+  widget_type: "metric" | "spend_receive_pair" | "bar_chart" | "pie_chart" | "line_chart";
   query_config: Record<string, unknown>;
 }
 
@@ -12,6 +12,7 @@ interface WidgetSuggestionCardProps {
 
 const WIDGET_TYPE_LABELS: Record<WidgetSuggestion["widget_type"], string> = {
   metric: "Metric",
+  spend_receive_pair: "Spend / Received",
   bar_chart: "Bar Chart",
   pie_chart: "Pie Chart",
   line_chart: "Line Chart",
@@ -19,6 +20,7 @@ const WIDGET_TYPE_LABELS: Record<WidgetSuggestion["widget_type"], string> = {
 
 const WIDGET_TYPE_BADGE_COLORS: Record<WidgetSuggestion["widget_type"], string> = {
   metric: "bg-emerald-100 text-emerald-700",
+  spend_receive_pair: "bg-teal-100 text-teal-700",
   bar_chart: "bg-blue-100 text-blue-700",
   pie_chart: "bg-purple-100 text-purple-700",
   line_chart: "bg-amber-100 text-amber-700",
@@ -30,6 +32,9 @@ const WIDGET_TYPE_BADGE_COLORS: Record<WidgetSuggestion["widget_type"], string> 
  */
 function buildDescription(suggestion: WidgetSuggestion): string {
   const { query_config } = suggestion;
+  if (suggestion.widget_type === "spend_receive_pair") {
+    return "Shows total spend and total received for the selected period.";
+  }
   const agg = String(query_config.aggregation ?? "sum").toLowerCase();
   const field = String(query_config.field ?? "amount").replace(/_/g, " ");
   const groupByRaw = query_config.group_by;

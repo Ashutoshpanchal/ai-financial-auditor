@@ -91,7 +91,7 @@ _WIDGET_REQUIRED_KEYS: frozenset[str] = frozenset(
 
 # Allowed values for widget_type.
 _VALID_WIDGET_TYPES: frozenset[str] = frozenset(
-    {"metric", "bar_chart", "pie_chart", "line_chart"}
+    {"metric", "spend_receive_pair", "bar_chart", "pie_chart", "line_chart"}
 )
 
 

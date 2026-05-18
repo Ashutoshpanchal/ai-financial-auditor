@@ -15,6 +15,7 @@ from backend.config import get_settings
 from backend.database import get_db, set_rls_user
 from backend.middleware.auth import get_current_user
 from backend.models.dashboard import UserDashboard
+from backend.models.user import UserRole
 from backend.models.widget import UserWidget
 from backend.services.preview_rate_limit import (
     WidgetPreviewRateLimited,
@@ -22,6 +23,7 @@ from backend.services.preview_rate_limit import (
 )
 from backend.services.widget_query import (
     describe_widget_query_human,
+    describe_widget_query_real,
     resolve_widget_data,
     validate_widget_query_config,
 )
@@ -36,7 +38,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 _ALLOWED_WIDGET_TYPES: frozenset[str] = frozenset(
-    {"metric", "bar_chart", "pie_chart", "line_chart"}
+    {"metric", "spend_receive_pair", "bar_chart", "pie_chart", "line_chart"}
 )
 
 
@@ -188,7 +190,20 @@ def preview_widget(
         ) from exc
 
     human = describe_widget_query_human(body.query_config)
-    return {"data": data, "human_query": human}
+    payload: dict[str, Any] = {"data": data, "human_query": human}
+    if current_user.role == UserRole.super_admin:
+        payload["debug_sql"] = describe_widget_query_real(
+            body.query_config,
+            current_user.id,
+            date_from=body.date_from,
+            date_to=body.date_to,
+            bank_name=body.bank_name,
+            category=body.category,
+            parent_category=body.parent_category,
+            sub_category=body.sub_category,
+            default_month_for_preview=True,
+        )
+    return payload
 
 
 # ---------------------------------------------------------------------------

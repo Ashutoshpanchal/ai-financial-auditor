@@ -4,9 +4,11 @@ import { Link } from "react-router-dom";
 import { BarChartWidget } from "../components/dashboard/BarChartWidget";
 import { ChatPanel } from "../components/dashboard/ChatPanel";
 import { FilterBar, type FilterState } from "../components/dashboard/FilterBar";
+import { DualMetricCard } from "../components/dashboard/DualMetricCard";
 import { MetricCard } from "../components/dashboard/MetricCard";
 import { PieChartWidget } from "../components/dashboard/PieChartWidget";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
+import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
 import {
   makeInitialWidgetDraft,
@@ -20,14 +22,11 @@ import {
 } from "../utils/widgetDraftModel";
 
 const STUDIO_DISABLED = import.meta.env.VITE_WIDGET_STUDIO_ENABLED === "false";
-/** Re-enable when manual widget editor returns. */
-const SHOW_MANUAL_EDITOR = false;
-/** Re-enable when horizontal library strip returns. */
-const SHOW_LIBRARY_STRIP = false;
 
 interface PreviewResponse {
   data: unknown;
   human_query: string;
+  debug_sql?: string;
 }
 
 interface GridItem {
@@ -82,7 +81,33 @@ function isChartPreview(d: unknown): d is { label: string; value: number }[] {
   return Array.isArray(d) && d.every((r) => r && typeof r.label === "string" && typeof r.value === "number");
 }
 
+function isDualMetricPreview(
+  d: unknown,
+): d is { spend: number; received: number; format?: string } {
+  return (
+    d !== null &&
+    typeof d === "object" &&
+    "spend" in d &&
+    "received" in d &&
+    typeof (d as { spend: unknown }).spend === "number" &&
+    typeof (d as { received: unknown }).received === "number"
+  );
+}
+
 function defaultQueryForType(widgetType: WidgetType): WidgetDraft["query_config"] {
+  if (widgetType === "spend_receive_pair") {
+    return {
+      template: "spend_receive_pair",
+      format: "currency",
+      filters: {
+        date_from: "{{date_from}}",
+        date_to: "{{date_to}}",
+        bank_name: "{{bank_name}}",
+        parent_category: "{{parent_category}}",
+        sub_category: "{{sub_category}}",
+      },
+    };
+  }
   if (widgetType === "metric") {
     return { aggregation: "sum", field: "debit", format: "currency" };
   }
@@ -100,10 +125,22 @@ function mergeMaster(split: MasterSplit): Record<string, string[]> {
   return out;
 }
 
+const WIDGET_TYPE_LABEL: Record<WidgetType, string> = {
+  metric: "Metric",
+  spend_receive_pair: "Spend / Received",
+  bar_chart: "Bar",
+  line_chart: "Line",
+  pie_chart: "Pie",
+};
+
 export default function WidgetStudio() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
+
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [libraryWidgets, setLibraryWidgets] = useState<LibraryWidget[]>([]);
+  const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [categoryMaster, setCategoryMaster] = useState<Record<string, string[]>>({});
   const [draft, setDraft] = useState<WidgetDraft>(() => makeInitialWidgetDraft());
   const [filters, setFilters] = useState<FilterState>({
@@ -124,7 +161,6 @@ export default function WidgetStudio() {
   const [studioDraftState, setStudioDraftState] = useState<Record<string, unknown> | null>(
     null,
   );
-  const [queryOpen, setQueryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionSummary | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -233,13 +269,22 @@ export default function WidgetStudio() {
   }, [deleteTarget, sessionId, loadSessions, createNewChat]);
 
   const loadLibraryWidget = useCallback((w: LibraryWidget) => {
+    setEditingWidgetId(w.id);
     setDraft({
       title: w.title,
       widget_type: w.widget_type,
       query_config: w.query_config as WidgetDraft["query_config"],
       col_span: 1,
     });
-    setAppliedHint(`Loaded "${w.title}" from your library into the draft.`);
+    setAppliedHint(`Editing "${w.title}" — change fields or chat to refine.`);
+    setSavedHint(null);
+  }, []);
+
+  const startNewWidget = useCallback(() => {
+    setEditingWidgetId(null);
+    setDraft(makeInitialWidgetDraft());
+    setAppliedHint(null);
+    setSavedHint(null);
   }, []);
 
   const runPreview = useCallback(
@@ -346,20 +391,21 @@ export default function WidgetStudio() {
     [preview?.human_query],
   );
 
-  const saveToLibrary = useCallback(async () => {
+  const saveAsNew = useCallback(async () => {
     if (!canSave) return;
     setBusy(true);
     setSavedHint(null);
     setAppliedHint(null);
     try {
-      await api.post("/dashboard/widgets", {
+      const created = await api.post<{ id: string }>("/dashboard/widgets", {
         title: draft.title.trim(),
         widget_type: draft.widget_type,
         query_config: draft.query_config,
       });
       await refreshLibrary();
+      setEditingWidgetId(created.data.id);
       setSavedHint(
-        formatSavedHint(`"${draft.title.trim()}" saved to your widget library.`),
+        formatSavedHint(`"${draft.title.trim()}" saved as a new library widget.`),
       );
     } catch (e: unknown) {
       setPreviewError(formatError(e));
@@ -367,6 +413,27 @@ export default function WidgetStudio() {
       setBusy(false);
     }
   }, [canSave, draft, formatSavedHint, refreshLibrary]);
+
+  const updateWidget = useCallback(async () => {
+    if (!canSave || !editingWidgetId) return;
+    setBusy(true);
+    setSavedHint(null);
+    setAppliedHint(null);
+    try {
+      await api.patch(`/dashboard/widgets/${editingWidgetId}`, {
+        title: draft.title.trim(),
+        query_config: draft.query_config,
+      });
+      await refreshLibrary();
+      setSavedHint(
+        formatSavedHint(`"${draft.title.trim()}" updated in your library.`),
+      );
+    } catch (e: unknown) {
+      setPreviewError(formatError(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [canSave, draft, editingWidgetId, formatSavedHint, refreshLibrary]);
 
   const saveAndAddToDashboard = useCallback(async () => {
     if (!canSave) return;
@@ -416,15 +483,25 @@ export default function WidgetStudio() {
   }
 
   const metricData = preview?.data && isMetricPreview(preview.data) ? preview.data : null;
+  const dualMetricData =
+    preview?.data && isDualMetricPreview(preview.data) ? preview.data : null;
   const chartData = preview?.data && isChartPreview(preview.data) ? preview.data : [];
+  const debugResultJson =
+    preview?.data !== undefined ? JSON.stringify(preview.data, null, 2) : "—";
+  const debugError = previewError ?? "—";
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-gray-50">
       <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Widget Studio</h1>
-          <p className="text-xs text-gray-500">
-            Build and test your widget on the left; chat on the right to describe what you want.
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold text-gray-900">Widget Studio</h1>
+            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+              Library ({libraryWidgets.length})
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Describe your widget in chat, then save · {libraryWidgets.length} in library
           </p>
         </div>
         <Link to="/dashboard" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
@@ -433,8 +510,46 @@ export default function WidgetStudio() {
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
+        <aside className="shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 bg-white lg:w-52 flex flex-col max-h-48 lg:max-h-none">
+          <div className="p-3 border-b border-gray-100 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+              Library ({libraryWidgets.length})
+            </span>
+            <button
+              type="button"
+              onClick={startNewWidget}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              + New
+            </button>
+          </div>
+          <ul className="flex-1 overflow-y-auto p-2 space-y-1 text-sm min-h-0">
+            {libraryWidgets.length === 0 && (
+              <li className="px-2 py-3 text-xs text-gray-500 text-center">
+                No saved widgets yet. Build one in the center and save.
+              </li>
+            )}
+            {libraryWidgets.map((w) => (
+              <li key={w.id}>
+                <button
+                  type="button"
+                  onClick={() => loadLibraryWidget(w)}
+                  className={`w-full text-left rounded-lg px-2 py-2 ${
+                    editingWidgetId === w.id
+                      ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="block truncate font-medium">{w.title}</span>
+                  <span className="block text-[10px] text-gray-400">
+                    {WIDGET_TYPE_LABEL[w.widget_type]}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
 
-        {/* Draft + preview */}
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200">
           <div className="shrink-0 border-b border-gray-200 bg-white">
             <FilterBar
@@ -445,25 +560,12 @@ export default function WidgetStudio() {
             />
           </div>
 
-          {SHOW_LIBRARY_STRIP && libraryWidgets.length > 0 && (
-            <div className="shrink-0 border-b border-gray-100 bg-gray-50 px-4 py-2">
-              <p className="text-xs font-medium text-gray-600 mb-2">Widget library</p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {libraryWidgets.map((w) => (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => loadLibraryWidget(w)}
-                    className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-800 hover:border-indigo-300"
-                  >
-                    {w.title}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="p-4 space-y-4 max-w-4xl w-full mx-auto">
+            {editingWidgetId && (
+              <p className="text-xs font-medium text-indigo-700">
+                Editing library widget: {draft.title}
+              </p>
+            )}
             {appliedHint && (
               <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
                 {appliedHint}
@@ -503,6 +605,16 @@ export default function WidgetStudio() {
                   error={preview && !metricData ? "Invalid metric preview" : null}
                 />
               )}
+              {draft.widget_type === "spend_receive_pair" && (
+                <DualMetricCard
+                  title={draft.title}
+                  spend={dualMetricData?.spend ?? 0}
+                  received={dualMetricData?.received ?? 0}
+                  format={(dualMetricData?.format as "currency" | "number") ?? "currency"}
+                  isLoading={preview === null && !previewError}
+                  error={preview && !dualMetricData ? "Invalid spend/received preview" : null}
+                />
+              )}
               {(draft.widget_type === "bar_chart" || draft.widget_type === "line_chart") && (
                 <BarChartWidget
                   title={draft.title}
@@ -522,14 +634,56 @@ export default function WidgetStudio() {
             </div>
             )}
 
-            <div className="flex flex-wrap gap-2 max-w-md mx-auto w-full">
+            {isSuperAdmin && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 space-y-3 max-w-4xl w-full">
+                <p className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
+                  Super admin debug
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[10px] font-medium text-amber-800 mb-1">Query</p>
+                    <pre className="max-h-36 overflow-auto rounded-lg bg-white p-2 text-[10px] text-gray-700 font-mono whitespace-pre-wrap">
+                      {preview?.debug_sql ?? "—"}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-amber-800 mb-1">Result</p>
+                    <pre className="max-h-36 overflow-auto rounded-lg bg-white p-2 text-[10px] text-gray-700 font-mono whitespace-pre-wrap">
+                      {debugResultJson}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-amber-800 mb-1">Error</p>
+                    <pre className="max-h-36 overflow-auto rounded-lg bg-white p-2 text-[10px] text-red-700 font-mono whitespace-pre-wrap">
+                      {debugError}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 max-w-4xl w-full">
+              {editingWidgetId && (
+                <button
+                  type="button"
+                  disabled={busy || !canSave}
+                  onClick={() => void updateWidget()}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  Update widget
+                </button>
+              )}
               <button
                 type="button"
                 disabled={busy || !canSave}
-                onClick={() => void saveToLibrary()}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                onClick={() => void saveAsNew()}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 ${
+                  editingWidgetId
+                    ? "border border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
+                    : "bg-indigo-600 text-white hover:bg-indigo-500"
+                }`}
               >
-                Save to library
+                Save as new
               </button>
               <button
                 type="button"
@@ -546,25 +700,16 @@ export default function WidgetStudio() {
               </p>
             )}
 
-            {preview?.human_query && (
-              <div className="max-w-md mx-auto w-full">
-                <button
-                  type="button"
-                  onClick={() => setQueryOpen((v) => !v)}
-                  className="text-xs font-medium text-indigo-600"
-                >
-                  {queryOpen ? "Hide" : "Show"} stored query
-                </button>
-                {queryOpen && (
-                  <pre className="mt-2 max-h-28 overflow-auto rounded-lg bg-gray-50 p-2 text-xs text-gray-600">
-                    {preview.human_query}
-                  </pre>
-                )}
-              </div>
-            )}
-
-            {SHOW_MANUAL_EDITOR && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4 max-w-4xl w-full">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((v) => !v)}
+                className="text-sm font-semibold text-gray-900"
+              >
+                {advancedOpen ? "▼" : "▶"} Advanced settings
+              </button>
+              {advancedOpen && (
+              <>
               <h2 className="text-sm font-semibold text-gray-900">Widget settings</h2>
 
               <div>
@@ -595,6 +740,7 @@ export default function WidgetStudio() {
                     className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   >
                     <option value="metric">Metric</option>
+                    <option value="spend_receive_pair">Spend / Received</option>
                     <option value="bar_chart">Bar chart</option>
                     <option value="line_chart">Line chart</option>
                     <option value="pie_chart">Pie chart</option>
@@ -756,9 +902,9 @@ export default function WidgetStudio() {
                   </div>
                 );
               })()}
-
+              </>
+              )}
             </div>
-            )}
           </div>
         </div>
 
@@ -768,6 +914,14 @@ export default function WidgetStudio() {
             hideAnalyze
             mergeOnlyWhenReady
             showGeneratingLabel
+            showChatSaveActions={studioDraftState?.status === "ready"}
+            canSaveWidget={canSave}
+            saveBusy={busy}
+            saveWidgetLabel={editingWidgetId ? "Update widget" : "Save widget"}
+            onSaveWidget={() =>
+              void (editingWidgetId ? updateWidget() : saveAsNew())
+            }
+            onSaveAndAddToDashboard={() => void saveAndAddToDashboard()}
             onDraftStateChange={handleDraftStateChange}
             onWidgetSuggestion={handleSuggestion}
             inputPlaceholder="Describe the widget you want… (Enter to send)"

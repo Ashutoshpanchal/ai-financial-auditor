@@ -15,6 +15,9 @@ from backend.models.user import User
 from backend.services.category_flow_analytics import (
     compute_category_flow,
     compute_category_flow_by_parent_month,
+    compute_category_flow_by_parent_paginated,
+    compute_category_flow_metadata,
+    compute_transaction_date_scope,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,6 +25,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 FlowMode = Literal["debit", "credit", "both"]
+
+
+@router.get("/transaction-date-scope")
+def get_transaction_date_scope(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return min/max transaction dates and months with data for date pickers."""
+    set_rls_user(db, current_user.id)
+
+    try:
+        return compute_transaction_date_scope(
+            db=db,
+            user_id=current_user.id,
+        )
+    except Exception as exc:
+        logger.exception(
+            "transaction-date-scope failed for user %s: %s",
+            current_user.id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to compute transaction date scope.",
+        ) from exc
 
 
 @router.get("/category-flow")
@@ -85,6 +113,96 @@ def get_category_flow(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to compute category flow.",
+        ) from exc
+
+
+@router.get("/category-flow-by-parent/metadata")
+def get_category_flow_by_parent_metadata(
+    date_from: date = Query(
+        ..., description="Inclusive start of transaction_date range."
+    ),
+    date_to: date = Query(..., description="Inclusive end of transaction_date range."),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return data scope: available years, months, total rows, parent categories."""
+    if date_from > date_to:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="date_from must be on or before date_to.",
+        )
+
+    set_rls_user(db, current_user.id)
+
+    try:
+        return compute_category_flow_metadata(
+            db=db,
+            user_id=current_user.id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except Exception as exc:
+        logger.exception(
+            "category-flow-by-parent/metadata failed for user %s: %s",
+            current_user.id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to compute category flow metadata.",
+        ) from exc
+
+
+@router.get("/category-flow-by-parent/paginated")
+def get_category_flow_by_parent_paginated_endpoint(
+    date_from: date = Query(
+        ..., description="Inclusive start of transaction_date range."
+    ),
+    date_to: date = Query(..., description="Inclusive end of transaction_date range."),
+    mode: FlowMode = Query(
+        "both",
+        description="debit: spending groups only; credit: income groups only; both: all groups.",
+    ),
+    month_cursor: str | None = Query(
+        None, description="Start from this YYYY-MM month (inclusive)."
+    ),
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=200,
+        description="Max rows per page.",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return paginated (parent_category, month) aggregates via month cursor."""
+    if date_from > date_to:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="date_from must be on or before date_to.",
+        )
+
+    set_rls_user(db, current_user.id)
+
+    try:
+        return compute_category_flow_by_parent_paginated(
+            db=db,
+            user_id=current_user.id,
+            date_from=date_from,
+            date_to=date_to,
+            mode=mode,
+            month_cursor=month_cursor,
+            limit=limit,
+        )
+    except Exception as exc:
+        logger.exception(
+            "category-flow-by-parent/paginated failed for user %s: %s",
+            current_user.id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to compute paginated category flow.",
         ) from exc
 
 

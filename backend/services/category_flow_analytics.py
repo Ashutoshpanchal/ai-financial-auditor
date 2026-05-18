@@ -238,3 +238,186 @@ def compute_category_flow_by_parent_month(
             "groups matched; results are truncated. Narrow the date range."
         )
     return out
+
+
+def compute_category_flow_metadata(
+    db: Session,
+    user_id: str,
+    date_from: date,
+    date_to: date,
+) -> dict[str, Any]:
+    """Return scope metadata: months, years, total paginated rows, parent categories.
+
+    Args:
+        db: Active SQLAlchemy session (caller sets RLS).
+        user_id: Tenant id.
+        date_from: Inclusive lower bound on transaction_date.
+        date_to: Inclusive upper bound on transaction_date.
+
+    Returns:
+        Dict with months_available (YYYY-MM list), years, total_rows (count of distinct
+        (parent, month) groups), parent_categories (list of all parents).
+    """
+    clauses = _build_filters_all_parents(user_id, date_from, date_to)
+    month_expr = func.to_char(Transaction.transaction_date, "YYYY-MM")
+
+    # Distinct months (sorted)
+    months_stmt = (
+        select(month_expr.label("month"))
+        .where(*clauses)
+        .distinct()
+        .order_by(month_expr)
+    )
+    months: list[str] = [row.month for row in db.execute(months_stmt).all()]
+    years: list[int] = sorted({int(m[:4]) for m in months})
+
+    # Count of distinct (parent_category, month) groups — this is the total paginated rows
+    sub = (
+        select(
+            _coalesce_parent().label("pc"),
+            month_expr.label("month"),
+        )
+        .where(*clauses)
+        .group_by(_coalesce_parent(), month_expr)
+        .subquery()
+    )
+    total_rows: int = db.scalar(select(func.count()).select_from(sub)) or 0
+
+    # Distinct parent categories (sorted)
+    parents_stmt = (
+        select(_coalesce_parent().label("parent_category"))
+        .where(*clauses)
+        .distinct()
+        .order_by(_coalesce_parent())
+    )
+    parent_categories: list[str] = [
+        r.parent_category for r in db.execute(parents_stmt).all()
+    ]
+
+    return {
+        "date_from": date_from.isoformat(),
+        "date_to": date_to.isoformat(),
+        "months_available": months,
+        "years": years,
+        "total_rows": total_rows,
+        "parent_categories": parent_categories,
+    }
+
+
+def compute_category_flow_by_parent_paginated(
+    db: Session,
+    user_id: str,
+    date_from: date,
+    date_to: date,
+    mode: FlowMode = "both",
+    month_cursor: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Paginate (parent_category, month) aggregates via a YYYY-MM month cursor.
+
+    Fetches limit+1 rows to detect has_more. next_cursor is the month of
+    the first row NOT included in this page.
+
+    Args:
+        db: Active SQLAlchemy session (caller sets RLS).
+        user_id: Tenant id.
+        date_from: Inclusive lower bound on transaction_date.
+        date_to: Inclusive upper bound on transaction_date.
+        mode: debit / credit / both for HAVING on grouped sums.
+        month_cursor: Start from this YYYY-MM month (inclusive). None = start from beginning.
+        limit: Max rows to return (1-200).
+
+    Returns:
+        Dict with rows (list of aggregates), pagination metadata (current_cursor, next_cursor,
+        has_more, limit, rows_returned).
+    """
+    clauses = _build_filters_all_parents(user_id, date_from, date_to)
+    month_expr = func.to_char(Transaction.transaction_date, "YYYY-MM")
+
+    if month_cursor:
+        clauses.append(month_expr >= month_cursor)
+
+    parent_expr = _coalesce_parent().label("parent_category")
+    month_labeled = month_expr.label("month")
+    debit_sum = func.sum(Transaction.debit).label("debit_total")
+    credit_sum = func.sum(Transaction.credit).label("credit_total")
+    txn_count = func.count(Transaction.id).label("txn_count")
+
+    stmt = (
+        select(parent_expr, month_labeled, debit_sum, credit_sum, txn_count)
+        .where(*clauses)
+        .group_by(parent_expr, month_labeled)
+        .order_by(month_labeled.asc(), parent_expr.asc())
+    )
+    having = _having_for_mode(mode)
+    if having is not None:
+        stmt = stmt.having(having)
+
+    raw_rows = db.execute(stmt.limit(limit + 1)).all()
+
+    has_more = len(raw_rows) > limit
+    next_cursor: str | None = raw_rows[limit].month if has_more else None
+    if has_more:
+        raw_rows = raw_rows[:limit]
+
+    rows: list[dict[str, Any]] = [
+        {
+            "parent_category": r.parent_category,
+            "month": r.month,
+            "debit_total": float(r.debit_total or 0),
+            "credit_total": float(r.credit_total or 0),
+            "txn_count": int(r.txn_count or 0),
+        }
+        for r in raw_rows
+    ]
+
+    return {
+        "rows": rows,
+        "pagination": {
+            "current_cursor": month_cursor,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "limit": limit,
+            "rows_returned": len(rows),
+        },
+    }
+
+
+def compute_transaction_date_scope(
+    db: Session,
+    user_id: str,
+) -> dict[str, Any]:
+    """Return global transaction date bounds and months with data for the user.
+
+    Args:
+        db: Active SQLAlchemy session (caller sets RLS).
+        user_id: Tenant id.
+
+    Returns:
+        Dict with ``min_date``, ``max_date`` (ISO strings or null), sorted
+        ``months_with_data`` (YYYY-MM), and ``has_transactions`` flag.
+    """
+    clauses: list[Any] = [Transaction.user_id == user_id]
+
+    min_date: date | None = db.scalar(
+        select(func.min(Transaction.transaction_date)).where(*clauses)
+    )
+    max_date: date | None = db.scalar(
+        select(func.max(Transaction.transaction_date)).where(*clauses)
+    )
+
+    month_expr = func.to_char(Transaction.transaction_date, "YYYY-MM")
+    months_stmt = (
+        select(month_expr.label("month"))
+        .where(*clauses)
+        .distinct()
+        .order_by(month_expr)
+    )
+    months_with_data: list[str] = [row.month for row in db.execute(months_stmt).all()]
+
+    return {
+        "min_date": min_date.isoformat() if min_date else None,
+        "max_date": max_date.isoformat() if max_date else None,
+        "months_with_data": months_with_data,
+        "has_transactions": min_date is not None,
+    }

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -22,6 +21,7 @@ from backend.agents.widget_studio_prompts import (
 from backend.models.chat_session import ChatSession
 from backend.services.observability import get_callbacks
 from backend.services.widget_query import validate_widget_query_config
+from backend.services.widget_sql_aliases import translate_llm_sql_to_real
 
 logger = logging.getLogger(__name__)
 
@@ -147,29 +147,9 @@ async def run_widget_studio_chat(
     if not response_text:
         raise RuntimeError("run_widget_studio_chat: empty LLM response")
 
-    print(
-        f"[widget_studio] session={session.id} user_message={user_message.strip()!r}",
-        flush=True,
-    )
-    print(
-        f"[widget_studio] assistant_reply={response_text[:800]!r}",
-        flush=True,
-    )
-
     widget: dict[str, Any] | None = _extract_widget_suggestion(response_text)
     display_text = strip_widget_json_from_reply(response_text)
     clarification_only = widget is None
-
-    if widget is not None:
-        print(
-            "[widget_studio] generated_query_config="
-            + json.dumps(widget.get("query_config") or {}, default=str),
-            flush=True,
-        )
-    else:
-        print(
-            "[widget_studio] no widget json in reply (clarification turn)", flush=True
-        )
 
     if widget is not None:
         try:

@@ -10,6 +10,9 @@ import pytest
 from backend.services.category_flow_analytics import (
     compute_category_flow,
     compute_category_flow_by_parent_month,
+    compute_category_flow_by_parent_paginated,
+    compute_category_flow_metadata,
+    compute_transaction_date_scope,
 )
 
 
@@ -142,3 +145,170 @@ def test_compute_by_parent_month_returns_rows() -> None:
     assert len(out["rows"]) == 2
     assert "sub_category" not in out["rows"][0]
     assert out["rows"][0]["parent_category"] == "Food"
+
+
+def test_metadata_returns_months_years_totals() -> None:
+    """Metadata query returns distinct months, years, total rows, and parents."""
+    db = MagicMock()
+
+    # Mock distinct months query
+    months_exec = MagicMock()
+    months_exec.all.return_value = [
+        MagicMock(month="2024-01"),
+        MagicMock(month="2024-02"),
+        MagicMock(month="2024-03"),
+    ]
+
+    # Mock total rows (distinct parent, month groups) = 9
+    count_exec = MagicMock()
+    count_exec.scalar.return_value = 9
+
+    # Mock distinct parents query
+    parents_exec = MagicMock()
+    parents_exec.all.return_value = [
+        MagicMock(parent_category="Food"),
+        MagicMock(parent_category="Travel"),
+        MagicMock(parent_category="Utilities"),
+    ]
+
+    db.execute.side_effect = [months_exec, parents_exec]
+    db.scalar.return_value = 9
+
+    out = compute_category_flow_metadata(
+        db=db,
+        user_id="u1",
+        date_from=date(2024, 1, 1),
+        date_to=date(2024, 3, 31),
+    )
+
+    assert out["months_available"] == ["2024-01", "2024-02", "2024-03"]
+    assert out["years"] == [2024]
+    assert out["total_rows"] == 9
+    assert out["parent_categories"] == ["Food", "Travel", "Utilities"]
+    assert out["date_from"] == "2024-01-01"
+    assert out["date_to"] == "2024-03-31"
+
+
+def test_transaction_date_scope_with_data() -> None:
+    """Scope returns min/max ISO dates and sorted months."""
+    db = MagicMock()
+    db.scalar.side_effect = [date(2024, 3, 12), date(2026, 4, 28)]
+    months_exec = MagicMock()
+    months_exec.all.return_value = [
+        MagicMock(month="2024-03"),
+        MagicMock(month="2024-04"),
+        MagicMock(month="2026-04"),
+    ]
+    db.execute.return_value = months_exec
+
+    out = compute_transaction_date_scope(db=db, user_id="u1")
+
+    assert out["min_date"] == "2024-03-12"
+    assert out["max_date"] == "2026-04-28"
+    assert out["months_with_data"] == ["2024-03", "2024-04", "2026-04"]
+    assert out["has_transactions"] is True
+
+
+def test_transaction_date_scope_empty_user() -> None:
+    """Scope with no transactions returns null dates and empty months."""
+    db = MagicMock()
+    db.scalar.side_effect = [None, None]
+    months_exec = MagicMock()
+    months_exec.all.return_value = []
+    db.execute.return_value = months_exec
+
+    out = compute_transaction_date_scope(db=db, user_id="u1")
+
+    assert out["min_date"] is None
+    assert out["max_date"] is None
+    assert out["months_with_data"] == []
+    assert out["has_transactions"] is False
+
+
+def test_metadata_empty_range_returns_zeros() -> None:
+    """Metadata with no rows returns empty lists and zero totals."""
+    db = MagicMock()
+
+    months_exec = MagicMock()
+    months_exec.all.return_value = []
+
+    parents_exec = MagicMock()
+    parents_exec.all.return_value = []
+
+    db.execute.side_effect = [months_exec, parents_exec]
+    db.scalar.return_value = 0
+
+    out = compute_category_flow_metadata(
+        db=db,
+        user_id="u1",
+        date_from=date(2024, 1, 1),
+        date_to=date(2024, 1, 31),
+    )
+
+    assert out["months_available"] == []
+    assert out["years"] == []
+    assert out["total_rows"] == 0
+    assert out["parent_categories"] == []
+
+
+def test_paginated_returns_rows_and_cursor() -> None:
+    """Paginated query returns rows and has_more=True when limit+1 rows exist."""
+    db = MagicMock()
+
+    # Return limit+1 rows to trigger has_more
+    rows = [
+        _parent_month_row("Food", "2024-01", 10.0, 0.0, 1),
+        _parent_month_row("Food", "2024-02", 15.0, 0.0, 1),
+        _parent_month_row("Food", "2024-03", 20.0, 0.0, 1),  # This is the +1
+    ]
+
+    exec_obj = MagicMock()
+    exec_obj.all.return_value = rows
+
+    db.execute.return_value = exec_obj
+
+    out = compute_category_flow_by_parent_paginated(
+        db=db,
+        user_id="u1",
+        date_from=date(2024, 1, 1),
+        date_to=date(2024, 12, 31),
+        mode="both",
+        month_cursor=None,
+        limit=2,
+    )
+
+    assert out["pagination"]["has_more"] is True
+    assert out["pagination"]["next_cursor"] == "2024-03"
+    assert len(out["rows"]) == 2
+    assert out["rows"][0]["month"] == "2024-01"
+    assert out["rows"][1]["month"] == "2024-02"
+    assert out["pagination"]["rows_returned"] == 2
+
+
+def test_paginated_last_page_has_no_cursor() -> None:
+    """Paginated query returns has_more=False and next_cursor=None on last page."""
+    db = MagicMock()
+
+    rows = [
+        _parent_month_row("Food", "2024-01", 10.0, 0.0, 1),
+        _parent_month_row("Food", "2024-02", 15.0, 0.0, 1),
+    ]
+
+    exec_obj = MagicMock()
+    exec_obj.all.return_value = rows
+
+    db.execute.return_value = exec_obj
+
+    out = compute_category_flow_by_parent_paginated(
+        db=db,
+        user_id="u1",
+        date_from=date(2024, 1, 1),
+        date_to=date(2024, 12, 31),
+        mode="both",
+        month_cursor=None,
+        limit=2,
+    )
+
+    assert out["pagination"]["has_more"] is False
+    assert out["pagination"]["next_cursor"] is None
+    assert len(out["rows"]) == 2

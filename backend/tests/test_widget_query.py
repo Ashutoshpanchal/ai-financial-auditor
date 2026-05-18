@@ -9,6 +9,7 @@ import pytest
 
 from backend.services.widget_query import (
     describe_widget_query_human,
+    describe_widget_query_real,
     resolve_widget_data,
     validate_widget_query_config,
 )
@@ -655,6 +656,57 @@ class TestValidateWidgetQueryConfig:
                     "group_by": "month",
                 },
             )
+
+
+class TestSpendReceivePairResolve:
+    """resolve_widget_data for spend_receive_pair template."""
+
+    def test_returns_spend_and_received(self) -> None:
+        """Dual template returns both scalar values."""
+        db = MagicMock()
+        execute_result = MagicMock()
+        execute_result.scalar.side_effect = [500.0, 200.0]
+        db.execute.return_value = execute_result
+
+        config = {
+            "template": "spend_receive_pair",
+            "format": "currency",
+            "filters": {
+                "date_from": "{{date_from}}",
+                "date_to": "{{date_to}}",
+                "bank_name": "{{bank_name}}",
+                "parent_category": "{{parent_category}}",
+                "sub_category": "{{sub_category}}",
+            },
+        }
+        result = resolve_widget_data(
+            config=config,
+            user_id=USER_ID,
+            db=db,
+            default_month_for_preview=True,
+        )
+        assert isinstance(result, dict)
+        assert result["spend"] == 500.0
+        assert result["received"] == 200.0
+        assert result["format"] == "currency"
+
+
+class TestDescribeWidgetQueryReal:
+    """describe_widget_query_real returns transactions SQL for super-admin debug."""
+
+    def test_structured_metric_mentions_transactions(self) -> None:
+        """Structured metric debug SQL uses the real transactions table."""
+        text = describe_widget_query_real(
+            {
+                "aggregation": "sum",
+                "field": "debit",
+                "filters": {"transaction_type": "debit"},
+            },
+            "user-1",
+            default_month_for_preview=True,
+        )
+        assert "transactions" in text.lower()
+        assert "user_id" in text.lower() or "user-1" in text
 
 
 class TestDescribeWidgetQueryHuman:

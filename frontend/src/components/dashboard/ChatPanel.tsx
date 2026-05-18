@@ -11,7 +11,7 @@ interface ChatMessage {
 
 export interface WidgetSuggestion {
   title: string;
-  widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
+  widget_type: "metric" | "spend_receive_pair" | "bar_chart" | "pie_chart" | "line_chart";
   query_config: Record<string, unknown>;
 }
 
@@ -48,6 +48,15 @@ export interface ChatPanelProps {
   onDraftStateChange?: (draft: Record<string, unknown> | null) => void;
   /** Widget Studio: show "Generating your widget…" instead of typing dots while sending. */
   showGeneratingLabel?: boolean;
+  /** Widget Studio: show save actions when draft has a generated widget. */
+  showChatSaveActions?: boolean;
+  /** Whether preview passed and save is allowed. */
+  canSaveWidget?: boolean;
+  /** Primary save handler (save as new or update). */
+  onSaveWidget?: () => void;
+  saveWidgetLabel?: string;
+  onSaveAndAddToDashboard?: () => void;
+  saveBusy?: boolean;
 }
 
 const SENSITIVE_ERROR =
@@ -85,6 +94,12 @@ export function ChatPanel({
   mergeOnlyWhenReady = false,
   onDraftStateChange,
   showGeneratingLabel = false,
+  showChatSaveActions = false,
+  canSaveWidget = false,
+  onSaveWidget,
+  saveWidgetLabel = "Save widget",
+  onSaveAndAddToDashboard,
+  saveBusy = false,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -123,7 +138,7 @@ export function ChatPanel({
   }, [sessionId, onDraftStateChange]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages]);
 
   const sendMessage = useCallback(async () => {
@@ -261,6 +276,38 @@ export function ChatPanel({
       </div>
 
       <div className="px-4 pb-4 pt-2 border-t border-gray-100 shrink-0">
+        {showChatSaveActions && onWidgetSuggestion && (
+          <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/80 p-3 space-y-2">
+            <p className="text-xs font-medium text-indigo-900">Widget ready</p>
+            <div className="flex flex-wrap gap-2">
+              {onSaveWidget && (
+                <button
+                  type="button"
+                  disabled={saveBusy || !canSaveWidget}
+                  onClick={() => void onSaveWidget()}
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {saveWidgetLabel}
+                </button>
+              )}
+              {onSaveAndAddToDashboard && (
+                <button
+                  type="button"
+                  disabled={saveBusy || !canSaveWidget}
+                  onClick={() => void onSaveAndAddToDashboard()}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Save and add to dashboard
+                </button>
+              )}
+            </div>
+            {!canSaveWidget && (
+              <p className="text-[10px] text-indigo-700">
+                Preview must succeed for current filters before saving.
+              </p>
+            )}
+          </div>
+        )}
         {sendError && (
           <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
             {sendError}

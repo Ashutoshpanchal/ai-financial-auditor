@@ -1,6 +1,11 @@
 /** Draft widget state for Widget Studio — aligned with backend validate_widget_query_config rules. */
 
-export type WidgetType = "metric" | "bar_chart" | "pie_chart" | "line_chart";
+export type WidgetType =
+  | "metric"
+  | "spend_receive_pair"
+  | "bar_chart"
+  | "pie_chart"
+  | "line_chart";
 
 export type ColSpan = 1 | 2 | 3;
 
@@ -11,6 +16,7 @@ export interface WidgetQueryConfig {
   filters?: Record<string, string | null>;
   format?: string;
   raw_metric_sql?: string;
+  template?: string;
 }
 
 export interface WidgetDraft {
@@ -37,7 +43,13 @@ const PLACEHOLDERS = new Set([
   "{{parent_category}}",
   "{{sub_category}}",
 ]);
-const TYPES: Set<WidgetType> = new Set(["metric", "bar_chart", "pie_chart", "line_chart"]);
+const TYPES: Set<WidgetType> = new Set([
+  "metric",
+  "spend_receive_pair",
+  "bar_chart",
+  "pie_chart",
+  "line_chart",
+]);
 
 export function makeInitialWidgetDraft(): WidgetDraft {
   return {
@@ -78,6 +90,20 @@ export function validateDraftForPreview(draft: WidgetDraft): string | null {
   }
 
   const cfg = draft.query_config;
+
+  if (draft.widget_type === "spend_receive_pair") {
+    if (cfg.template != null && cfg.template !== "spend_receive_pair") {
+      return "template must be spend_receive_pair.";
+    }
+    if (cfg.aggregation || cfg.field || cfg.group_by || isNonEmptyRawSql(cfg)) {
+      return "spend_receive_pair must not use aggregation, field, group_by, or raw SQL.";
+    }
+    const txn = cfg.filters?.transaction_type;
+    if (txn != null && txn !== "") {
+      return "spend_receive_pair must not set filters.transaction_type.";
+    }
+    return null;
+  }
 
   if (isNonEmptyRawSql(cfg)) {
     if (draft.widget_type !== "metric") {

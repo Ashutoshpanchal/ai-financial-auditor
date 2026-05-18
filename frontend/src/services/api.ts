@@ -99,6 +99,18 @@ export interface CategoryFlowResponse {
   truncated_reason?: string;
 }
 
+export interface TransactionDateScope {
+  min_date: string | null;
+  max_date: string | null;
+  months_with_data: string[];
+  has_transactions: boolean;
+}
+
+export async function fetchTransactionDateScope(): Promise<TransactionDateScope> {
+  const res = await api.get<TransactionDateScope>("/analytics/transaction-date-scope");
+  return res.data;
+}
+
 export async function fetchCategoryFlow(params: {
   dateFrom: string;
   dateTo: string;

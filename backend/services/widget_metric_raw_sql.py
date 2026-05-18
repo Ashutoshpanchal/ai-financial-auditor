@@ -209,6 +209,66 @@ def _append_dashboard_filters(
     return augmented, params
 
 
+def _format_sql_with_binds(sql: str, bind: dict[str, Any]) -> str:
+    """Inline bind parameters into SQL for super-admin debug display."""
+    result = sql
+    for key in sorted(bind.keys(), key=len, reverse=True):
+        val = bind[key]
+        if isinstance(val, date):
+            replacement = f"'{val.isoformat()}'"
+        elif isinstance(val, str):
+            escaped = val.replace("'", "''")
+            replacement = f"'{escaped}'"
+        else:
+            replacement = repr(val)
+        result = result.replace(f":{key}", replacement)
+    return result
+
+
+def build_raw_metric_sql_preview(
+    sql: str,
+    user_id: str,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    bank_name: str | None = None,
+    category: str | None = None,
+    parent_category: str | None = None,
+    sub_category: str | None = None,
+    transaction_type: str | None = None,
+) -> str:
+    """Build the final sandboxed SQL string without executing it.
+
+    Args:
+        sql: Raw or LLM-dummy SQL (translated to real identifiers).
+        user_id: Tenant id for scope injection.
+        date_from: Optional inclusive lower bound on ``transaction_date``.
+        date_to: Optional inclusive upper bound on ``transaction_date``.
+        bank_name: Optional bank filter.
+        category: Optional legacy category filter.
+        parent_category: Optional parent category filter.
+        sub_category: Optional sub-category filter.
+        transaction_type: Optional ``credit`` or ``debit`` direction filter.
+
+    Returns:
+        SQL with user scope and dashboard filters applied (binds inlined).
+    """
+    real_sql = translate_llm_sql_to_real(sql)
+    augmented, bind = inject_user_scope(real_sql, user_id)
+    augmented, bind = _append_dashboard_filters(
+        augmented,
+        bind,
+        date_from=date_from,
+        date_to=date_to,
+        bank_name=bank_name,
+        category=category,
+        parent_category=parent_category,
+        sub_category=sub_category,
+        transaction_type=transaction_type,
+    )
+    return _format_sql_with_binds(augmented, bind)
+
+
 def execute_raw_metric_sql(
     sql: str,
     user_id: str,

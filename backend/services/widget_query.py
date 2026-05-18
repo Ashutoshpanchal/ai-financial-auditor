@@ -11,10 +11,12 @@ from datetime import date
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 
 from backend.models.transaction import Transaction
 from backend.services.widget_metric_raw_sql import (
+    build_raw_metric_sql_preview,
     execute_raw_metric_sql,
     validate_raw_metric_sql,
 )
@@ -37,6 +39,29 @@ _ALLOWED_GROUP_BY: frozenset[str] = frozenset({"month", "day", "category", "bank
 _CHART_WIDGET_TYPES: frozenset[str] = frozenset(
     {"bar_chart", "pie_chart", "line_chart"}
 )
+SPEND_RECEIVE_PAIR_TYPE = "spend_receive_pair"
+_ALL_WIDGET_TYPES: frozenset[str] = (
+    frozenset({"metric", SPEND_RECEIVE_PAIR_TYPE}) | _CHART_WIDGET_TYPES
+)
+
+
+def _validate_spend_receive_pair_config(config: dict[str, Any]) -> None:
+    """Validate query_config for spend+received dual-metric widgets."""
+    tpl = config.get("template")
+    if tpl is not None and tpl != SPEND_RECEIVE_PAIR_TYPE:
+        raise ValueError(
+            f"Invalid template '{tpl}'. Use '{SPEND_RECEIVE_PAIR_TYPE}' or omit."
+        )
+    if config.get("raw_metric_sql"):
+        raise ValueError("raw_metric_sql is not supported for spend_receive_pair.")
+    for key in ("aggregation", "field", "group_by"):
+        if config.get(key) is not None:
+            raise ValueError(f"spend_receive_pair must not include '{key}'.")
+    cfg_filters: dict[str, Any] = config.get("filters", {}) or {}
+    txn = cfg_filters.get("transaction_type")
+    if txn is not None:
+        raise ValueError("spend_receive_pair must not set filters.transaction_type.")
+    validate_placeholder_filter_values(config)
 
 
 def validate_widget_query_config(widget_type: str, config: dict[str, Any]) -> None:
@@ -46,17 +71,21 @@ def validate_widget_query_config(widget_type: str, config: dict[str, Any]) -> No
     that ``group_by`` presence aligns with metric vs chart widget types.
 
     Args:
-        widget_type: One of metric, bar_chart, pie_chart, line_chart.
+        widget_type: One of metric, spend_receive_pair, bar_chart, pie_chart, line_chart.
         config:       Same shape as accepted by ``resolve_widget_data``.
 
     Raises:
         ValueError: If any rule is violated.
     """
-    if widget_type not in ({"metric"} | _CHART_WIDGET_TYPES):
+    if widget_type not in _ALL_WIDGET_TYPES:
         raise ValueError(
             f"Invalid widget_type '{widget_type}'. "
-            f"Allowed: metric, {', '.join(sorted(_CHART_WIDGET_TYPES))}"
+            f"Allowed: {', '.join(sorted(_ALL_WIDGET_TYPES))}"
         )
+
+    if widget_type == SPEND_RECEIVE_PAIR_TYPE:
+        _validate_spend_receive_pair_config(config)
+        return
 
     raw_sql = config.get("raw_metric_sql")
     if isinstance(raw_sql, str) and raw_sql.strip():
@@ -125,6 +154,24 @@ def describe_widget_query_human(config: dict[str, Any]) -> str:
         For builder configs: a short multi-line human-readable description for UI display.
         For ``raw_metric_sql`` metric configs: the stripped SQL (server still injects user scope).
     """
+    if config.get("template") == SPEND_RECEIVE_PAIR_TYPE:
+        cfg_filters: dict[str, Any] = config.get("filters", {}) or {}
+        lines = [
+            "SELECT sum(debit) AS spend, sum(credit) AS received",
+            "FROM your_transactions",
+        ]
+        where_parts: list[str] = ["(only your transactions — applied by the app)"]
+        if cfg_filters.get("category"):
+            where_parts.append(f"category = '{cfg_filters['category']}'")
+        if cfg_filters.get("parent_category"):
+            where_parts.append(f"parent_category = '{cfg_filters['parent_category']}'")
+        if cfg_filters.get("sub_category"):
+            where_parts.append(f"sub_category = '{cfg_filters['sub_category']}'")
+        if cfg_filters.get("bank_name"):
+            where_parts.append(f"bank_name = '{cfg_filters['bank_name']}'")
+        lines.append("WHERE " + " AND ".join(where_parts))
+        return "\n".join(lines)
+
     raw_sql = config.get("raw_metric_sql")
     if isinstance(raw_sql, str) and raw_sql.strip():
         return abstract_sql_for_display(translate_llm_sql_to_real(raw_sql.strip()))
@@ -158,6 +205,229 @@ def describe_widget_query_human(config: dict[str, Any]) -> str:
     lines.append("WHERE " + " AND ".join(where_parts))
 
     return "\n".join(lines)
+
+
+def _strip_unresolved_placeholder(value: str | None) -> str | None:
+    """Return None when a filter value is still an unresolved ``{{...}}`` token."""
+    if value is None:
+        return None
+    if isinstance(value, str) and value.startswith("{{"):
+        return None
+    return value
+
+
+def _compile_stmt_for_debug(stmt: Any) -> str:
+    """Compile a SQLAlchemy statement to PostgreSQL SQL with literal binds."""
+    compiled = stmt.compile(
+        dialect=postgresql.dialect(),
+        compile_kwargs={"literal_binds": True},
+    )
+    return str(compiled)
+
+
+def describe_widget_query_real(
+    config: dict[str, Any],
+    user_id: str,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    bank_name: str | None = None,
+    category: str | None = None,
+    parent_category: str | None = None,
+    sub_category: str | None = None,
+    default_month_for_preview: bool = False,
+) -> str:
+    """Build real ``transactions`` SQL for super-admin debug (not executed).
+
+    Args:
+        config: Widget ``query_config`` dict.
+        user_id: Tenant id used in WHERE clauses.
+        date_from: FilterBar lower date bound.
+        date_to: FilterBar upper date bound.
+        bank_name: Optional bank filter from UI.
+        category: Optional category filter from UI.
+        parent_category: Optional parent category filter from UI.
+        sub_category: Optional sub-category filter from UI.
+        default_month_for_preview: Default unresolved date placeholders to current month.
+
+    Returns:
+        Representative SQL string matching what ``resolve_widget_data`` would run.
+    """
+    if config.get("template") == SPEND_RECEIVE_PAIR_TYPE:
+        spend_cfg = {
+            **config,
+            "aggregation": "sum",
+            "field": "debit",
+            "filters": {
+                **(config.get("filters") or {}),
+                "transaction_type": "debit",
+            },
+        }
+        recv_cfg = {
+            **config,
+            "aggregation": "sum",
+            "field": "credit",
+            "filters": {
+                **(config.get("filters") or {}),
+                "transaction_type": "credit",
+            },
+        }
+        spend_sql = describe_widget_query_real(
+            spend_cfg,
+            user_id,
+            date_from=date_from,
+            date_to=date_to,
+            bank_name=bank_name,
+            category=category,
+            parent_category=parent_category,
+            sub_category=sub_category,
+            default_month_for_preview=default_month_for_preview,
+        )
+        recv_sql = describe_widget_query_real(
+            recv_cfg,
+            user_id,
+            date_from=date_from,
+            date_to=date_to,
+            bank_name=bank_name,
+            category=category,
+            parent_category=parent_category,
+            sub_category=sub_category,
+            default_month_for_preview=default_month_for_preview,
+        )
+        return f"-- Spend\n{spend_sql}\n\n-- Received\n{recv_sql}"
+
+    resolved_config, runtime = resolve_query_config_placeholders(
+        config,
+        date_from=date_from,
+        date_to=date_to,
+        bank_name=bank_name,
+        category=category,
+        parent_category=parent_category,
+        sub_category=sub_category,
+        default_month_for_preview=default_month_for_preview,
+    )
+    config = resolved_config
+    date_from = runtime.date_from
+    date_to = runtime.date_to
+    bank_name = runtime.bank_name
+    category = runtime.category
+    parent_category = runtime.parent_category
+    sub_category = runtime.sub_category
+
+    raw_sql = config.get("raw_metric_sql")
+    if isinstance(raw_sql, str) and raw_sql.strip():
+        cfg_filters_r: dict[str, Any] = config.get("filters", {}) or {}
+        effective_category_r = _strip_unresolved_placeholder(
+            category if category is not None else cfg_filters_r.get("category")
+        )
+        effective_bank_name_r = _strip_unresolved_placeholder(
+            bank_name if bank_name is not None else cfg_filters_r.get("bank_name")
+        )
+        effective_parent_r = _strip_unresolved_placeholder(
+            parent_category
+            if parent_category is not None
+            else cfg_filters_r.get("parent_category")
+        )
+        effective_sub_r = _strip_unresolved_placeholder(
+            sub_category
+            if sub_category is not None
+            else cfg_filters_r.get("sub_category")
+        )
+        transaction_type_r: str | None = cfg_filters_r.get("transaction_type")
+        return build_raw_metric_sql_preview(
+            raw_sql.strip(),
+            user_id,
+            date_from=date_from,
+            date_to=date_to,
+            bank_name=effective_bank_name_r,
+            category=effective_category_r,
+            parent_category=effective_parent_r,
+            sub_category=effective_sub_r,
+            transaction_type=transaction_type_r,
+        )
+
+    aggregation = config.get("aggregation", "")
+    field = config.get("field", "")
+    group_by: str | None = config.get("group_by")
+
+    target_col = Transaction.credit if field == "credit" else Transaction.debit
+    agg_map: dict[str, Any] = {
+        "sum": func.sum(target_col),
+        "count": func.count(Transaction.id),
+        "avg": func.avg(target_col),
+        "max": func.max(target_col),
+        "min": func.min(target_col),
+    }
+    agg_col = agg_map.get(aggregation, func.sum(target_col))
+
+    cfg_filters: dict[str, Any] = config.get("filters", {}) or {}
+    effective_category = _strip_unresolved_placeholder(
+        category if category is not None else cfg_filters.get("category")
+    )
+    effective_bank_name = _strip_unresolved_placeholder(
+        bank_name if bank_name is not None else cfg_filters.get("bank_name")
+    )
+    effective_parent_category = _strip_unresolved_placeholder(
+        parent_category
+        if parent_category is not None
+        else cfg_filters.get("parent_category")
+    )
+    effective_sub_category = _strip_unresolved_placeholder(
+        sub_category if sub_category is not None else cfg_filters.get("sub_category")
+    )
+    transaction_type: str | None = cfg_filters.get("transaction_type")
+
+    clauses = _build_where_clauses(
+        user_id=user_id,
+        effective_category=effective_category,
+        effective_bank_name=effective_bank_name,
+        effective_parent_category=effective_parent_category,
+        effective_sub_category=effective_sub_category,
+        transaction_type=transaction_type,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    if group_by is None:
+        stmt = select(agg_col).where(*clauses)
+        return _compile_stmt_for_debug(stmt)
+
+    labeled_agg = agg_col.label("total")
+    if group_by == "month":
+        group_col = func.to_char(Transaction.transaction_date, "YYYY-MM").label("month")
+        stmt = (
+            select(group_col, labeled_agg)
+            .where(*clauses)
+            .group_by(group_col)
+            .order_by(group_col.asc())
+        )
+    elif group_by == "day":
+        group_col = func.to_char(Transaction.transaction_date, "YYYY-MM-DD").label(
+            "day"
+        )
+        stmt = (
+            select(group_col, labeled_agg)
+            .where(*clauses)
+            .group_by(group_col)
+            .order_by(group_col.asc())
+        )
+    elif group_by == "category":
+        group_col: Any = Transaction.category.label("label")
+        stmt = (
+            select(group_col, labeled_agg)
+            .where(*clauses)
+            .group_by(group_col)
+            .order_by(labeled_agg.desc())
+        )
+    else:
+        group_col = Transaction.bank_name.label("label")
+        stmt = (
+            select(group_col, labeled_agg)
+            .where(*clauses)
+            .group_by(group_col)
+            .order_by(labeled_agg.desc())
+        )
+    return _compile_stmt_for_debug(stmt)
 
 
 def resolve_widget_data(
@@ -232,6 +502,19 @@ def resolve_widget_data(
     category = runtime.category
     parent_category = runtime.parent_category
     sub_category = runtime.sub_category
+
+    if config.get("template") == SPEND_RECEIVE_PAIR_TYPE:
+        return _resolve_spend_receive_pair(
+            db=db,
+            user_id=user_id,
+            config=config,
+            effective_category=category,
+            effective_bank_name=bank_name,
+            effective_parent_category=parent_category,
+            effective_sub_category=sub_category,
+            date_from=date_from,
+            date_to=date_to,
+        )
 
     raw_sql = config.get("raw_metric_sql")
     if isinstance(raw_sql, str) and raw_sql.strip():
@@ -428,6 +711,52 @@ def _build_where_clauses(
         clauses.append(Transaction.transaction_date <= date_to)
 
     return clauses
+
+
+def _resolve_spend_receive_pair(
+    db: Session,
+    user_id: str,
+    config: dict[str, Any],
+    effective_category: str | None,
+    effective_bank_name: str | None,
+    effective_parent_category: str | None,
+    effective_sub_category: str | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> dict[str, Any]:
+    """Return spend and received totals for a dual-metric widget."""
+    fmt = config.get("format", "currency")
+    spend_result = _resolve_metric(
+        db=db,
+        user_id=user_id,
+        agg_col=func.sum(Transaction.debit),
+        effective_category=effective_category,
+        effective_bank_name=effective_bank_name,
+        effective_parent_category=effective_parent_category,
+        effective_sub_category=effective_sub_category,
+        transaction_type="debit",
+        date_from=date_from,
+        date_to=date_to,
+        fmt=fmt,
+    )
+    received_result = _resolve_metric(
+        db=db,
+        user_id=user_id,
+        agg_col=func.sum(Transaction.credit),
+        effective_category=effective_category,
+        effective_bank_name=effective_bank_name,
+        effective_parent_category=effective_parent_category,
+        effective_sub_category=effective_sub_category,
+        transaction_type="credit",
+        date_from=date_from,
+        date_to=date_to,
+        fmt=fmt,
+    )
+    return {
+        "spend": spend_result["value"],
+        "received": received_result["value"],
+        "format": fmt,
+    }
 
 
 def _resolve_metric(

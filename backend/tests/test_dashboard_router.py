@@ -26,8 +26,11 @@ WIDGET_ID = "widget-uuid-001"
 
 def _make_user(user_id: str = USER_ID) -> MagicMock:
     """Return a minimal mock User object."""
+    from backend.models.user import UserRole
+
     user = MagicMock()
     user.id = user_id
+    user.role = UserRole.user
     return user
 
 
@@ -611,6 +614,45 @@ class TestPreviewWidget:
         assert body["data"] == mock_data
         assert "human_query" in body
         assert "your_transactions" in body["human_query"]
+        assert "debug_sql" not in body
+
+    def test_super_admin_gets_debug_sql(self) -> None:
+        """Super admin preview responses include debug_sql."""
+        from backend.models.user import UserRole
+
+        db = _make_db()
+        user = _make_user()
+        user.role = UserRole.super_admin
+        mock_data = {"value": 10.0, "format": "currency"}
+
+        with (
+            patch("backend.routers.dashboard.set_rls_user"),
+            patch(
+                "backend.routers.dashboard.resolve_widget_data",
+                return_value=mock_data,
+            ),
+            patch(
+                "backend.routers.dashboard.describe_widget_query_real",
+                return_value="SELECT sum(transactions.debit) FROM transactions",
+            ) as mock_real,
+        ):
+            client = _client_with_overrides(db, user)
+            response = client.post(
+                "/dashboard/widgets/preview",
+                json={
+                    "widget_type": "metric",
+                    "query_config": {
+                        "aggregation": "sum",
+                        "field": "debit",
+                        "format": "currency",
+                    },
+                },
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["debug_sql"] == "SELECT sum(transactions.debit) FROM transactions"
+        mock_real.assert_called_once()
 
     def test_invalid_config_returns_422(self) -> None:
         """Preview with metric + group_by must return 422."""

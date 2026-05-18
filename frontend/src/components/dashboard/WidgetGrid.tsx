@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DualMetricCard } from "./DualMetricCard";
 import { MetricCard } from "./MetricCard";
 import { BarChartWidget } from "./BarChartWidget";
 import { PieChartWidget } from "./PieChartWidget";
@@ -9,7 +10,7 @@ import type { FilterState } from "./FilterBar";
 interface Widget {
   id: string;
   title: string;
-  widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
+  widget_type: "metric" | "spend_receive_pair" | "bar_chart" | "pie_chart" | "line_chart";
   query_config: Record<string, unknown>;
   is_default: boolean;
 }
@@ -40,7 +41,13 @@ interface MetricApiData {
   format?: "currency" | "number";
 }
 
-type WidgetApiData = MetricApiData | ChartRow[];
+interface DualMetricApiData {
+  spend: number;
+  received: number;
+  format?: "currency" | "number";
+}
+
+type WidgetApiData = MetricApiData | DualMetricApiData | ChartRow[];
 
 const API_BASE = "http://localhost:8000";
 
@@ -103,6 +110,15 @@ function isMetricData(d: WidgetApiData | null): d is MetricApiData {
   return d !== null && !Array.isArray(d) && typeof (d as MetricApiData).value === "number";
 }
 
+function isDualMetricData(d: WidgetApiData | null): d is DualMetricApiData {
+  return (
+    d !== null &&
+    !Array.isArray(d) &&
+    typeof (d as DualMetricApiData).spend === "number" &&
+    typeof (d as DualMetricApiData).received === "number"
+  );
+}
+
 // ─── WidgetCell ───────────────────────────────────────────────────────────────
 
 interface WidgetCellProps {
@@ -132,6 +148,7 @@ function WidgetCell({
 
   const metricValue = isMetricData(data) ? data.value : 0;
   const metricFormat = isMetricData(data) ? (data.format ?? "number") : "number";
+  const dualData = isDualMetricData(data) ? data : null;
   const chartData = Array.isArray(data) ? data : [];
 
   const colSpan = COL_SPAN_CLASSES[item.col_span] ?? "col-span-1";
@@ -172,6 +189,16 @@ function WidgetCell({
 
       {widget.widget_type === "metric" && (
         <MetricCard title={widget.title} value={metricValue} format={metricFormat} isLoading={isLoading} error={error} />
+      )}
+      {widget.widget_type === "spend_receive_pair" && (
+        <DualMetricCard
+          title={widget.title}
+          spend={dualData?.spend ?? 0}
+          received={dualData?.received ?? 0}
+          format={(dualData?.format as "currency" | "number") ?? "currency"}
+          isLoading={isLoading}
+          error={error}
+        />
       )}
       {(widget.widget_type === "bar_chart" || widget.widget_type === "line_chart") && (
         <BarChartWidget title={widget.title} data={chartData} isLoading={isLoading} error={error} />
