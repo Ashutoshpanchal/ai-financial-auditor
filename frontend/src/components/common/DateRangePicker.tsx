@@ -4,6 +4,8 @@ import {
   clampRangeToScope,
   detectPreset,
   formatDateRangeLabel,
+  getPresetRange,
+  normalizeScopeBound,
   PICKER_PRESET_ORDER,
   PRESET_LABELS,
   type DateRangePreset,
@@ -166,8 +168,8 @@ export function DateRangePicker({
     ? "Loading dates…"
     : formatDateRangeLabel(value.from, value.to, activeCommitted);
 
-  const minBound = scope?.min_date ?? undefined;
-  const maxBound = scope?.max_date ?? undefined;
+  const minBound = normalizeScopeBound(scope?.min_date);
+  const maxBound = normalizeScopeBound(scope?.max_date);
   const noData = scope && !scope.has_transactions;
 
   const leftYear = viewStart.getFullYear();
@@ -187,7 +189,7 @@ export function DateRangePicker({
         setOpen(false);
       }
     }
-    function onPointer(e: MouseEvent) {
+    function onOutsideClick(e: MouseEvent) {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         if (applyMode === "confirm") {
           setDraftFrom(snapshotRef.current.from);
@@ -197,10 +199,14 @@ export function DateRangePicker({
       }
     }
     document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onPointer);
+    // Defer so the opening click does not immediately dismiss the panel.
+    const attachId = window.setTimeout(() => {
+      document.addEventListener("click", onOutsideClick);
+    }, 0);
     return () => {
+      window.clearTimeout(attachId);
       document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("click", onOutsideClick);
     };
   }, [open, applyMode]);
 
@@ -216,6 +222,13 @@ export function DateRangePicker({
     wasOpenRef.current = open;
   }, [open, value.from, value.to]);
 
+  useEffect(() => {
+    if (!open) {
+      setDraftFrom(value.from);
+      setDraftTo(value.to);
+    }
+  }, [value.from, value.to, open]);
+
   function commitDraft(preset: DateRangePreset | null) {
     onChange({ from: draftFrom, to: draftTo }, preset ?? undefined);
   }
@@ -227,18 +240,39 @@ export function DateRangePicker({
   }
 
   function handlePreset(preset: DateRangePreset) {
+    const raw = getPresetRange(preset);
     const applied = applyPreset(preset, scope);
+    // #region agent log
+    fetch("http://127.0.0.1:7468/ingest/c6a2fb7b-a253-45f4-9e0e-b6181ccf071d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "77f6a0" },
+      body: JSON.stringify({
+        sessionId: "77f6a0",
+        runId: "browser",
+        hypothesisId: "H4",
+        location: "DateRangePicker.tsx:handlePreset",
+        message: "preset applied in UI",
+        data: {
+          preset,
+          raw,
+          applied,
+          applyMode,
+          scopeMin: scope?.min_date ?? null,
+          scopeMax: scope?.max_date ?? null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (!applied) return;
     const p = detectPreset(applied.from, applied.to, scope);
-    if (applyMode === "live") {
-      pushLive(applied, p);
-    } else {
-      setDraftFrom(applied.from);
-      setDraftTo(applied.to);
-      setSelectAnchor(null);
-      const d = parseIsoDate(applied.from) ?? new Date();
-      setViewStart(startOfMonth(d));
-    }
+    setDraftFrom(applied.from);
+    setDraftTo(applied.to);
+    setSelectAnchor(null);
+    setViewStart(startOfMonth(parseIsoDate(applied.from) ?? new Date()));
+    snapshotRef.current = { from: applied.from, to: applied.to };
+    // Quick presets always commit — users expect filters to update immediately.
+    onChange(applied, p ?? undefined);
   }
 
   function handleDayClick(iso: string) {
@@ -322,7 +356,10 @@ export function DateRangePicker({
           aria-expanded={open}
           aria-haspopup="dialog"
           aria-controls={open ? panelId : undefined}
-          onClick={() => setOpen((o) => !o)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((o) => !o);
+          }}
           className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-gray-800 transition hover:bg-violet-50/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-100 dark:hover:bg-violet-950/30"
         >
           <span className="truncate text-violet-950 dark:text-violet-100">{triggerLabel}</span>
@@ -357,6 +394,8 @@ export function DateRangePicker({
           id={panelId}
           role="dialog"
           aria-label={label}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
           className="absolute left-0 top-full z-50 mt-2 w-[min(100vw-1rem,44rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10"
         >
           {noData ? (
@@ -378,7 +417,10 @@ export function DateRangePicker({
                       key={preset}
                       type="button"
                       disabled={!canApply}
-                      onClick={() => handlePreset(preset)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePreset(preset);
+                      }}
                       className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition sm:w-full ${
                         isActive
                           ? "border-l-4 border-violet-600 bg-violet-100 font-semibold text-violet-900 sm:border-l-4"

@@ -14,6 +14,8 @@ export interface FilterState {
 interface FilterBarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
+  /** Light default; editorial uses dark dashboard tokens. */
+  variant?: "default" | "editorial";
   /** Distinct bank names for dropdown; when empty, bank stays a free-text input. */
   bankOptions?: string[];
   /** Parent category options for dropdown (Widget Studio / dashboard). */
@@ -46,6 +48,7 @@ const EMPTY_FILTERS: FilterState = {
 export function FilterBar({
   filters,
   onChange,
+  variant = "default",
   bankOptions = [],
   parentCategoryOptions = [],
   subCategoryOptions = [],
@@ -63,6 +66,21 @@ export function FilterBar({
   }
 
   function handleDateChange(range: DateRangeValue) {
+    // #region agent log
+    fetch("http://127.0.0.1:7468/ingest/c6a2fb7b-a253-45f4-9e0e-b6181ccf071d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "77f6a0" },
+      body: JSON.stringify({
+        sessionId: "77f6a0",
+        runId: "browser",
+        hypothesisId: "H5",
+        location: "FilterBar.tsx:handleDateChange",
+        message: "filter dates committed",
+        data: { from: range.from, to: range.to },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     onChange({ ...filters, dateFrom: range.from, dateTo: range.to });
   }
 
@@ -96,10 +114,17 @@ export function FilterBar({
   const hasMaster = parentCategoryOptions.length > 0;
   const parentSelected = Boolean(filters.parentCategory);
   const showSubCategoryRow = hasMaster && parentSelected;
+  const isEditorial = variant === "editorial";
 
   return (
-    <div className="w-full border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div
+      className={
+        isEditorial
+          ? "de-filter-bar w-full border-b border-[var(--border2)] bg-[var(--surface)] px-4 py-3 sm:px-6 lg:px-8"
+          : "w-full border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6 lg:px-8"
+      }
+    >
+      <div className={isEditorial ? "mx-auto max-w-[1120px]" : "max-w-7xl mx-auto"}>
         <div className="flex flex-wrap items-center gap-3">
           <DateRangePicker
             label="Date range"
@@ -107,6 +132,7 @@ export function FilterBar({
             onChange={(range) => handleDateChange(range)}
             scope={dateScope}
             loading={dateScopeLoading}
+            applyMode="live"
           />
 
           {/* Bank name */}

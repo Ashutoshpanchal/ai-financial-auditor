@@ -21,6 +21,7 @@ langchain-openai>=0.1.7,<0.2
 langchain-community>=0.2.16,<0.3
 langgraph>=0.2.50,<0.3
 openai>=1.40.0,<2
+agentscope>=1.0,<2
 
 # Observability
 langsmith>=0.1.112,<0.2

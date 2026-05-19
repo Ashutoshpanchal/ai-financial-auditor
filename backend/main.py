@@ -24,6 +24,7 @@ from backend.models import (  # noqa: F401 — side-effect: registers models wit
     transaction,
     user,
     widget,
+    widget_studio,
 )
 from backend.models.base import Base
 from backend.routers import (
@@ -36,6 +37,7 @@ from backend.routers import (
     dashboard as dashboard_router,
     documents,
     transactions,
+    widget_studio as widget_studio_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,6 +98,7 @@ app.include_router(transactions.router)
 app.include_router(categories.router)
 app.include_router(analytics.router)
 app.include_router(dashboard_router.router)
+app.include_router(widget_studio_router.router)
 
 
 @app.get("/health")

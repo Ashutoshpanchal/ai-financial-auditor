@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { ThemeProvider } from "../contexts/ThemeContext";
+import { ThemeProvider, type Theme } from "../contexts/ThemeContext";
 
 vi.mock("../hooks/useAuth", () => ({
   useAuth: () => ({ user: { name: "Test User" } }),
@@ -21,8 +21,8 @@ vi.mock("../hooks/useTransactionDateScope", () => ({
   }),
 }));
 
-vi.mock("../components/dashboard/WidgetGrid", () => ({
-  WidgetGrid: () => <div data-testid="widget-grid">WidgetGrid</div>,
+vi.mock("../components/dashboard/cards/DashboardOverview", () => ({
+  DashboardOverview: () => <div data-testid="dashboard-overview">Overview</div>,
 }));
 
 vi.mock("../components/dashboard/FilterBar", () => ({
@@ -31,10 +31,25 @@ vi.mock("../components/dashboard/FilterBar", () => ({
 
 import Dashboard from "./Dashboard";
 
-const WIDGETS = [
-  { id: "w1", title: "Total Credits", widget_type: "metric", query_config: {}, is_default: true },
-];
-const LAYOUT = { cols: 3, grid: [{ widget_id: "w1", row: 0, col: 0, col_span: 1 }] };
+const OVERVIEW = {
+  totals: {
+    credits: 1000,
+    debits: 800,
+    credit_count: 5,
+    debit_count: 10,
+    net: 200,
+  },
+  by_month: [{ label: "2024-04", debit: 100 }],
+  by_quarter: [
+    { label: "Q1", debit: 100, months: "Apr–Jun" },
+    { label: "Q2", debit: 0, months: "Jul–Sep" },
+    { label: "Q3", debit: 0, months: "Oct–Dec" },
+    { label: "Q4", debit: 0, months: "Jan–Mar" },
+  ],
+  top_categories: [{ label: "Food", value: 500 }],
+  top_descriptions: [{ label: "ZOMATO", value: 200 }],
+  investment_debits: 100,
+};
 
 function makeFetch(responses: Record<string, unknown>) {
   return vi.fn((url: string) => {
@@ -47,7 +62,13 @@ function makeFetch(responses: Record<string, unknown>) {
   });
 }
 
-function renderDashboard() {
+function renderDashboard(initialTheme: Theme = "light") {
+  if (initialTheme === "light") {
+    document.documentElement.classList.remove("dark");
+  } else {
+    document.documentElement.classList.add("dark");
+  }
+  localStorage.setItem("financeai-theme", initialTheme);
   return render(
     <ThemeProvider>
       <MemoryRouter>
@@ -62,57 +83,61 @@ describe("Dashboard", () => {
     vi.clearAllMocks();
   });
 
-  it("shows loading skeletons while fetching", () => {
-    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
-    renderDashboard();
-    const skeletons = document.querySelectorAll(".animate-pulse");
-    expect(skeletons.length).toBeGreaterThan(0);
-  });
-
-  it("renders widget grid and filter bar after data loads", async () => {
+  it("shows editorial shell and filter bar", async () => {
     vi.stubGlobal(
       "fetch",
       makeFetch({
-        "/dashboard/widgets": WIDGETS,
-        "/dashboard/layout": LAYOUT,
+        "/dashboard/overview": OVERVIEW,
       }),
     );
 
     renderDashboard();
 
-    await waitFor(() => expect(screen.getByTestId("widget-grid")).toBeInTheDocument());
-    expect(screen.getByTestId("filter-bar")).toBeInTheDocument();
-    expect(screen.queryByTestId("chat-panel")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("filter-bar")).toBeInTheDocument());
+    expect(screen.getByTestId("dashboard-overview")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-editorial")).toBeTruthy();
   });
 
-  it("shows Spending overview heading and filter summary", async () => {
+  it("applies light editorial class when theme is light", async () => {
     vi.stubGlobal(
       "fetch",
       makeFetch({
-        "/dashboard/widgets": WIDGETS,
-        "/dashboard/layout": LAYOUT,
+        "/dashboard/overview": OVERVIEW,
+      }),
+    );
+
+    renderDashboard("light");
+
+    await waitFor(() => expect(screen.getByTestId("dashboard-overview")).toBeInTheDocument());
+    expect(document.querySelector(".dashboard-editorial--light")).toBeTruthy();
+  });
+
+  it("uses dark editorial shell when theme is dark", async () => {
+    vi.stubGlobal(
+      "fetch",
+      makeFetch({
+        "/dashboard/overview": OVERVIEW,
+      }),
+    );
+
+    renderDashboard("dark");
+
+    await waitFor(() => expect(screen.getByTestId("dashboard-overview")).toBeInTheDocument());
+    const shell = document.querySelector(".dashboard-editorial");
+    expect(shell).toBeTruthy();
+    expect(shell?.classList.contains("dashboard-editorial--light")).toBe(false);
+  });
+
+  it("shows SPENDING OVERVIEW heading and user name", async () => {
+    vi.stubGlobal(
+      "fetch",
+      makeFetch({
+        "/dashboard/overview": OVERVIEW,
       }),
     );
 
     renderDashboard();
-    await waitFor(() => screen.getByText("Spending overview"));
+    await waitFor(() => screen.getByText(/SPENDING/));
     expect(screen.getByText(/Test User/)).toBeInTheDocument();
-    expect(screen.queryByText("Finance Assistant")).not.toBeInTheDocument();
-    expect(screen.queryByText("+ Add Widgets")).not.toBeInTheDocument();
-  });
-
-  it("toggles edit mode via Edit button", async () => {
-    vi.stubGlobal(
-      "fetch",
-      makeFetch({
-        "/dashboard/widgets": WIDGETS,
-        "/dashboard/layout": LAYOUT,
-      }),
-    );
-
-    renderDashboard();
-    await waitFor(() => screen.getByText("Edit"));
-    fireEvent.click(screen.getByText("Edit"));
-    expect(screen.getByText("Done")).toBeInTheDocument();
   });
 });

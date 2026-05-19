@@ -1,38 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { DashboardOverview } from "../components/dashboard/cards/DashboardOverview";
 import { FilterBar, FilterState } from "../components/dashboard/FilterBar";
+import { useDashboardOverview } from "../hooks/useDashboardOverview";
 import { useTransactionDateScope } from "../hooks/useTransactionDateScope";
-import { WidgetGrid } from "../components/dashboard/WidgetGrid";
 import { useAuth } from "../hooks/useAuth";
-
-const API = "http://localhost:8000";
-
-interface Widget {
-  id: string;
-  title: string;
-  widget_type: "metric" | "bar_chart" | "pie_chart" | "line_chart";
-  query_config: Record<string, unknown>;
-  is_default: boolean;
-}
-
-interface GridItem {
-  widget_id: string;
-  row: number;
-  col: number;
-  col_span: number;
-}
-
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`HTTP ${res.status}: ${body}`);
-  }
-  return res.json() as Promise<T>;
-}
+import { useTheme } from "../contexts/ThemeContext";
+import "../styles/dashboard-editorial.css";
 
 function formatFilterDate(iso: string): string {
   if (!iso) return "";
@@ -41,22 +14,19 @@ function formatFilterDate(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", year: "numeric", day: "numeric" });
 }
 
-function buildFilterSummary(filters: FilterState, userName?: string | null): string {
-  const parts: string[] = [];
+function buildPeriodLabel(filters: FilterState): string {
   if (filters.dateFrom || filters.dateTo) {
     const from = filters.dateFrom ? formatFilterDate(filters.dateFrom) : "…";
     const to = filters.dateTo ? formatFilterDate(filters.dateTo) : "…";
-    parts.push(`${from} – ${to}`);
+    return `${from} – ${to}`;
   }
-  if (filters.bankName) parts.push(filters.bankName);
-  if (userName) parts.push(userName);
-  return parts.length > 0 ? parts.join(" · ") : "All transactions";
+  return "All transactions";
 }
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [widgets, setWidgets] = useState<Widget[]>([]);
-  const [grid, setGrid] = useState<GridItem[]>([]);
+  const { theme } = useTheme();
+  const isDarkEditorial = theme === "dark";
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: "",
     dateTo: "",
@@ -64,8 +34,6 @@ export default function Dashboard() {
     parentCategory: "",
     subCategories: [],
   });
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [isLoadingLayout, setIsLoadingLayout] = useState(true);
   const {
     scope: dateScope,
     defaultRange,
@@ -86,10 +54,8 @@ export default function Dashboard() {
     return subs.map((s) => s.sub_category).sort((a, b) => a.localeCompare(b));
   }, [categoryMaster, filters.parentCategory]);
 
-  const filterSummary = useMemo(
-    () => buildFilterSummary(filters, user?.name),
-    [filters, user?.name],
-  );
+  const periodLabel = useMemo(() => buildPeriodLabel(filters), [filters]);
+  const { data, isLoading, error } = useDashboardOverview(filters);
 
   useEffect(() => {
     if (datesInitialized.current || dateScopeLoading || !defaultRange) return;
@@ -103,75 +69,44 @@ export default function Dashboard() {
     }
   }, [dateScopeLoading, defaultRange, filters.dateFrom, filters.dateTo]);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [widgetList, layout] = await Promise.all([
-          apiFetch<Widget[]>("/dashboard/widgets"),
-          apiFetch<{ cols: number; grid: GridItem[] }>("/dashboard/layout"),
-        ]);
-        setWidgets(widgetList);
-        setGrid(layout.grid ?? []);
-      } catch {
-        // silently handle — widget grid shows empty state
-      } finally {
-        setIsLoadingLayout(false);
-      }
-    };
-    void load();
-  }, []);
-
-  const saveLayout = useCallback(async (newGrid: GridItem[]) => {
-    try {
-      await apiFetch("/dashboard/layout", {
-        method: "PUT",
-        body: JSON.stringify({ layout: { cols: 3, grid: newGrid } }),
-      });
-    } catch {
-      // best-effort save
-    }
-  }, []);
-
-  const handleGridChange = useCallback(
-    (newGrid: GridItem[]) => {
-      setGrid(newGrid);
-      void saveLayout(newGrid);
-    },
-    [saveLayout],
-  );
-
-  const handleRemoveFromGrid = useCallback(
-    (widgetId: string) => {
-      const newGrid = grid.filter((g) => g.widget_id !== widgetId);
-      setGrid(newGrid);
-      void saveLayout(newGrid);
-    },
-    [grid, saveLayout],
-  );
+  const headerBank = filters.bankName || (bankNames.length === 1 ? bankNames[0] : null);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 dark:bg-gray-950">
-      <header className="border-b border-gray-200 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Spending overview</h1>
-            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{filterSummary}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsEditMode((v) => !v)}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-              isEditMode
-                ? "border-gray-700 bg-gray-800 text-white hover:bg-gray-700 dark:border-gray-500"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-            }`}
+    <div
+      className={
+        isDarkEditorial
+          ? "dashboard-editorial"
+          : "dashboard-editorial dashboard-editorial--light"
+      }
+    >
+      <div className="de-glow-1" aria-hidden />
+      <div className="de-glow-2" aria-hidden />
+
+      <header className="relative z-10 border-b border-[var(--border2)] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1120px]">
+          {headerBank && (
+            <p
+              className="mb-2 text-xs font-semibold uppercase tracking-[0.2em]"
+              style={{ color: "var(--lime)" }}
+            >
+              {headerBank}
+            </p>
+          )}
+          <h1
+            className="font-display text-5xl tracking-wide sm:text-6xl"
+            style={{ fontFamily: "var(--font-display)", lineHeight: 0.9 }}
           >
-            {isEditMode ? "Done" : "Edit"}
-          </button>
+            SPENDING <span style={{ color: "var(--lime)" }}>OVERVIEW</span>
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: "var(--t3)" }}>
+            {user?.name ?? "Your account"}
+            {periodLabel !== "All transactions" ? ` · ${periodLabel}` : ""}
+          </p>
         </div>
       </header>
 
       <FilterBar
+        variant={isDarkEditorial ? "editorial" : "default"}
         filters={filters}
         onChange={setFilters}
         bankOptions={bankNames}
@@ -182,26 +117,15 @@ export default function Dashboard() {
         defaultDateRange={defaultRange}
       />
 
-      <main className="mx-auto max-w-7xl p-4 sm:px-6 lg:px-8">
-        {isLoadingLayout ? (
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3, 4].map((n) => (
-              <div
-                key={n}
-                className="h-32 animate-pulse rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-              />
-            ))}
-          </div>
-        ) : (
-          <WidgetGrid
-            widgets={widgets}
-            grid={grid}
-            filters={filters}
-            isEditMode={isEditMode}
-            onGridChange={handleGridChange}
-            onRemove={handleRemoveFromGrid}
-          />
-        )}
+      <main className="de-wrap">
+        <DashboardOverview
+          data={data}
+          isLoading={isLoading}
+          error={error}
+          periodLabel={periodLabel}
+          holderName={user?.name}
+          bankLabel={headerBank}
+        />
       </main>
     </div>
   );

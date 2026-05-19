@@ -65,6 +65,8 @@ class Settings(BaseSettings):
 
     # Widget Studio / dashboard preview — 0 disables per-user sliding-window limit.
     widget_preview_rate_limit_per_minute: int = 0
+    # Widget Studio chat message endpoint — 0 disables; spec default 20/min.
+    widget_studio_message_rate_limit_per_minute: int = 20
     # Reserved for future API/UI gating (defaults on).
     widget_studio_enabled: bool = True
 

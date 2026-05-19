@@ -17,6 +17,7 @@ from backend.middleware.auth import get_current_user
 from backend.models.dashboard import UserDashboard
 from backend.models.user import UserRole
 from backend.models.widget import UserWidget
+from backend.services.dashboard_overview import build_dashboard_overview
 from backend.services.preview_rate_limit import (
     WidgetPreviewRateLimited,
     check_widget_preview_rate_limit,
@@ -26,6 +27,10 @@ from backend.services.widget_query import (
     describe_widget_query_real,
     resolve_widget_data,
     validate_widget_query_config,
+)
+from backend.widget_studio.broken_widget import (
+    query_config_category_still_valid,
+    widget_broken_response,
 )
 
 if TYPE_CHECKING:
@@ -97,6 +102,34 @@ def _widget_to_dict(widget: UserWidget) -> dict[str, Any]:
         "is_default": widget.is_default,
         "created_at": widget.created_at,
     }
+
+
+# ---------------------------------------------------------------------------
+# GET /dashboard/overview
+# ---------------------------------------------------------------------------
+
+
+@router.get("/overview")
+def get_dashboard_overview(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    bank_name: str | None = Query(default=None),
+    parent_category: str | None = Query(default=None),
+    sub_category: Annotated[list[str] | None, Query()] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return aggregated totals and breakdowns for the editorial dashboard cards."""
+    set_rls_user(db, current_user.id)
+    return build_dashboard_overview(
+        db,
+        current_user.id,
+        date_from=date_from,
+        date_to=date_to,
+        bank_name=bank_name,
+        parent_category=parent_category,
+        sub_categories=sub_category,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -421,6 +454,9 @@ def get_widget_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Widget '{widget_id}' not found.",
         )
+
+    if not query_config_category_still_valid(widget.query_config, current_user.id, db):
+        return widget_broken_response()
 
     try:
         result = resolve_widget_data(

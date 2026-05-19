@@ -4,6 +4,7 @@ import { MetricCard } from "./MetricCard";
 import { BarChartWidget } from "./BarChartWidget";
 import { PieChartWidget } from "./PieChartWidget";
 import type { FilterState } from "./FilterBar";
+import { BrokenWidgetCard } from "../widgetStudio/BrokenWidgetCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,20 @@ interface DualMetricApiData {
 
 type WidgetApiData = MetricApiData | DualMetricApiData | ChartRow[];
 
+interface BrokenWidgetPayload {
+  error: string;
+  message: string;
+}
+
+function isBrokenPayload(d: unknown): d is BrokenWidgetPayload {
+  return (
+    d !== null &&
+    typeof d === "object" &&
+    "error" in d &&
+    (d as BrokenWidgetPayload).error === "WIDGET_BROKEN"
+  );
+}
+
 const API_BASE = "http://localhost:8000";
 
 const COL_SPAN_CLASSES: Record<number, string> = {
@@ -63,11 +78,13 @@ function useWidgetData(widgetId: string, filters: FilterState) {
   const [data, setData] = useState<WidgetApiData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [brokenMessage, setBrokenMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
+    setBrokenMessage(null);
 
     const params = new URLSearchParams();
     if (filters.dateFrom) params.set("date_from", filters.dateFrom);
@@ -83,9 +100,19 @@ function useWidgetData(widgetId: string, filters: FilterState) {
     })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<WidgetApiData>;
+        return res.json() as Promise<WidgetApiData | BrokenWidgetPayload>;
       })
-      .then((json) => { if (!cancelled) { setData(json); setIsLoading(false); } })
+      .then((json) => {
+        if (cancelled) return;
+        if (isBrokenPayload(json)) {
+          setBrokenMessage(json.message);
+          setData(null);
+          setIsLoading(false);
+          return;
+        }
+        setData(json);
+        setIsLoading(false);
+      })
       .catch((err: unknown) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load");
@@ -103,7 +130,7 @@ function useWidgetData(widgetId: string, filters: FilterState) {
     filters.subCategories.join("\0"),
   ]);
 
-  return { data, isLoading, error };
+  return { data, isLoading, error, brokenMessage };
 }
 
 function isMetricData(d: WidgetApiData | null): d is MetricApiData {
@@ -144,7 +171,18 @@ function WidgetCell({
   onDragOver,
   onDrop,
 }: WidgetCellProps) {
-  const { data, isLoading, error } = useWidgetData(item.widget_id, filters);
+  const { data, isLoading, error, brokenMessage } = useWidgetData(
+    item.widget_id,
+    filters,
+  );
+
+  if (brokenMessage) {
+    return (
+      <div className={`${COL_SPAN_CLASSES[item.col_span] ?? "col-span-1"}`}>
+        <BrokenWidgetCard title={widget.title} message={brokenMessage} />
+      </div>
+    );
+  }
 
   const metricValue = isMetricData(data) ? data.value : 0;
   const metricFormat = isMetricData(data) ? (data.format ?? "number") : "number";

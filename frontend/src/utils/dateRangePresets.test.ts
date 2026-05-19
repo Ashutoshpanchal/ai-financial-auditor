@@ -33,6 +33,10 @@ describe("getPresetRange", () => {
     expect(getPresetRange("last_30_days", TODAY)).toEqual({ from: "2026-04-19", to: "2026-05-18" });
   });
 
+  it("returns last week as Mon–Sun ISO week before current week", () => {
+    expect(getPresetRange("last_week", TODAY)).toEqual({ from: "2026-05-11", to: "2026-05-17" });
+  });
+
   it("returns last month bounds", () => {
     const r = getPresetRange("last_month", TODAY);
     expect(r).toEqual({ from: "2026-04-01", to: "2026-04-30" });
@@ -58,6 +62,16 @@ describe("clampRangeToScope", () => {
   it("treats missing end as same day as start for comparison", () => {
     const r = clampRangeToScope("2024-06-10", "", SCOPE);
     expect(r).toEqual({ from: "2024-06-10", to: "2024-06-10" });
+  });
+
+  it("intersects partial overlap without expanding to full scope", () => {
+    const r = clampRangeToScope("2026-04-01", "2026-04-30", SCOPE);
+    expect(r).toEqual({ from: "2026-04-01", to: "2026-04-15" });
+  });
+
+  it("slides last-week-length window when preset is entirely after max_date", () => {
+    const r = clampRangeToScope("2026-05-11", "2026-05-17", SCOPE);
+    expect(r).toEqual({ from: "2026-04-09", to: "2026-04-15" });
   });
 });
 
@@ -86,7 +100,39 @@ describe("resolveDefaultRange", () => {
 });
 
 describe("applyPreset", () => {
-  it("returns null when preset has no overlap with scope", () => {
+  it("yesterday uses same from and to when inside scope", () => {
+    const wide: TransactionDateScope = { ...SCOPE, max_date: "2026-12-31" };
+    const r = applyPreset("yesterday", wide, TODAY);
+    expect(r).toEqual({ from: "2026-05-17", to: "2026-05-17" });
+  });
+
+  it("yesterday stays on calendar day when after last transaction", () => {
+    const r = applyPreset("yesterday", SCOPE, TODAY);
+    expect(r).toEqual({ from: "2026-05-17", to: "2026-05-17" });
+  });
+
+  it("today stays on calendar day when after last transaction", () => {
+    const r = applyPreset("today", SCOPE, TODAY);
+    expect(r).toEqual({ from: "2026-05-18", to: "2026-05-18" });
+  });
+
+  it("today snaps to min_date when calendar today is before first transaction", () => {
+    const futureToday = new Date(2024, 1, 15);
+    const r = applyPreset("today", SCOPE, futureToday);
+    expect(r).toEqual({ from: "2024-03-01", to: "2024-03-01" });
+  });
+
+  it("last week preserves 7-day span anchored to max_date when calendar week is after data", () => {
+    const r = applyPreset("last_week", SCOPE, TODAY);
+    expect(r).toEqual({ from: "2026-04-09", to: "2026-04-15" });
+  });
+
+  it("last month intersects to partial month inside scope", () => {
+    const r = applyPreset("last_month", SCOPE, TODAY);
+    expect(r).toEqual({ from: "2026-04-01", to: "2026-04-15" });
+  });
+
+  it("clamps wide preset to scope bounds when partially overlapping", () => {
     const narrow: TransactionDateScope = {
       min_date: "2024-03-10",
       max_date: "2024-03-12",
@@ -96,5 +142,6 @@ describe("applyPreset", () => {
     const r = applyPreset("this_year", narrow, new Date(2026, 0, 15));
     expect(r).not.toBeNull();
     expect(r!.from).toBe("2024-03-10");
+    expect(r!.to).toBe("2024-03-12");
   });
 });

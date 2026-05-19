@@ -170,7 +170,41 @@ export function getPresetRange(preset: DateRangePreset, today: Date = new Date()
   }
 }
 
-/** Intersect a range with the user's transaction bounds. */
+/** Normalize API date to YYYY-MM-DD for comparisons. */
+export function normalizeScopeBound(iso: string | null | undefined): string | undefined {
+  if (!iso) return undefined;
+  const trimmed = iso.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : undefined;
+}
+
+function parseYmd(iso: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const [y, mo, d] = iso.split("-").map(Number);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return dt;
+}
+
+function addDaysIso(iso: string, deltaDays: number): string {
+  const d = parseYmd(iso);
+  if (!d) return iso;
+  d.setDate(d.getDate() + deltaDays);
+  return toIsoDate(d);
+}
+
+/** Inclusive day count between two ISO dates (minimum 1). */
+function daysBetweenInclusive(from: string, to: string): number {
+  const a = parseYmd(from);
+  const b = parseYmd(to);
+  if (!a || !b) return 1;
+  const diff = Math.round((b.getTime() - a.getTime()) / 86_400_000);
+  return Math.max(1, diff + 1);
+}
+
+/**
+ * Intersect [from, to] with transaction scope.
+ * When the preset falls entirely outside data, slide the window to fit (preserve span) instead of using full min–max.
+ */
 export function clampRangeToScope(
   from: string,
   to: string,
@@ -185,15 +219,64 @@ export function clampRangeToScope(
   let effTo = b;
   if (!effFrom) effFrom = effTo;
   if (!effTo) effTo = effFrom;
-  if (!scope?.min_date || !scope?.max_date) {
+  if (effFrom > effTo) {
+    [effFrom, effTo] = [effTo, effFrom];
+  }
+
+  const minDate = normalizeScopeBound(scope?.min_date);
+  const maxDate = normalizeScopeBound(scope?.max_date);
+  if (!minDate || !maxDate) {
     return { from: effFrom, to: effTo };
   }
-  const f = effFrom < scope.min_date ? scope.min_date : effFrom;
-  const t = effTo > scope.max_date ? scope.max_date : effTo;
-  if (f > t) {
-    return { from: scope.min_date, to: scope.max_date };
+
+  const interFrom = effFrom < minDate ? minDate : effFrom;
+  const interTo = effTo > maxDate ? maxDate : effTo;
+  if (interFrom <= interTo) {
+    return { from: interFrom, to: interTo };
   }
-  return { from: f, to: t };
+
+  if (effFrom === effTo) {
+    if (effFrom > maxDate) return { from: maxDate, to: maxDate };
+    if (effFrom < minDate) return { from: minDate, to: minDate };
+  }
+
+  const spanDays = daysBetweenInclusive(effFrom, effTo);
+
+  if (effFrom > maxDate) {
+    const end = maxDate;
+    let start = addDaysIso(end, -(spanDays - 1));
+    if (start < minDate) start = minDate;
+    return { from: start, to: end };
+  }
+
+  if (effTo < minDate) {
+    const start = minDate;
+    let end = addDaysIso(start, spanDays - 1);
+    if (end > maxDate) end = maxDate;
+    return { from: start, to: end };
+  }
+
+  return { from: minDate, to: maxDate };
+}
+
+/** Presets that mean a specific calendar day, not “latest day with data”. */
+const CALENDAR_DAY_PRESETS = new Set<DateRangePreset>(["today", "yesterday"]);
+
+/**
+ * Keep today/yesterday on the real calendar date even when transactions end earlier.
+ * Still snaps to min_date when the calendar day is before the first transaction.
+ */
+function applyCalendarDayPreset(
+  raw: DateRangeValue,
+  scope: TransactionDateScope | null,
+): DateRangeValue {
+  const minDate = normalizeScopeBound(scope?.min_date);
+  let { from, to } = raw;
+  if (minDate && from < minDate) {
+    from = minDate;
+    to = minDate;
+  }
+  return { from, to };
 }
 
 /** Apply preset and return null when the clamped range is empty. */
@@ -203,7 +286,9 @@ export function applyPreset(
   today: Date = new Date(),
 ): DateRangeValue | null {
   const raw = getPresetRange(preset, today);
-  const clamped = clampRangeToScope(raw.from, raw.to, scope);
+  const clamped = CALENDAR_DAY_PRESETS.has(preset)
+    ? applyCalendarDayPreset(raw, scope)
+    : clampRangeToScope(raw.from, raw.to, scope);
   if (clamped.from > clamped.to) {
     return null;
   }
