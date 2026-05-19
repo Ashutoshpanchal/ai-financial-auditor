@@ -18,6 +18,7 @@ import type {
   StudioWidgetType,
   WidgetStudioLibraryItem,
   WidgetStudioPreview,
+  WidgetStudioRenderResponse,
   WidgetStudioSendResponse,
   WidgetStudioSession,
 } from "../types/widgetStudio";
@@ -29,6 +30,32 @@ import {
 } from "../utils/widgetStudioPreview";
 
 const STUDIO_DISABLED = import.meta.env.VITE_WIDGET_STUDIO_ENABLED === "false";
+
+/** Build API filter payload / query params from FilterBar state. */
+function studioFiltersFromState(filters: FilterState): MessageFiltersPayload {
+  const payload: MessageFiltersPayload = {
+    date_from: filters.dateFrom || undefined,
+    date_to: filters.dateTo || undefined,
+    banks: filters.bankNames.length > 0 ? filters.bankNames : undefined,
+    parent_category: filters.parentCategory || undefined,
+    sub_categories:
+      filters.subCategories.length > 0 ? filters.subCategories : undefined,
+  };
+  if (filters.bankNames.length === 1) {
+    payload.bank = filters.bankNames[0];
+  }
+  return payload;
+}
+
+function studioRenderQueryParams(filters: FilterState): URLSearchParams {
+  const q = new URLSearchParams();
+  if (filters.dateFrom) q.set("date_from", filters.dateFrom);
+  if (filters.dateTo) q.set("date_to", filters.dateTo);
+  if (filters.parentCategory) q.set("parent_category", filters.parentCategory);
+  filters.bankNames.forEach((b) => q.append("banks", b));
+  filters.subCategories.forEach((s) => q.append("sub_categories", s));
+  return q;
+}
 
 function formatError(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -58,7 +85,7 @@ export default function WidgetStudio() {
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: "",
     dateTo: "",
-    bankName: "",
+    bankNames: [],
     parentCategory: "",
     subCategories: [],
   });
@@ -73,11 +100,17 @@ export default function WidgetStudio() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<WidgetStudioLibraryItem | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [executedQuery, setExecutedQuery] = useState<string | null>(null);
+  const [applyLoading, setApplyLoading] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderAbortRef = useRef<AbortController | null>(null);
-  const { scope: dateScope, defaultRange, loading: dateScopeLoading, bankNames } =
-    useTransactionDateScope();
+  const {
+    scope: dateScope,
+    defaultRange,
+    loading: dateScopeLoading,
+    bankNames: scopeBankNames,
+    categoryMaster,
+  } = useTransactionDateScope();
   const datesInitialized = useRef(false);
 
   useEffect(() => {
@@ -93,13 +126,20 @@ export default function WidgetStudio() {
   }, [dateScopeLoading, defaultRange, filters.dateFrom, filters.dateTo]);
 
   const filterPayload: MessageFiltersPayload = useMemo(
-    () => ({
-      date_from: filters.dateFrom || undefined,
-      date_to: filters.dateTo || undefined,
-      bank: filters.bankName || undefined,
-    }),
+    () => studioFiltersFromState(filters),
     [filters],
   );
+
+  const parentCategoryOptions = useMemo(
+    () => Object.keys(categoryMaster).sort((a, b) => a.localeCompare(b)),
+    [categoryMaster],
+  );
+
+  const subCategoryOptions = useMemo(() => {
+    if (!filters.parentCategory) return [];
+    const subs = categoryMaster[filters.parentCategory] ?? [];
+    return subs.map((s) => s.sub_category).sort((a, b) => a.localeCompare(b));
+  }, [categoryMaster, filters.parentCategory]);
 
   const loadSessions = useCallback(async () => {
     const res = await api.get<WidgetStudioSession[]>("/widget-studio/sessions");
@@ -143,55 +183,89 @@ export default function WidgetStudio() {
     async (widgetId: string, signal?: AbortSignal) => {
       setPreviewError(null);
       setBrokenMessage(null);
-      const params: Record<string, string> = {};
-      if (filters.dateFrom) params.date_from = filters.dateFrom;
-      if (filters.dateTo) params.date_to = filters.dateTo;
-      if (filters.bankName) params.bank = filters.bankName;
-      const res = await api.get<{
-        data?: WidgetStudioPreview["data"];
-        error?: string;
-        message?: string;
-      }>(`/widget-studio/widgets/${widgetId}/render`, { params, signal });
+      const qs = studioRenderQueryParams(filters);
+      const res = await api.get<WidgetStudioRenderResponse>(
+        `/widget-studio/widgets/${widgetId}/render?${qs.toString()}`,
+        { signal },
+      );
       if (res.data.error === "WIDGET_BROKEN" || res.data.error === "CATEGORY_NOT_FOUND") {
         setBrokenMessage(
           res.data.message ??
             "The category used in this widget no longer exists. Please delete it and create a new one.",
         );
         setPreview(null);
+        setExecutedQuery(null);
         return;
       }
       if (res.data.error) {
         setPreviewError(res.data.message ?? "Could not render widget.");
         setPreview(null);
+        setExecutedQuery(null);
         return;
       }
       const item = library.find((w) => w.id === widgetId);
       setPreview({
         type: (item?.type ?? "metric") as StudioWidgetType,
         data: res.data.data ?? { rows: [], scalar: 0 },
+        resolved_query: res.data.resolved_query_template ?? undefined,
+        executed_query: res.data.executed_query ?? undefined,
       });
+      setExecutedQuery(res.data.executed_query ?? null);
       setPreviewTitle(item?.name ?? "Widget");
     },
     [filters, library],
   );
 
-  useEffect(() => {
-    if (!selectedLibraryId || STUDIO_DISABLED) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+  const executeDraftPreview = useCallback(async (signal?: AbortSignal) => {
+    if (!preview?.resolved_query) return;
+    setPreviewError(null);
+    setBrokenMessage(null);
+    const res = await api.post<WidgetStudioRenderResponse>(
+      "/widget-studio/preview/execute",
+      {
+        resolved_query: preview.resolved_query,
+        ...studioFiltersFromState(filters),
+      },
+      { signal },
+    );
+    if (res.data.error) {
+      setPreviewError(res.data.message ?? "Could not run query.");
+      setExecutedQuery(null);
+      return;
+    }
+    setPreview((prev) =>
+      prev
+        ? {
+            ...prev,
+            data: res.data.data ?? prev.data,
+            executed_query: res.data.executed_query ?? undefined,
+          }
+        : prev,
+    );
+    setExecutedQuery(res.data.executed_query ?? null);
+  }, [preview?.resolved_query, filters]);
+
+  const applyFilters = useCallback(async () => {
     renderAbortRef.current?.abort();
     const ac = new AbortController();
     renderAbortRef.current = ac;
-    debounceRef.current = setTimeout(() => {
-      void renderLibraryWidget(selectedLibraryId, ac.signal).catch((e: unknown) => {
-        if (axios.isCancel(e)) return;
-        setPreviewError(formatError(e));
-      });
-    }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      ac.abort();
-    };
-  }, [selectedLibraryId, filterPayload, renderLibraryWidget]);
+    setApplyLoading(true);
+    setPreviewError(null);
+    try {
+      if (selectedLibraryId) {
+        await renderLibraryWidget(selectedLibraryId, ac.signal);
+      } else if (preview?.resolved_query) {
+        await executeDraftPreview(ac.signal);
+      }
+    } catch (e: unknown) {
+      if (axios.isCancel(e)) return;
+      setPreviewError(formatError(e));
+    } finally {
+      setApplyLoading(false);
+    }
+  }, [selectedLibraryId, preview?.resolved_query, renderLibraryWidget, executeDraftPreview]);
+
+  const canApplyFilters = Boolean(selectedLibraryId || preview?.resolved_query);
 
   const handlePreviewFromChat = useCallback(
     (p: WidgetStudioPreview | null, response: WidgetStudioSendResponse) => {
@@ -199,6 +273,7 @@ export default function WidgetStudio() {
       setBrokenMessage(null);
       setPreviewError(null);
       setPreview(p);
+      setExecutedQuery(p?.executed_query ?? null);
       setPreviewTitle(p?.type ? studioTypeLabel(p.type) : "Widget preview");
       setAgentLogs(response.agent_logs ?? undefined);
       if (p && !saveName) {
@@ -252,6 +327,7 @@ export default function WidgetStudio() {
     setPreviewError(null);
     setBrokenMessage(null);
     setAgentLogs(undefined);
+    setExecutedQuery(null);
     setSaveName("");
     setSelectedLibraryId(null);
     setSavedHint(null);
@@ -350,6 +426,10 @@ export default function WidgetStudio() {
                   type="button"
                   onClick={() => {
                     setSelectedLibraryId(w.id);
+                    setPreview(null);
+                    setExecutedQuery(null);
+                    setPreviewError(null);
+                    setBrokenMessage(null);
                     setPreviewTitle(w.name);
                     setSaveName(w.name);
                   }}
@@ -430,19 +510,24 @@ export default function WidgetStudio() {
             <FilterBar
               filters={filters}
               onChange={setFilters}
-              bankOptions={bankNames}
-              parentCategoryOptions={[]}
-              subCategoryOptions={[]}
+              bankOptions={scopeBankNames}
+              bankSelectionMode="multi"
+              parentCategoryOptions={parentCategoryOptions}
+              subCategoryOptions={subCategoryOptions}
+              subCategoryInputMode="checkboxes"
               dateScope={dateScope}
               dateScopeLoading={dateScopeLoading}
               defaultDateRange={defaultRange}
+              onApply={() => void applyFilters()}
+              applyLoading={applyLoading}
+              applyDisabled={!canApplyFilters || applyLoading}
             />
           </div>
 
           <div className="p-4 space-y-4 max-w-2xl mx-auto w-full">
             <FilterSummaryBar
               filters={filters}
-              bankOptions={bankNames}
+              bankOptions={scopeBankNames}
               defaultDateFrom={defaultRange?.from}
               defaultDateTo={defaultRange?.to}
             />
@@ -506,6 +591,8 @@ export default function WidgetStudio() {
                 preview={preview}
                 previewError={previewError}
                 agentLogs={agentLogs ?? null}
+                executedQuery={executedQuery ?? undefined}
+                queryTemplate={preview?.resolved_query}
               />
             )}
 

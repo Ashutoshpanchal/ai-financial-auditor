@@ -18,7 +18,8 @@ export function useDashboardOverview(filters: FilterState): UseDashboardOverview
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { dateFrom, dateTo, bankName, parentCategory, subCategories } = filters;
+  const { dateFrom, dateTo, bankNames, parentCategory, subCategories } = filters;
+  const bankName = bankNames[0] ?? "";
 
   useEffect(() => {
     let cancelled = false;

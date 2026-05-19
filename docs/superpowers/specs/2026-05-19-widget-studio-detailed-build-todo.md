@@ -2,7 +2,7 @@
 
 > **Scope:** Multi-agent backend, chat interface, widget/graph creation, storage, security, super admin debug mode, and logging.
 >
-> **Progress:** Foundation complete; **AgentScope agents** + **broken widget** feature in progress (single phase).
+> **Progress:** Complete (2026-05-19) — AgentScope agents, broken widgets, API, UI, migrations 015–016.
 >
 > **Implementation notes:**
 > - Widget Studio agents: **AgentScope** + OpenRouter (`backend/widget_studio/agentscope/`).

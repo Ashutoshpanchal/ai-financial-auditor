@@ -17,7 +17,7 @@ export function FilterSummaryBar({
   const dateActive =
     (filters.dateFrom && filters.dateFrom !== defaultDateFrom) ||
     (filters.dateTo && filters.dateTo !== defaultDateTo);
-  const bankActive = Boolean(filters.bankName);
+  const bankActive = filters.bankNames.length > 0;
 
   if (!dateActive && !bankActive) {
     return (
@@ -34,7 +34,11 @@ export function FilterSummaryBar({
     parts.push("Custom date range");
   }
   if (bankActive) {
-    parts.push(filters.bankName);
+    parts.push(
+      filters.bankNames.length === 1
+        ? filters.bankNames[0]
+        : `${filters.bankNames.length} banks`,
+    );
   } else if (bankOptions.length > 1) {
     parts.push("All banks");
   }

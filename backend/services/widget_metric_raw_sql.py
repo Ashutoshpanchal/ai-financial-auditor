@@ -174,6 +174,7 @@ def _append_dashboard_filters(
     date_from: date | None,
     date_to: date | None,
     bank_name: str | None,
+    bank_names: list[str] | None = None,
     category: str | None,
     parent_category: str | None,
     sub_categories: list[str] | None,
@@ -181,15 +182,32 @@ def _append_dashboard_filters(
 ) -> tuple[str, dict[str, Any]]:
     """Append date/bank/category/direction predicates before trailing clauses."""
     fragments: list[str] = []
-    if date_from is not None:
-        fragments.append("transactions.transaction_date >= :_widget_df")
+    if date_from is not None and date_to is not None:
+        fragments.append(
+            "transactions.transaction_date BETWEEN :_widget_df AND :_widget_dt"
+        )
         params["_widget_df"] = date_from
-    if date_to is not None:
-        fragments.append("transactions.transaction_date <= :_widget_dt")
         params["_widget_dt"] = date_to
-    if bank_name is not None:
+    else:
+        if date_from is not None:
+            fragments.append("transactions.transaction_date >= :_widget_df")
+            params["_widget_df"] = date_from
+        if date_to is not None:
+            fragments.append("transactions.transaction_date <= :_widget_dt")
+            params["_widget_dt"] = date_to
+    effective_banks: list[str] = []
+    if bank_names:
+        effective_banks = [b.strip() for b in bank_names if b and b.strip()]
+    elif bank_name is not None and str(bank_name).strip():
+        effective_banks = [str(bank_name).strip()]
+    if len(effective_banks) == 1:
         fragments.append("transactions.bank_name = :_widget_bn")
-        params["_widget_bn"] = bank_name
+        params["_widget_bn"] = effective_banks[0]
+    elif len(effective_banks) > 1:
+        parts = [f":_widget_bn{i}" for i in range(len(effective_banks))]
+        fragments.append(f"transactions.bank_name IN ({', '.join(parts)})")
+        for i, bn in enumerate(effective_banks):
+            params[f"_widget_bn{i}"] = bn
     if category is not None:
         fragments.append("transactions.category = :_widget_cat")
         params["_widget_cat"] = category

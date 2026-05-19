@@ -1,6 +1,6 @@
 # Web framework
 fastapi==0.111.0
-uvicorn[standard]==0.29.0
+uvicorn[standard]>=0.31.1,<0.35
 python-multipart==0.0.9
 
 # Database
@@ -10,17 +10,24 @@ psycopg2-binary==2.9.9
 pgvector==0.2.5
 alembic==1.13.1
 
-# Auth
-python-jose[cryptography]==3.3.0
+# Auth (explicit cryptography: avoids pip 26+ false conflict on python-jose[crypto]==X vs python-jose==X)
+python-jose==3.3.0
+cryptography>=42.0.0,<45
 authlib==1.3.0
-httpx==0.27.0
+# mcp>=1.24 requires httpx>=0.27.1; stack uses httpx<1 (langfuse, openai)
+httpx>=0.27.1,<1.0
 
-# AI / LangChain (loose pins — let pip resolve compatible set within 0.2.x ecosystem)
-langchain>=0.2.16,<0.3
+# AI / LangChain (langchain-community 0.2.18+ requires langchain>=0.2.17 — see pip ResolutionImpossible)
+langchain>=0.2.17,<0.3
 langchain-openai>=0.1.7,<0.2
-langchain-community>=0.2.16,<0.3
+langchain-community>=0.2.17,<0.3
 langgraph>=0.2.50,<0.3
-openai>=1.40.0,<2
+# openai>=1.68 requires numpy>=2.0.2; langchain 0.2.x on Py3.11 requires numpy<2 — cap openai for a solvable graph.
+openai>=1.40.0,<1.68
+# AgentScope imports MCP client code at package load; without `mcp` the app fails on
+# ModuleNotFoundError: mcp.client.streamable_http (see agentscope.tool → mcp).
+# Pin mcp to cut pip backtracking with agentscope + httpx during Docker builds.
+mcp>=1.24.0,<2
 agentscope>=1.0,<2
 
 # Observability
@@ -31,8 +38,8 @@ langfuse==2.30.0
 pdfplumber==0.11.0
 pandas==2.2.2
 
-# Config
-pydantic-settings==2.2.1
+# Config (mcp>=1.24 requires pydantic-settings>=2.5.2)
+pydantic-settings>=2.5.2,<3
 python-dotenv==1.0.1
 
 # Knowledge Graph

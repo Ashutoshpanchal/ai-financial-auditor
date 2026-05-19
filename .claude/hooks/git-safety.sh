@@ -13,7 +13,8 @@ if ! echo "$COMMAND" | grep -qE "^git (add|commit|push)"; then
   exit 0
 fi
 
-BLOCKED_PATTERNS=(".env" ".env.local" "__pycache__" ".DS_Store" "node_modules" ".next" "graphify-out" ".venv")
+# Block graphify cache dirs only — tracked graphify-out/*.json|*.md|*.html are OK to commit.
+BLOCKED_PATTERNS=(".env" ".env.local" "__pycache__" ".DS_Store" "node_modules" ".next" "graphify-out/cache" "graphify-out/.graphify_python" ".venv")
 FOUND_ISSUES=""
 
 # Check 1: inspect the command string itself for sensitive file patterns

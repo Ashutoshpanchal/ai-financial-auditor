@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -79,6 +79,9 @@ class MessageFilters(BaseModel):
     date_from: date | None = None
     date_to: date | None = None
     bank: str | None = None
+    banks: list[str] = Field(default_factory=list)
+    parent_category: str | None = None
+    sub_categories: list[str] = Field(default_factory=list)
 
 
 class SendMessageRequest(BaseModel):
@@ -139,6 +142,48 @@ class RenderWidgetResponse(BaseModel):
     data: dict[str, Any] | None = None
     error: str | None = None
     message: str | None = None
+    executed_query: str | None = None
+    resolved_query_template: str | None = None
+
+
+class PreviewExecuteRequest(BaseModel):
+    """Re-run a draft widget SQL template with dashboard filters."""
+
+    resolved_query: str
+    date_from: date | None = None
+    date_to: date | None = None
+    bank: str | None = None
+    banks: list[str] = Field(default_factory=list)
+    parent_category: str | None = None
+    sub_categories: list[str] = Field(default_factory=list)
+
+
+def _coerce_widget_studio_filters(
+    *,
+    date_from: date | None,
+    date_to: date | None,
+    bank: str | None,
+    banks: list[str] | None,
+    parent_category: str | None,
+    sub_categories: list[str] | None,
+) -> dict[str, Any]:
+    """Normalise FilterBar values for query execution."""
+    effective_banks = [b.strip() for b in (banks or []) if b and b.strip()]
+    if bank and bank.strip():
+        if bank.strip() not in effective_banks:
+            effective_banks = [bank.strip(), *effective_banks]
+    subs = [s.strip() for s in (sub_categories or []) if s and s.strip()]
+    pc = (
+        parent_category.strip() if parent_category and parent_category.strip() else None
+    )
+    return {
+        "date_from": date_from,
+        "date_to": date_to,
+        "bank": bank.strip() if bank and bank.strip() else None,
+        "banks": effective_banks or None,
+        "parent_category": pc,
+        "sub_categories": subs or None,
+    }
 
 
 def _get_owned_session(session_id: str, user_id: str, db: Session) -> WidgetChatSession:
@@ -237,16 +282,21 @@ async def list_messages(
     ]
 
 
-@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
 async def delete_session(
     session_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> Response:
     """Soft-delete a Widget Studio session."""
     session = _get_owned_session(session_id, current_user.id, db)
     session.is_deleted = True
     db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/sessions/{session_id}/message", response_model=SendMessageResponse)
@@ -275,15 +325,21 @@ async def send_message(
     is_super = current_user.role == UserRole.super_admin
 
     try:
+        fx = _coerce_widget_studio_filters(
+            date_from=body.filters.date_from,
+            date_to=body.filters.date_to,
+            bank=body.filters.bank,
+            banks=body.filters.banks,
+            parent_category=body.filters.parent_category,
+            sub_categories=body.filters.sub_categories,
+        )
         result = await run_widget_studio_turn(
             session,
             body.message,
             db,
-            date_from=body.filters.date_from,
-            date_to=body.filters.date_to,
-            bank=body.filters.bank,
             include_agent_logs=is_super,
             include_sql_in_preview=is_super,
+            **fx,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -362,6 +418,9 @@ async def render_widget(
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     bank: str | None = Query(None),
+    banks: Annotated[list[str] | None, Query()] = None,
+    parent_category: str | None = Query(None),
+    sub_categories: Annotated[list[str] | None, Query()] = None,
 ) -> RenderWidgetResponse:
     """Execute saved widget SQL with current filters."""
     widget = db.get(WidgetDefinition, widget_id)
@@ -371,16 +430,61 @@ async def render_widget(
     if widget.broken or mark_widget_broken_if_needed(widget, current_user.id, db):
         return RenderWidgetResponse(**widget_broken_response())
 
+    fx = _coerce_widget_studio_filters(
+        date_from=date_from,
+        date_to=date_to,
+        bank=bank,
+        banks=banks,
+        parent_category=parent_category,
+        sub_categories=sub_categories,
+    )
     try:
-        data, _ = execute_resolved_query(
+        data, _, executed_sql = execute_resolved_query(
             widget.resolved_query,
             current_user.id,
             db,
-            date_from=date_from,
-            date_to=date_to,
-            bank=bank,
+            **fx,
         )
-        return RenderWidgetResponse(data=data)
+        return RenderWidgetResponse(
+            data=data,
+            executed_query=executed_sql,
+            resolved_query_template=widget.resolved_query,
+        )
+    except WidgetQueryExecutionError as exc:
+        return RenderWidgetResponse(error="EXECUTION_ERROR", message=exc.user_message)
+
+
+@router.post("/preview/execute", response_model=RenderWidgetResponse)
+async def execute_preview_query(
+    body: PreviewExecuteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RenderWidgetResponse:
+    """Execute a widget SQL template (chat draft) with current dashboard filters."""
+    if not body.resolved_query.strip():
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="resolved_query is required."
+        )
+    fx = _coerce_widget_studio_filters(
+        date_from=body.date_from,
+        date_to=body.date_to,
+        bank=body.bank,
+        banks=body.banks,
+        parent_category=body.parent_category,
+        sub_categories=body.sub_categories,
+    )
+    try:
+        data, _, executed_sql = execute_resolved_query(
+            body.resolved_query.strip(),
+            current_user.id,
+            db,
+            **fx,
+        )
+        return RenderWidgetResponse(
+            data=data,
+            executed_query=executed_sql,
+            resolved_query_template=body.resolved_query.strip(),
+        )
     except WidgetQueryExecutionError as exc:
         return RenderWidgetResponse(error="EXECUTION_ERROR", message=exc.user_message)
 
@@ -435,18 +539,23 @@ async def add_widget_to_dashboard(
     }
 
 
-@router.delete("/widgets/{widget_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/widgets/{widget_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
 async def delete_widget(
     widget_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> Response:
     """Soft-delete a saved widget."""
     widget = db.get(WidgetDefinition, widget_id)
     if widget is None or widget.user_id != current_user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Widget not found.")
     widget.is_deleted = True
     db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/sessions/{session_id}/logs")

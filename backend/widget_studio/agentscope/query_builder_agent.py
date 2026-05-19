@@ -14,4 +14,5 @@ async def run_query_builder_agent(resolved_intent: dict[str, Any]) -> dict[str, 
     return await invoke_json_agent(
         QUERY_BUILDER_AGENT_PROMPT,
         json.dumps({"resolved_intent": resolved_intent}),
+        agent_name="query_builder",
     )

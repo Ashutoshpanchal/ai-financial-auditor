@@ -40,7 +40,10 @@ export interface WidgetStudioPreview {
   data: WidgetStudioPreviewData;
   chart_config?: Record<string, unknown>;
   abstract_query?: string;
+  /** Stored SQL template with ``{{user_id}}`` / date placeholders. */
   resolved_query?: string;
+  /** SQL actually executed (binds inlined) — set after Apply or super-admin message turn. */
+  executed_query?: string;
   hardcoded_filters?: Record<string, string>;
   intent_text?: string;
 }
@@ -71,10 +74,15 @@ export interface WidgetStudioRenderResponse {
   data?: WidgetStudioPreviewData;
   error?: string | null;
   message?: string | null;
+  executed_query?: string | null;
+  resolved_query_template?: string | null;
 }
 
 export interface MessageFiltersPayload {
   date_from?: string;
   date_to?: string;
   bank?: string;
+  banks?: string[];
+  parent_category?: string;
+  sub_categories?: string[];
 }

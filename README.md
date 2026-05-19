@@ -8,7 +8,7 @@ AI-powered personal finance auditor with LangChain audit pipeline, LangGraph mul
 |---|---|
 | Frontend | React 18 + TypeScript + Tailwind CSS + Recharts |
 | Backend | FastAPI + Python 3.11 |
-| AI Pipeline | LangChain (audit) + LangGraph (chat) |
+| AI Pipeline | LangChain (audit) + LangGraph (chat) + AgentScope (Widget Studio agents) |
 | LLM | OpenRouter (Llama 3.3, DeepSeek, Mistral) |
 | Database | PostgreSQL 15 + pgvector |
 | Auth | Google OAuth2 (drive.file scope) |
@@ -23,14 +23,16 @@ AI-powered personal finance auditor with LangChain audit pipeline, LangGraph mul
 # 1. Copy and fill env vars
 cp .env.example .env
 
-# 2. Start all services
+# 2. Apply DB migrations (includes Widget Studio + `broken` column — see `migrations/015_*.sql`, `016_*.sql`)
+
+# 3. Start all services
 cd docker && docker compose up -d
 
-# 3. Backend dev
+# 4. Backend dev
 cd backend && pip install -r requirements.txt
 uvicorn backend.main:app --reload
 
-# 4. Frontend dev
+# 5. Frontend dev
 cd frontend && npm install && npm run dev
 ```
 

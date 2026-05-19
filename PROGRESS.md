@@ -80,16 +80,15 @@
 - [x] backend/tests/test_categories_router.py — 49 tests
 - [x] frontend/src/pages/Categories.test.tsx — 38 tests
 
-## Phase 9 — Combined Chat + Dashboard (UX redesign) 🔴
-- [ ] Redesign Dashboard page as split-panel: charts (left) + AI chat (right)
-      → replaces separate Chat.tsx and AuditReport.tsx pages
-- [ ] Filter bar at top — date range, bank, category — all charts react to filters
+## Phase 9 — Combined Chat + Dashboard (UX redesign) 🟡
+- [x] Filter bar at top — date range, bank, category — charts react to filters (Dashboard + `FilterBar`)
+- [x] Dashboard overview / editorial card layout (`dashboard_overview` API + cards)
+- [x] **Widget Studio** — `/widget-studio` UI, `POST /widget-studio/*` API, AgentScope agents (`backend/widget_studio/agentscope/`), migrations `015_widget_studio_tables.sql` + `016_widget_definitions_broken.sql`
+- [ ] Redesign Dashboard as split-panel: charts (left) + AI chat (right) — still separate Chat page
 - [ ] Drag-and-drop widget layout (user can rearrange chart panels)
-- [ ] Charts driven by `category` column: pie by category, bar by month, spend trends
-- [ ] Chat panel wired to backend `routers/chat.py` (LangGraph agents)
-      → chat can interpret filter intent ("show food spends in March") and update charts
-- [ ] "Analyze" button on Upload page navigates to combined dashboard on completion
-      → pre-loads audit results for the uploaded document
+- [ ] Charts driven by `category` column: pie by category, bar by month, spend trends (partial — existing widgets + studio)
+- [ ] Chat panel wired on same page as dashboard filters (LangGraph)
+- [ ] "Analyze" on Upload navigates to combined dashboard with pre-loaded audit
 
 ## Phase 10 — Polish & Ops 🟡
 - [ ] Admin.tsx — full user management UI (list users, change roles)
@@ -112,5 +111,6 @@
 - 2026-05-07: Disabled ruff TC001/TC002/TC003 rules globally — SQLAlchemy Mapped[] + LangGraph get_type_hints() require real runtime imports, not TYPE_CHECKING aliases
 - 2026-05-07: Category master table is global (admin-managed); description_categories is per-user with RLS
 - 2026-05-07: No confidence column or user_edited boolean on categories — keep schema minimal
+- 2026-05-19: Widget Studio uses AgentScope + OpenRouter only for studio agents; legacy `/chat?session_kind=widget_studio` unchanged. Broken widgets: sticky `broken` on `widget_definitions`; dashboard data validates literal categories in `query_config`.
 
-## Last Updated: 2026-05-07
+## Last Updated: 2026-05-19

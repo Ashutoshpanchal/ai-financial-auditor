@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: "",
     dateTo: "",
-    bankName: "",
+    bankNames: [],
     parentCategory: "",
     subCategories: [],
   });
@@ -69,7 +69,8 @@ export default function Dashboard() {
     }
   }, [dateScopeLoading, defaultRange, filters.dateFrom, filters.dateTo]);
 
-  const headerBank = filters.bankName || (bankNames.length === 1 ? bankNames[0] : null);
+  const headerBank =
+    filters.bankNames[0] ?? (bankNames.length === 1 ? bankNames[0] : null);
 
   return (
     <div

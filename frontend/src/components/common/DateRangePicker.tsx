@@ -4,7 +4,6 @@ import {
   clampRangeToScope,
   detectPreset,
   formatDateRangeLabel,
-  getPresetRange,
   normalizeScopeBound,
   PICKER_PRESET_ORDER,
   PRESET_LABELS,
@@ -240,30 +239,7 @@ export function DateRangePicker({
   }
 
   function handlePreset(preset: DateRangePreset) {
-    const raw = getPresetRange(preset);
     const applied = applyPreset(preset, scope);
-    // #region agent log
-    fetch("http://127.0.0.1:7468/ingest/c6a2fb7b-a253-45f4-9e0e-b6181ccf071d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "77f6a0" },
-      body: JSON.stringify({
-        sessionId: "77f6a0",
-        runId: "browser",
-        hypothesisId: "H4",
-        location: "DateRangePicker.tsx:handlePreset",
-        message: "preset applied in UI",
-        data: {
-          preset,
-          raw,
-          applied,
-          applyMode,
-          scopeMin: scope?.min_date ?? null,
-          scopeMax: scope?.max_date ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!applied) return;
     const p = detectPreset(applied.from, applied.to, scope);
     setDraftFrom(applied.from);

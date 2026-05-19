@@ -23,4 +23,8 @@ async def run_clarification_agent(
         "conversation": conversation[-20:],
         "doubt_from_query_builder": doubt_context,
     }
-    return await invoke_json_agent(system, json.dumps(payload))
+    return await invoke_json_agent(
+        system,
+        json.dumps(payload),
+        agent_name="clarification",
+    )

@@ -89,7 +89,7 @@ function useWidgetData(widgetId: string, filters: FilterState) {
     const params = new URLSearchParams();
     if (filters.dateFrom) params.set("date_from", filters.dateFrom);
     if (filters.dateTo) params.set("date_to", filters.dateTo);
-    if (filters.bankName) params.set("bank_name", filters.bankName);
+    if (filters.bankNames[0]) params.set("bank_name", filters.bankNames[0]);
     if (filters.parentCategory) params.set("parent_category", filters.parentCategory);
     for (const s of filters.subCategories) {
       params.append("sub_category", s);
@@ -125,7 +125,7 @@ function useWidgetData(widgetId: string, filters: FilterState) {
     widgetId,
     filters.dateFrom,
     filters.dateTo,
-    filters.bankName,
+    filters.bankNames,
     filters.parentCategory,
     filters.subCategories.join("\0"),
   ]);

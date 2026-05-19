@@ -6,7 +6,10 @@ interface WidgetStudioDebugPanelProps {
   previewError: string | null;
   agentLogs: AgentLogEntry[] | null;
   abstractQuery?: string;
-  resolvedQuery?: string;
+  /** SQL actually run (binds inlined) — shown under Query (resolved). */
+  executedQuery?: string;
+  /** Stored template with ``{{placeholders}}`` — optional second panel. */
+  queryTemplate?: string;
 }
 
 /** Super-admin collapsible debug panel below the live preview. */
@@ -15,13 +18,17 @@ export function WidgetStudioDebugPanel({
   previewError,
   agentLogs,
   abstractQuery,
-  resolvedQuery,
+  executedQuery,
+  queryTemplate,
 }: WidgetStudioDebugPanelProps) {
   const [open, setOpen] = useState(true);
 
+  const resolvedDisplay =
+    executedQuery ?? preview?.executed_query ?? preview?.resolved_query ?? "";
+  const templateDisplay = queryTemplate ?? preview?.resolved_query ?? "";
+
   const copyResolved = () => {
-    const q = resolvedQuery ?? preview?.resolved_query ?? "";
-    if (q) void navigator.clipboard.writeText(q);
+    if (resolvedDisplay) void navigator.clipboard.writeText(resolvedDisplay);
   };
 
   return (
@@ -54,8 +61,16 @@ export function WidgetStudioDebugPanel({
                 </button>
               </div>
               <pre className="max-h-32 overflow-auto rounded-lg bg-white p-2 text-[10px] font-mono whitespace-pre-wrap">
-                {resolvedQuery ?? preview?.resolved_query ?? "—"}
+                {resolvedDisplay || "—"}
               </pre>
+              {templateDisplay && templateDisplay !== resolvedDisplay && (
+                <>
+                  <p className="text-[10px] font-medium text-amber-800 mt-2 mb-1">Query (template)</p>
+                  <pre className="max-h-24 overflow-auto rounded-lg bg-white/80 p-2 text-[10px] font-mono whitespace-pre-wrap text-amber-950/80">
+                    {templateDisplay}
+                  </pre>
+                </>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

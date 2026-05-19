@@ -12,12 +12,15 @@ from sqlalchemy.orm import Session
 
 from backend.models.widget_studio import WidgetChatMessage, WidgetChatSession
 from backend.widget_studio.agent_logging import AgentTimer, log_agent_call
+from backend.widget_studio.agentscope.json_parse import AgentJsonParseError
 from backend.widget_studio.agentscope.pipeline import run_agent_turn
 from backend.widget_studio.context_loader import get_session_categories_doc
 from backend.widget_studio.domain_guard import check_domain_or_refuse
 from backend.widget_studio.query_executor import (
     WidgetQueryExecutionError,
     execute_resolved_query,
+    format_executed_sql,
+    prepare_resolved_sql,
 )
 from backend.widget_studio.query_translator import translate_abstract_sql
 from backend.widget_studio.vocabulary import CLARIFICATION_LOOP_ERROR
@@ -33,6 +36,7 @@ def _sanitize_widget_preview(
         return preview
     safe = dict(preview)
     safe.pop("resolved_query", None)
+    safe.pop("executed_query", None)
     return safe
 
 
@@ -75,6 +79,9 @@ async def run_widget_studio_turn(
     date_from: date | None = None,
     date_to: date | None = None,
     bank: str | None = None,
+    banks: list[str] | None = None,
+    parent_category: str | None = None,
+    sub_categories: list[str] | None = None,
     include_agent_logs: bool = False,
     include_sql_in_preview: bool = False,
 ) -> dict[str, Any]:
@@ -133,12 +140,27 @@ async def run_widget_studio_turn(
             conversation=conversation,
             categories_doc=categories_doc,
         )
-    except ValueError as exc:
+    except (ValueError, AgentJsonParseError) as exc:
+        error_detail: dict[str, Any] | None = None
+        if isinstance(exc, AgentJsonParseError):
+            error_detail = exc.details
+            logger.warning(
+                "Widget Studio pipeline JSON failure session=%s: %s",
+                session_id,
+                exc.details,
+            )
+        else:
+            logger.warning(
+                "Widget Studio pipeline failure session=%s: %s",
+                session_id,
+                exc,
+            )
         log_agent_call(
             db,
             session_id=session_id,
             agent_name="agentscope_pipeline",
             error=str(exc),
+            output_data=error_detail,
             duration_ms=0,
         )
         raise
@@ -195,17 +217,40 @@ async def run_widget_studio_turn(
         duration_ms=0,
     )
 
+    executed_query: str | None = None
+    if include_sql_in_preview:
+        try:
+            sql, bind = prepare_resolved_sql(
+                resolved_query,
+                user_id,
+                date_from=date_from,
+                date_to=date_to,
+                bank=bank,
+                banks=banks,
+                parent_category=parent_category,
+                sub_categories=sub_categories,
+            )
+            executed_query = format_executed_sql(sql, bind)
+        except ValueError:
+            executed_query = None
+
     timer = AgentTimer()
     try:
-        data, exec_ms = execute_resolved_query(
+        data, exec_ms, run_executed_sql = execute_resolved_query(
             resolved_query,
             user_id,
             db,
             date_from=date_from,
             date_to=date_to,
             bank=bank,
+            banks=banks,
+            parent_category=parent_category,
+            sub_categories=sub_categories,
         )
+        if include_sql_in_preview and not executed_query:
+            executed_query = run_executed_sql
     except WidgetQueryExecutionError as exc:
+        db.rollback()
         log_agent_call(
             db,
             session_id=session_id,
@@ -248,6 +293,7 @@ async def run_widget_studio_turn(
         **preview,
         "abstract_query": abstract_query,
         "resolved_query": resolved_query,
+        "executed_query": executed_query,
         "hardcoded_filters": _hardcoded_filters_from_intent(resolved_intent),
         "intent_text": user_message.strip(),
     }

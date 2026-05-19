@@ -5,7 +5,7 @@ import { FilterBar, FilterState } from "./FilterBar";
 const EMPTY: FilterState = {
   dateFrom: "",
   dateTo: "",
-  bankName: "",
+  bankNames: [],
   parentCategory: "",
   subCategories: [],
 };
@@ -42,7 +42,7 @@ describe("FilterBar", () => {
     const onChange = vi.fn();
     renderBar(EMPTY, onChange);
     fireEvent.change(screen.getByLabelText(/^bank$/i), { target: { value: "ANZ" } });
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ bankName: "ANZ" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ bankNames: ["ANZ"] }));
   });
 
   it("calls onChange with updated parentCategory when parent select changes", () => {
@@ -67,7 +67,7 @@ describe("FilterBar", () => {
     const filled: FilterState = {
       dateFrom: "2024-01-01",
       dateTo: "2024-12-31",
-      bankName: "ANZ",
+      bankNames: ["ANZ"],
       parentCategory: "Food & Dining",
       subCategories: ["Restaurants"],
     };
@@ -81,10 +81,10 @@ describe("FilterBar", () => {
   });
 
   it("reflects controlled bankName value in input", () => {
-    const { rerender } = renderBar({ ...EMPTY, bankName: "HSBC" });
+    const { rerender } = renderBar({ ...EMPTY, bankNames: ["HSBC"] });
     expect(screen.getByLabelText(/^bank$/i)).toHaveValue("HSBC");
     rerender(
-      <FilterBar filters={{ ...EMPTY, bankName: "ANZ" }} onChange={vi.fn()} />,
+      <FilterBar filters={{ ...EMPTY, bankNames: ["ANZ"] }} onChange={vi.fn()} />,
     );
     expect(screen.getByLabelText(/^bank$/i)).toHaveValue("ANZ");
   });
@@ -95,17 +95,31 @@ describe("FilterBar", () => {
     const bankSelect = screen.getByLabelText(/^bank$/i);
     expect(bankSelect.tagName).toBe("SELECT");
     fireEvent.change(bankSelect, { target: { value: "ICICI" } });
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ bankName: "ICICI" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ bankNames: ["ICICI"] }));
   });
 
   it("reflects controlled bankName in select when bankOptions provided", () => {
     render(
       <FilterBar
-        filters={{ ...EMPTY, bankName: "HDFC" }}
+        filters={{ ...EMPTY, bankNames: ["HDFC"] }}
         onChange={vi.fn()}
         bankOptions={["HDFC", "ICICI"]}
       />,
     );
     expect(screen.getByLabelText(/^bank$/i)).toHaveValue("HDFC");
+  });
+
+  it("shows Apply before Clear when onApply is provided", () => {
+    const onApply = vi.fn();
+    render(
+      <FilterBar filters={EMPTY} onChange={vi.fn()} onApply={onApply} defaultDateRange={DEFAULT_RANGE} />,
+    );
+    const buttons = screen.getAllByRole("button");
+    const applyIdx = buttons.findIndex((b) => b.textContent === "Apply");
+    const clearIdx = buttons.findIndex((b) => b.textContent === "Clear");
+    expect(applyIdx).toBeGreaterThanOrEqual(0);
+    expect(clearIdx).toBeGreaterThan(applyIdx);
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onApply).toHaveBeenCalled();
   });
 });

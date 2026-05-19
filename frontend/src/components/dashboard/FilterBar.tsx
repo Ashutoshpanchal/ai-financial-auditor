@@ -5,7 +5,8 @@ import { capitalizeWords } from "../../utils/capitalizeWords";
 export interface FilterState {
   dateFrom: string; // ISO date string "YYYY-MM-DD" or ""
   dateTo: string; // ISO date string "YYYY-MM-DD" or ""
-  bankName: string; // "" means no filter
+  /** Selected banks; empty = all banks. */
+  bankNames: string[];
   parentCategory: string; // "" means no filter
   /** Selected sub-category labels (empty = all subs under parent). */
   subCategories: string[];
@@ -29,12 +30,18 @@ interface FilterBarProps {
   dateScopeLoading?: boolean;
   /** Data-aware default range used when Clear is pressed. */
   defaultDateRange?: DateRangeValue | null;
+  /** When set, shows Apply before Clear and uses draft date picker until Apply. */
+  onApply?: () => void;
+  applyLoading?: boolean;
+  applyDisabled?: boolean;
+  /** Single bank dropdown vs multi-select checkboxes (Widget Studio). */
+  bankSelectionMode?: "single" | "multi";
 }
 
 const EMPTY_FILTERS: FilterState = {
   dateFrom: "",
   dateTo: "",
-  bankName: "",
+  bankNames: [],
   parentCategory: "",
   subCategories: [],
 };
@@ -56,6 +63,10 @@ export function FilterBar({
   dateScope = null,
   dateScopeLoading = false,
   defaultDateRange = null,
+  onApply,
+  applyLoading = false,
+  applyDisabled = false,
+  bankSelectionMode = "single",
 }: FilterBarProps) {
   function handleField(field: keyof FilterState, value: string) {
     const next = { ...filters, [field]: value } as FilterState;
@@ -66,21 +77,6 @@ export function FilterBar({
   }
 
   function handleDateChange(range: DateRangeValue) {
-    // #region agent log
-    fetch("http://127.0.0.1:7468/ingest/c6a2fb7b-a253-45f4-9e0e-b6181ccf071d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "77f6a0" },
-      body: JSON.stringify({
-        sessionId: "77f6a0",
-        runId: "browser",
-        hypothesisId: "H5",
-        location: "FilterBar.tsx:handleDateChange",
-        message: "filter dates committed",
-        data: { from: range.from, to: range.to },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     onChange({ ...filters, dateFrom: range.from, dateTo: range.to });
   }
 
@@ -100,6 +96,21 @@ export function FilterBar({
 
   function clearSubCategories() {
     onChange({ ...filters, subCategories: [] });
+  }
+
+  function toggleBankName(name: string) {
+    const set = new Set(filters.bankNames);
+    if (set.has(name)) set.delete(name);
+    else set.add(name);
+    onChange({ ...filters, bankNames: Array.from(set) });
+  }
+
+  function clearBanks() {
+    onChange({ ...filters, bankNames: [] });
+  }
+
+  function handleBankSelectSingle(value: string) {
+    onChange({ ...filters, bankNames: value ? [value] : [] });
   }
 
   function handleClear() {
@@ -132,39 +143,40 @@ export function FilterBar({
             onChange={(range) => handleDateChange(range)}
             scope={dateScope}
             loading={dateScopeLoading}
-            applyMode="live"
+            applyMode={onApply ? "confirm" : "live"}
           />
 
-          {/* Bank name */}
-          <div className="flex flex-col gap-0.5">
-            <label htmlFor="filter-bank" className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              Bank
-            </label>
-            {bankOptions.length > 0 ? (
-              <select
-                id="filter-bank"
-                value={filters.bankName}
-                onChange={(e) => handleField("bankName", e.target.value)}
-                className="w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-indigo-500 dark:focus:bg-gray-800"
-              >
-                <option value="">All banks</option>
-                {bankOptions.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id="filter-bank"
-                type="text"
-                value={filters.bankName}
-                onChange={(e) => handleField("bankName", e.target.value)}
-                placeholder="All banks"
-                className="w-36 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:focus:border-indigo-500 dark:focus:bg-gray-800"
-              />
-            )}
-          </div>
+          {bankSelectionMode === "single" && (
+            <div className="flex flex-col gap-0.5">
+              <label htmlFor="filter-bank" className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Bank
+              </label>
+              {bankOptions.length > 0 ? (
+                <select
+                  id="filter-bank"
+                  value={filters.bankNames[0] ?? ""}
+                  onChange={(e) => handleBankSelectSingle(e.target.value)}
+                  className="w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-indigo-500 dark:focus:bg-gray-800"
+                >
+                  <option value="">All banks</option>
+                  {bankOptions.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="filter-bank"
+                  type="text"
+                  value={filters.bankNames[0] ?? ""}
+                  onChange={(e) => handleBankSelectSingle(e.target.value)}
+                  placeholder="All banks"
+                  className="w-36 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:focus:border-indigo-500 dark:focus:bg-gray-800"
+                />
+              )}
+            </div>
+          )}
 
           {hasMaster && (
             <div className="flex flex-col gap-0.5">
@@ -187,18 +199,62 @@ export function FilterBar({
             </div>
           )}
 
-          {/* Clear button — aligned to bottom of label+input stacks */}
+          {/* Apply / Clear — aligned to bottom of label+input stacks */}
           <div className="flex flex-col gap-0.5">
             <span className="text-xs font-medium text-transparent select-none">&nbsp;</span>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
-            >
-              Clear
-            </button>
+            <div className="flex gap-2">
+              {onApply && (
+                <button
+                  type="button"
+                  onClick={onApply}
+                  disabled={applyDisabled || applyLoading}
+                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                >
+                  {applyLoading ? "Applying…" : "Apply"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={applyLoading}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
+
+        {bankSelectionMode === "multi" && bankOptions.length > 0 && (
+          <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Banks (optional)</span>
+              <button
+                type="button"
+                onClick={clearBanks}
+                className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800">
+              {bankOptions.map((b) => (
+                <label
+                  key={b}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-white bg-white px-2 py-1 text-xs text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filters.bankNames.includes(b)}
+                    onChange={() => toggleBankName(b)}
+                    className="rounded border-gray-300 text-indigo-600"
+                  />
+                  {b}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Sub-categories — same block layout as Category Insights (below primary filters) */}
         {showSubCategoryRow && subCategoryInputMode === "select" && (

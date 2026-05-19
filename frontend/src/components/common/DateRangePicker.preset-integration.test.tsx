@@ -1,7 +1,7 @@
 /**
  * Full integration matrix for all date presets (debug verification suite).
  */
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { DateRangePicker } from "./DateRangePicker";
 import {
@@ -25,6 +25,15 @@ function isFullScope(from: string, to: string): boolean {
 }
 
 describe("DateRangePicker full preset matrix", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TODAY);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   for (const preset of PICKER_PRESET_ORDER) {
     it(`applyPreset: ${preset} returns valid ordered range`, () => {
       const applied = applyPreset(preset, SCOPE, TODAY);
