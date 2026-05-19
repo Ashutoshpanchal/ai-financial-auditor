@@ -80,6 +80,18 @@ def test_prepare_resolved_sql_uses_between_for_date_range() -> None:
     assert bind["_widget_dt"] == date(2025, 3, 31)
 
 
+def test_prepare_resolved_sql_strips_bank_placeholder_when_bank_selected() -> None:
+    """Selecting a bank must not leave ``{{bank}}`` in SQL (server injects bank)."""
+    sql = (
+        "SELECT MAX(debit) AS metric_value FROM transactions "
+        "WHERE user_id = '{{user_id}}' AND parent_category = 'Food & Dining' "
+        "AND bank_name = '{{bank}}'"
+    )
+    prepared, bind = prepare_resolved_sql(sql, "user-abc", banks=["Kotak"])
+    assert "{{bank}}" not in prepared
+    assert "Kotak" in prepared or bind.get("_widget_bn") == "Kotak"
+
+
 def test_prepare_resolved_sql_multi_bank_in() -> None:
     """Multiple banks use IN (…) bind params."""
     sql = "SELECT SUM(debit) AS value FROM transactions WHERE user_id = '{{user_id}}'"

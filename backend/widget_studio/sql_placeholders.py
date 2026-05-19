@@ -59,9 +59,6 @@ def strip_llm_embedded_filters(
     Returns:
         SQL with unused placeholder predicates removed.
     """
-    has_bank = bool(bank and str(bank).strip()) or bool(
-        banks and any(b.strip() for b in banks)
-    )
     result = sql
     if date_from is None:
         result = _EMBEDDED_DATE_FROM.sub("", result)
@@ -69,8 +66,9 @@ def strip_llm_embedded_filters(
         result = _EMBEDDED_DATE_TO.sub("", result)
     if date_from is None or date_to is None:
         result = _EMBEDDED_DATE_BETWEEN.sub("", result)
-    if not has_bank:
-        result = _EMBEDDED_BANK.sub("", result)
+    # Always strip LLM bank placeholders — real bank filters are injected via
+    # ``_append_dashboard_filters`` (bind params), not template substitution.
+    result = _EMBEDDED_BANK.sub("", result)
     # Remove duplicate / LLM-inlined user scope (re-injected as bind param).
     result = _EMBEDDED_USER.sub("", result)
     result = _WHERE_USER_AND.sub("WHERE ", result)
